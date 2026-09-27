@@ -67,6 +67,7 @@ The existing prototype previously published unauthenticated endpoints on all hos
 - Runtime verification rebuilt/recreated only the browser service. Chromium runs as UID 999; renderers have distinct user/PID/network namespaces and two seccomp filters, while the container init has one. HTTP 200 on loopback ports 3000/3001 and a 9,600-byte audio PCM frame passed. The headless `chrome://sandbox` page probe was inconclusive (“incorrect profile type”), but `/proc` independently confirmed the namespace/seccomp layers. STUN DNS warning `stun.l.google.com` / `-105` remains visible and unresolved.
 - No manual visual playback or perceptual audio confirmation was performed; the viewer is left running for the user-owned check.
 - No package test script exists. Manual visual playback and perceptual audio confirmation remain pending from the user.
+- Work-unit commit on `feat/mvp`: `f24a564584c77048721bf69ccb92ccf90ca377a4` (`fix(browser): harden sandbox and local viewer runtime`).
 
 ## User Test Procedure
 Once Chromium is confirmed running, open `http://127.0.0.1:3001/` on the Docker host, click **Activar audio**, verify the embedded noVNC browser, and confirm TikTok video/audio manually. The URL is hard-coded; an offline live may show no stream. Recreating can require a fresh TikTok login. Stop afterward with `docker compose -f prototypes/tiktok-live-browser/docker-compose.yml stop tiktok-browser`.
