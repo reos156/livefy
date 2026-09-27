@@ -63,3 +63,6 @@ The prototype has served as a disposable validation spike. Future Livefy work ne
 - T2: done; the bounded writer created and self-read the guide.
 - T3: done. Independent review found and parent corrected three operational/security wording issues; targeted follow-up verification passed.
 - Next: use the guide as a source-grounded reference during Livefy implementation; no prototype runtime changes were needed for this documentation task.
+
+## Commits
+- Work-unit commit on `feat/mvp`: `83c0e87b4fbdb6b9ef4041959fb6599ad217a01f` (`docs: document TikTok live browser prototype`).
