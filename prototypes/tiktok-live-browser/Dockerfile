@@ -3,16 +3,27 @@ FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends \
     xvfb \
     x11vnc \
+    x11-xserver-utils \
     fluxbox \
     pulseaudio pulseaudio-utils \
+    passwd \
+    util-linux \
     ffmpeg \
     wget \
     unzip \
     nodejs npm \
     chromium \
+    chromium-sandbox \
     chromium-l10n \
     websockify \
     && rm -rf /var/lib/apt/lists/*
+
+RUN useradd --system --create-home --home-dir /home/chromium \
+      --user-group --shell /usr/sbin/nologin chromium \
+    && install -d -o chromium -g chromium -m 0700 \
+      /home/chromium/.config \
+      /home/chromium/.cache \
+      /home/chromium/profile
 
 # noVNC
 RUN wget -qO- https://github.com/novnc/noVNC/archive/refs/tags/v1.4.0.tar.gz | tar xz -C /opt \

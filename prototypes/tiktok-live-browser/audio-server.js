@@ -9,14 +9,14 @@ const server = http.createServer((req, res) => {
 const WebSocket = require('ws');
 const wss = new WebSocket.Server({ server });
 
-let ffmpeg = null;
+let audioCapture = null;
 let clients = new Set();
 let killTimer = null;
 
 function startAudioCapture() {
-  if (ffmpeg) return;
+  if (audioCapture) return;
   console.log('Iniciando captura de audio...');
-  ffmpeg = spawn('ffmpeg', [
+  const child = spawn('ffmpeg', [
     '-f', 'pulse',
     '-i', 'tiktok_sink.monitor',
     '-f', 's16le',          // PCM 16-bit little-endian
@@ -25,8 +25,10 @@ function startAudioCapture() {
     '-ac', '2',
     'pipe:1'
   ]);
+  const capture = { child, stopRequested: false, stopSignalSent: false };
+  audioCapture = capture;
 
-  ffmpeg.stdout.on('data', (chunk) => {
+  child.stdout.on('data', (chunk) => {
     for (const ws of clients) {
       if (ws.readyState === WebSocket.OPEN) {
         ws.send(Buffer.from(chunk));
@@ -34,22 +36,37 @@ function startAudioCapture() {
     }
   });
 
-  ffmpeg.stderr.on('data', (d) => process.stderr.write(d));
-  ffmpeg.on('close', (code) => {
-    console.log(`ffmpeg salió con código ${code}`);
-    ffmpeg = null;
-    if (clients.size > 0) setTimeout(startAudioCapture, 1000);
+  child.stderr.on('data', (d) => process.stderr.write(d));
+  child.on('close', (code, signal) => {
+    const isCurrentCapture = audioCapture === capture;
+    if (isCurrentCapture) audioCapture = null;
+
+    const exitDetails = `código ${code}, señal ${signal ?? 'ninguna'}`;
+    if (capture.stopRequested && capture.stopSignalSent) {
+      console.info(`Captura de ffmpeg detenida por la desconexión del último cliente (${exitDetails})`);
+    } else if (code !== 0 || signal !== null) {
+      console.error(`ffmpeg terminó inesperadamente (${exitDetails})`);
+    } else {
+      console.log(`ffmpeg terminó correctamente (${exitDetails})`);
+    }
+
+    if (isCurrentCapture && clients.size > 0) {
+      setTimeout(() => {
+        if (clients.size > 0) startAudioCapture();
+      }, 1000);
+    }
   });
-  ffmpeg.on('error', (err) => {
-    console.error('Error en ffmpeg:', err);
-    ffmpeg = null;
+  child.on('error', (err) => {
+    console.error('Error en el proceso ffmpeg:', err);
   });
 }
 
 function stopAudioCapture() {
-  if (ffmpeg) {
-    ffmpeg.kill('SIGTERM');
-    ffmpeg = null;
+  const capture = audioCapture;
+  if (capture) {
+    capture.stopRequested = true;
+    capture.stopSignalSent = capture.child.kill('SIGTERM');
+    if (audioCapture === capture) audioCapture = null;
   }
 }
 

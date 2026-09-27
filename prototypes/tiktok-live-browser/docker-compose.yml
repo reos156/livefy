@@ -1,13 +1,14 @@
-version: '3.8'
 services:
   tiktok-browser:
     build: .
     ports:
-      - "3000:3000"   # noVNC + websockify
-      - "3001:3001"   # Página combinada + audio
+      - "127.0.0.1:3000:3000"   # noVNC + websockify
+      - "127.0.0.1:3001:3001"   # Página combinada + audio
     environment:
       - SCREEN_RESOLUTION=1280x720
     volumes:
       - /dev/shm:/dev/shm
     shm_size: '2gb'
+    security_opt:
+      - "seccomp=${PWD}/prototypes/tiktok-live-browser/seccomp-chromium.json"
     restart: unless-stopped
