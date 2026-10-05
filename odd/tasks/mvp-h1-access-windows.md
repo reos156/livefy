@@ -17,8 +17,8 @@ The repository currently contains prototypes rather than an integrated product. 
 - Ask about unresolved product decisions or scope changes before implementing them.
 
 ## Checklist and acceptance
-- [ ] H1.1 — Bootstrap minimal desktop workspace. Acceptance: mandated stack configured, safe Electron shell and access landing screen build; Windows launch evidence required before task closure. Status: implementation verified by user-provided Windows checks and screenshot; work-unit closure/commit pending explicit authorization.
-- [ ] H1.2 — Configure Convex Auth and session contract. Acceptance: real authenticated identity and backend rejection without a session. Status: in progress (functional acceptance verified on development API; work-unit closure/commit pending explicit user authorization).
+- [x] H1.1 — Bootstrap minimal desktop workspace. Closed in `b0df6f51119d3993c0788cc306ce354c49fff70e`. Windows launch evidence provided by user; reconstructed logical snapshot separately passed frozen install, 4 tests, typecheck and build, not a fresh Windows runtime check.
+- [x] H1.2 — Configure Convex Auth and session contract. Closed in `c5d65843b5143da0efa3704f0f82fd7d85e465ab`. Real identity/anonymous rejection and fixture cleanup passed on DEV; independent anonymous/inventory checks and 20 tests/typechecks/build passed. Windows Auth UI runtime belongs to later tasks.
 - [ ] H1.3 — Complete registration. Acceptance: email/password creates a real account; backend validation and usable UI errors.
 - [ ] H1.4 — Complete sign-in. Acceptance: valid credentials work, invalid credentials fail, repeated submission is controlled.
 - [ ] H1.5 — Protect routes and data. Acceptance: direct backend calls and private routes reject unauthenticated access.
@@ -56,7 +56,8 @@ Test-first for deterministic behavior where applicable; Vitest/React Testing Lib
 - User authorized H1.1/H1.2 commits and feature-branch push, then public GitHub repository creation with main protection.
 - Created `https://github.com/reos156/livefy` (PUBLIC, empty); shared origin is `git@github.com:reos156/livefy.git`.
 - Active ruleset `24511409` targets `refs/heads/main`: PR required, zero approving reviews, resolved conversations, no bypass actors, no force pushes or branch deletion. Read back effective rules before main exists.
-- No refs pushed and no commits created yet. Before public push, audit all reachable existing history and split coherent H1.1/H1.2 work units without staging unrelated untracked files.
+- Created H1.1 `b0df6f5` and H1.2 `c5d6584` with explicit manifests and alternate indexes, preserving live files, main and unrelated untracked files. Initial diff-check rejected two trailing blank lines in reconstructed bootstrap docs/ignore; trimmed only staging artifacts, then both checks passed. Captured43 hashes matched; bounded bundle scan found zero recognized secret patterns, not exhaustive.
+- No refs pushed yet. Public reachable-history audit remains in progress; authorized feature push is held for its result. Bootstrap authored size exceeds the normal small-review budget.
 - Empty remote has no default branch; do not silently bootstrap or push main. Preserve local primary/main and MVP/feat/mvp layout.
 
 ## Next step
