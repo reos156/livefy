@@ -1,0 +1,7 @@
+# Local Pi runtime state
+.atl/
+
+# Desktop workspace build and dependency output
+node_modules/
+.turbo/
+/apps/desktop/dist/
