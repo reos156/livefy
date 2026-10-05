@@ -1,0 +1,63 @@
+# MVP H1 — Windows access and account recovery
+
+## Objective
+Deliver free email/password registration, sign-in, protected navigation, session persistence, sign-out, and email password recovery in the Windows Electron application.
+
+## Problem and rationale
+The repository currently contains prototypes rather than an integrated product. Deliver one complete access milestone before shop setup or commerce features.
+
+## Authorized scope and constraints
+- User authorized starting H1 after approving vertical milestones.
+- Preserve Electron, React, TanStack Router, Vite, Shadcn, Convex, Turborepo and Bun Workspaces.
+- Use Convex Auth for email/password authentication and Resend for recovery email delivery. Verify the documented adapter before wiring it.
+- Windows is the supported target for this phase; Linux host checks are not Windows runtime evidence.
+- The scope document is a plan, not implementation evidence. Do not modify it as part of bootstrap.
+- Preserve pre-existing untracked files and prototypes; do not stage them implicitly.
+- No service account creation, production deployment, publishing, push or merge without explicit authorization. Commits require explicit user instruction.
+- Ask about unresolved product decisions or scope changes before implementing them.
+
+## Checklist and acceptance
+- [ ] H1.1 — Bootstrap minimal desktop workspace. Acceptance: mandated stack configured, safe Electron shell and access landing screen build; Windows launch evidence required before task closure. Status: implementation verified by user-provided Windows checks and screenshot; work-unit closure/commit pending explicit authorization.
+- [ ] H1.2 — Configure Convex Auth and session contract. Acceptance: real authenticated identity and backend rejection without a session. Status: in progress (functional acceptance verified on development API; work-unit closure/commit pending explicit user authorization).
+- [ ] H1.3 — Complete registration. Acceptance: email/password creates a real account; backend validation and usable UI errors.
+- [ ] H1.4 — Complete sign-in. Acceptance: valid credentials work, invalid credentials fail, repeated submission is controlled.
+- [ ] H1.5 — Protect routes and data. Acceptance: direct backend calls and private routes reject unauthenticated access.
+- [ ] H1.6 — Persist and end sessions. Acceptance: valid session survives restart; sign-out and invalid sessions remove access.
+- [ ] H1.7 — Verify desktop credential boundaries. Acceptance: isolation enabled; no passwords/tokens in logs or generic IPC.
+- [ ] H1.8 — Integrate Resend recovery delivery. Acceptance: documented Auth reset adapter and server-only secrets; delivery errors distinguished from accepted requests.
+- [ ] H1.9 — Request recovery. Acceptance: UI does not expose account existence; requests are abuse-limited.
+- [ ] H1.10 — Complete password reset. Acceptance: invalid/expired/reused challenges fail; new password works and old password fails. Prefer code entry subject to supported documented integration.
+- [ ] H1.11 — Verify real recovery on Windows. Acceptance: delivered email and complete reset journey with failure cases.
+- [ ] H1.12 — Verify packaged Windows access journey. Acceptance: registration, logout, login, restart and logout against real Convex.
+
+## Verification strategy
+Test-first for deterministic behavior where applicable; Vitest/React Testing Library and convex-test. Bootstrap configuration uses structural/build checks where no meaningful behavior RED exists. Record actual commands and results. Windows smoke checks and real service checks are separate from host builds and mocks.
+
+## Progress and evidence
+- Initial git state: branch `feat/mvp`; existing untracked configuration, scope documents, ODD documents and prototypes preserved.
+- Read-only mapping completed. H1.1 edits limited to root package.json/turbo.json/bun.lock, targeted .gitignore additions, and apps/desktop/**. Backend wiring belongs to H1.2.
+- Host availability observed: Bun executable available, Node v22.23.1, Linux. RDD mode observed off.
+- H1.1 writer returned partial: minimal desktop scaffold implemented; no authentication backend, credential collection or fake successful sign-in.
+- Writer checks: bun install, bun install --frozen-lockfile, bun run typecheck, bun run test (4 tests) and bun run build passed. Build emitted nonfatal use-client warnings. Independent confirmation pending.
+- Writer observed RED (4 failures), GREEN (4 passes), then security/disabled-access checks after refactoring.
+- Prior Linux launch reported GPU process exit 139 and bounded-run timeout 124. These do not prove the window failed to open or establish root cause; user reports an Electron window did open. Renderer content and actual runtime platform remain unconfirmed. No environment workaround performed.
+- Independent verifier failed twice with generic assistant errors, producing no check evidence. Worker read-only fallback was rejected by role validation. Explorer fallback completed static inspection but has no command-execution tool: typecheck/test/build were NOT independently executed.
+- Static inspection found configured isolation, navigation/permission denial, relative built assets and hash routing; this is not fresh build or runtime evidence. No further equivalent retries queued.
+- Native assessment returned unassessable because of untracked scope; conservative independent verifier delegated. RDD remains off; no native review started.
+- Approximate review size: 335 authored lines plus 212 generated scaffold lines, excluding lockfile. No deployments or commits.
+- User-provided Windows evidence: Node v24.18.0 exists at Program Files/nodejs; adding it to the PowerShell session PATH resolved the syntax-check failure. process.platform returned win32.
+- User ran desktop bun run typecheck successfully; bun run test passed 2 files/4 tests; bun run build completed in 2.22s with nonfatal ignored use-client directives from dependencies.
+- User ran bun run start; inspected screenshot shows the Livefy access preview rendered with unavailable-auth copy and disabled sign-in button. This validates the basic Windows launch, not installer/distribution or comprehensive runtime security.
+- Independent automated verifier remains unavailable; command evidence above comes from the human Windows run, not the failed subagents. No screenshot claim of close/reopen or credential flows.
+- User also reports successful application execution without errors in Ubuntu WSL. This is human-observed development smoke evidence, not an independently captured log or installer/security certification.
+- Convex development deployment identity and Resend sender configuration remain execution prerequisites, not verified availability.
+
+## Repository delivery setup
+- User authorized H1.1/H1.2 commits and feature-branch push, then public GitHub repository creation with main protection.
+- Created `https://github.com/reos156/livefy` (PUBLIC, empty); shared origin is `git@github.com:reos156/livefy.git`.
+- Active ruleset `24511409` targets `refs/heads/main`: PR required, zero approving reviews, resolved conversations, no bypass actors, no force pushes or branch deletion. Read back effective rules before main exists.
+- No refs pushed and no commits created yet. Before public push, audit all reachable existing history and split coherent H1.1/H1.2 work units without staging unrelated untracked files.
+- Empty remote has no default branch; do not silently bootstrap or push main. Preserve local primary/main and MVP/feat/mvp layout.
+
+## Next step
+H1.2 authorized by user. User explicitly authorized creating Livefy's Convex development project and completed login; CLI login status confirmed access to team `reos156`. Read-only mapping recommends `apps/desktop/convex/` and pinned Convex 1.46.0 initialization with explicit cloud-dev target and `--skip-push`. Provisioning succeeded: `reos156/livefy`, dev `polite-parrot-887`, public endpoint `https://polite-parrot-887.convex.cloud`. Convex 1.46.0 dependency and scaffold installed without function push. Frozen install and ignore check passed. CLI also generated `apps/desktop/.gitignore` outside delegated surfaces; parent inspected its sole `.env.local` rule and retained it as valid protective scaffold. Native assessment was unassessable due pre-existing untracked scope, so independent read-only configuration verification is required. Independent verifier passed pinned-dependency/scaffold inspection, frozen install with no changes, ignore protection and boolean-only dev deployment/URL binding checks. Remote ownership, endpoint availability and remote function/Auth state were not independently checked. Auth mapping completed against official setup, config/passwords and setup/manual docs plus npm peers. Local implementation returned: Password wiring/authTables/http/config, getAuthUserId + existing-user guard and minimal session query, fail-safe singleton React provider and exact CSP origins. Writer observed RED then GREEN (17 tests), desktop/backend typecheck, build and frozen install passed; nonfatal dependency use-client warnings. Independent command verification delegated because native assessment remains unassessable due untracked scope. No generated artifacts fabricated; supported generic bindings used. Independent verifier confirmed 5 files/17 passing tests, desktop/backend typechecks, build and frozen install; no severe local correctness issues found. Actual-query tests cover anonymous/existing/deleted users and supplied identity args. Built CSP is exact and excludes Vite websocket; bounded secret scan found no recognized patterns, not an exhaustive audit. Verifier observed GREEN only; writer's prior RED remains writer evidence. Provider success/singleton reuse not directly asserted. Remote activation, live sessions and Windows runtime remain untested. User explicitly authorized signing configuration, Auth/session deployment and disposable-account smoke with scoped cleanup on `polite-parrot-887` only. Next: verify target afresh, preserve any existing signing keys, activate development Auth, prove real identity and anonymous rejection, and remove only fixture-owned data. Stop on target mismatch, partially existing signing config or unproven safe cleanup. No production action or commit authorized. Worker confirmed remote dev identity via explicit CLI deployments selector; JWT_PRIVATE_KEY/JWKS absent by names-only check. Implemented marker-bounded internal cleanup locally with observed RED/GREEN (19 tests), desktop/backend typechecks passed. No remote mutation yet. Parent authorized CLI-managed updates to ignored desktop `.env.local` and `.gitignore` plus regenerable `dist/**` outputs; no direct env-file reads. Activation worker completed: only JWT_PRIVATE_KEY/JWKS configured by conflict-refusing stdin; dev push succeeded with real generated bindings. Real-token signup, authenticated identity match, anonymous Unauthorized and sign-out passed. Cleanup deleted one fixture user/account with zero dependent records after sign-out; repeat cleanup zero. Temporary INTERNAL registration removed, removal push succeeded and endpoint absence checked. Final writer20 tests/typechecks/build passed. Post-activation independent verifier passed20 tests, desktop/backend typechecks, build and frozen install. Confirmed remote dev identity, signing variable names present, anonymous session Unauthorized and temporary cleanup function absent via read-only function-spec inventory. Backend tsc initially ran from root and failed for nonexistent path, then passed from desktop; no source fix needed. Authenticated success/cleanup remain writer-observed evidence, not independently replayed after fixture disposal. Verifier did not invoke smoke --verify-removed because it attempts the mutation reference; used read-only inventory instead. Cleanup helper/module namespace retained for tests is not a registered endpoint. API evidence is not Windows/Electron runtime certification. Work-unit closure/commit remains pending explicit user authorization. Pins: auth 0.0.96, auth/core 0.41.1, convex-test 0.0.60. Password-only needs no SITE_URL. No remote signing-env changes, function deployment or fixture accounts in this local slice; those require separate authorization. Registration/login UI, Resend and persistence changes remain out of scope. No production mutation, paid action, commit or publishing authorized. H1.1 implementation verified, closure/commit pending explicit instruction; installer/restart/runtime security remain separate checks.

@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { createHashHistory, createRootRoute, createRoute, createRouter, Outlet, RouterProvider } from '@tanstack/react-router'
 import { AccessLanding } from './access'
+import { AuthBoundary } from './lib/auth'
 import './styles.css'
 
 const rootRoute = createRootRoute({ component: Outlet })
@@ -21,6 +22,8 @@ declare module '@tanstack/react-router' {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <RouterProvider router={router} />
+    <AuthBoundary endpoint={import.meta.env.VITE_CONVEX_URL}>
+      <RouterProvider router={router} />
+    </AuthBoundary>
   </StrictMode>,
 )

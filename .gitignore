@@ -5,3 +5,6 @@
 node_modules/
 .turbo/
 /apps/desktop/dist/
+
+# Local Convex development binding
+/apps/desktop/.env.local
