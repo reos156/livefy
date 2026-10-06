@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button'
+import { Registration } from './registration'
 import { useConvexAuth } from 'convex/react'
 import { useEffect, useState } from 'react'
 import { useAuthConfigured } from './lib/auth'
@@ -18,6 +19,7 @@ function NativeAccess() {
     <p role="status">{isLoading ? 'Checking backend access' : isAuthenticated ?
       'Backend access confirmed' : 'No authenticated session confirmed'}</p>
     <p>{persistence}</p>
+    {!isLoading && !isAuthenticated && <Registration />}
     <Button disabled>Sign in — coming soon</Button>
   </>
 }

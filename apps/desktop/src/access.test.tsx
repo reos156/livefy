@@ -1,4 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest'
+vi.mock('./registration', () => ({ Registration: () => <label>Registration email<input aria-label="Registration email" /></label> }))
 const state = vi.hoisted(() => ({ configured: false, isLoading: false, isAuthenticated: false }))
 vi.mock('convex/react', () => ({ useConvexAuth: () => state }))
 vi.mock('./lib/auth', () => ({
@@ -9,7 +10,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { AccessLanding } from './access'
 import { AuthBoundary } from './lib/auth'
 
-afterEach(() => { cleanup(); state.configured = false })
+afterEach(() => { cleanup(); Object.assign(state, { configured: false, isLoading: false, isAuthenticated: false }) })
 
 it('explains unavailable access and never offers working authentication', () => {
   render(<AuthBoundary><AccessLanding /></AuthBoundary>)
@@ -30,5 +31,5 @@ it.each([
   Object.assign(state, { configured: true, isLoading, isAuthenticated })
   render(<AccessLanding />)
   expect(screen.getByText(text)).toBeTruthy()
-  expect(screen.queryByRole('textbox')).toBeNull()
+  expect(Boolean(screen.queryByRole('textbox'))).toBe(!isAuthenticated && !isLoading)
 })
