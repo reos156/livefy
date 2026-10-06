@@ -6,30 +6,38 @@ Deliver free email/password registration, sign-in, protected navigation, session
 ## Problem and rationale
 The repository currently contains prototypes rather than an integrated product. Deliver one complete access milestone before shop setup or commerce features.
 
-## Entrega actual H1.2a–d — commits locales pendientes
+## Entrega actual H1.2a–d — commits locales verificados
 
-H1.2a–d están aceptados para DEV; la entrega local todavía no está verificada ni
-registrada en commits. La instrucción más reciente autoriza únicamente commits
-locales coherentes y exige avisar al completarlos: **sin push ni comandos remotos**.
-No autoriza PR, cambios en main, producción ni cuentas nuevas. Esta corrección es
-solo documental; no ejecuta staging, commits ni creación de worktrees.
+H1.2a–d están aceptados para DEV y registrados en seis commits locales de
+`feat/mvp`: `9839db8` (pins), `456516f` (diseño de identidad), `f8fd5e5`
+(confianza del backend), `3a022e6` (verificador DEV), `d0954ff` (bridge nativo)
+y `8823782` (proveedores). El árbol final coincide exactamente con el snapshot
+verificado independientemente `c33a1840e7b9c5988ea0f2d6063f727dc4b40859`.
+**No se autorizó ni realizó push.** No se autoriza PR, cambios en main, producción
+ni cuentas nuevas. Esta corrección es solo documental: no ejecuta staging,
+commits ni cambios de worktree.
 
-### Contenido y verificación pendiente
+### Contenido y verificación observada
 
-- Preservar los cambios legacy H1.3 y todos los archivos ajenos sin incorporarlos
-  implícitamente. El diff sucio de `apps/desktop/convex/_generated/api.d.ts` contiene
-  únicamente `registrationValidation`: queda fuera de los commits H1.2a–d.
-- La verificación previa de 100 tests en 14 archivos corresponde al checkout con
-  cambios locales; incluye 22 tests H1.3 excluidos (6 de registro UI y 16 de
-  validación). El contenido previsto de entrega **se espera** que tenga 78 tests
-  en 12 archivos; ese resultado aún no se ha ejecutado ni aprobado.
-- Verificar el contenido exacto previsto en un worktree temporal del mismo clon,
-  autorizado por el usuario, sin alterar el checkout padre. Registrar después el
-  resultado real y las identidades de los commits; ambos están pendientes, sin
-  rutas temporales ni hashes predeterminados. Limpiar únicamente ese worktree
-  propio tras la verificación y los commits locales; no esperar un push.
+- Los cambios legacy H1.3 y archivos ajenos se preservaron fuera de la entrega.
+  El diff local de `apps/desktop/convex/_generated/api.d.ts` con
+  `registrationValidation` no se incorporó a los commits H1.2a–d.
+- En la raíz aislada pasó la instalación congelada (528 paquetes). Pasaron
+  78/78 tests de escritorio en 12 archivos, typecheck de escritorio, tsc del
+  backend, build sin variables de entorno, sintaxis Node y diff-check.
+  Los 22 tests legacy H1.3 (6 de registro UI y 16 de validación) quedaron excluidos;
+  los 100 tests previos del checkout sucio no son el resultado de esta entrega.
+- La ejecución funcional corresponde únicamente al snapshot final combinado,
+  no a cada commit intermedio. Advertencias no bloqueantes: `use client` y chunk
+  mayor de 500 kB. Sin deriva generada ni secretos detectados.
+- El parent completó la higiene: los 30 paths temporales sucios no ignorados
+  coincidieron byte a byte con el snapshot inmutable `8823782` antes de retirar
+  el worktree propio `verify-h12`, incluidos outputs ignorados de instalación/build.
+  La lista de worktrees contiene solo primary y mvp. La aserción inicial falló
+  antes de mutar por trim de porcelain; se corrigió con parser delimitado por NUL,
+  sin pérdida de estado.
 
-### Seis unidades propuestas de revisión
+### Seis unidades locales de revisión (evidencia histórica y límites)
 
 | Unidad | Evidencia previa y límite de rollback |
 | --- | --- |
@@ -40,10 +48,9 @@ solo documental; no ejecuta staging, commits ni creación de worktrees.
 | Bridge nativo | Tests deterministas de almacenamiento, protocolo y precarga, con smoke visual Windows aceptado; revertir solo bridge y pruebas asociadas en coordinación con proveedores, no afirmar persistencia real. |
 | Proveedores/CSP | Tests, typechecks y build configurado previamente verificados; revertir proveedores/CSP y documentación asociada, sin modificar orígenes remotos automáticamente. |
 
-La evidencia anterior no sustituye la verificación aislada del contenido final de
-estas seis unidades. Asociar pruebas y documentación al comportamiento pertinente;
-no certificar cada corte intermedio sin comprobación ni reducir el alcance solo
-para ajustar el tamaño de revisión.
+La tabla conserva evidencia previa y límites de rollback, no resultados ejecutados
+por commit intermedio. La verificación aislada observada arriba certifica solo el
+snapshot final combinado de las seis unidades.
 
 ### Estado DEV y límites de aceptación
 
@@ -63,8 +70,9 @@ producción). No se ejecutan nuevas comprobaciones de autenticación en esta edi
 las secciones tituladas «Current plan» y «Active», conservan el estado de su momento.
 Sus pendientes y frases de falta de autorización no describen la autorización
 actual de commits locales. Ninguna autorización histórica de push prevalece sobre
-la instrucción actual de no publicar. La checklist conserva aceptación DEV, no
-prueba de entrega completada; esta sección rige el siguiente paso de entrega.
+la instrucción actual de no publicar. La checklist conserva aceptación DEV y sus notas de entrega históricas;
+esta sección registra el cierre local verificado, sin publicación ni certificación
+de los recorridos Windows pendientes.
 
 ## Authorized scope and constraints
 - User authorized starting H1 after approving vertical milestones.

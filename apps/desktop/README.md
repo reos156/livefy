@@ -51,14 +51,27 @@ Producción/FREE Native API y publicación pertenecen a H1.12.
 
 H1.2d fue aceptado para DEV: la captura de Windows muestra la interfaz y capacidad
 de almacenamiento cifrado, no inicio de sesión ni token persistido tras reiniciar.
-Los 100 tests en 14 archivos verificados en el checkout actual incluyen 22 tests
-legacy H1.3 excluidos de esta entrega (6 de registro UI y 16 de validación).
-Para el contenido previsto de los commits se esperan 78 tests en 12 archivos;
-la verificación aislada de ese contenido aún no se ha ejecutado. La autorización
-vigente permite solo commits locales, sin push, y requiere avisar al completarlos.
-Verificación aislada e identidades de commits siguen pendientes; no se afirma
-entrega completada. El worktree temporal propio debe limpiarse tras la verificación
-y los commits locales, sin depender de una publicación.
+La entrega local en `feat/mvp` quedó registrada en seis commits: `9839db8`
+(pins), `456516f` (diseño de identidad), `f8fd5e5` (confianza del backend),
+`3a022e6` (verificador DEV), `d0954ff` (bridge nativo) y `8823782` (proveedores).
+El árbol final coincide exactamente con el snapshot verificado independientemente
+`c33a1840e7b9c5988ea0f2d6063f727dc4b40859`.
+
+En la raíz aislada, la instalación congelada pasó (528 paquetes); los tests de
+escritorio pasaron: 78/78 en 12 archivos. También pasaron typecheck de escritorio,
+tsc del backend, build sin variables de entorno, sintaxis Node y diff-check.
+Solo se ejecutó el snapshot final combinado: no se certifican funcionalmente los
+commits intermedios por separado. Los 22 tests legacy H1.3 (6 de registro UI y
+16 de validación) quedaron excluidos. Se observaron advertencias no bloqueantes
+`use client` y chunk mayor de 500 kB, sin deriva generada ni secretos detectados.
+
+El parent completó la limpieza: los 30 paths temporales sucios no ignorados
+coincidieron byte a byte con el snapshot inmutable `8823782` antes de retirar el
+worktree propio `verify-h12`, incluidos sus outputs ignorados de instalación/build.
+La lista de worktrees contiene solo primary y mvp. Una aserción inicial falló antes
+de mutar por aplicar trim a porcelain; el parser delimitado por NUL lo corrigió,
+sin pérdida de estado. No se autorizó ni realizó push; esta edición solo cierra
+documentación, sin staging, commits ni cambios de worktree.
 
 Fuentes oficiales aportadas por el parent, acceso 2026-10-06 (no recuperadas aquí):
 https://clerk.com/docs/electron/getting-started/quickstart ;
