@@ -74,6 +74,48 @@ la instrucción actual de no publicar. La checklist conserva aceptación DEV y s
 esta sección registra el cierre local verificado, sin publicación ni certificación
 de los recorridos Windows pendientes.
 
+## Seguimiento issue-first — registro retrospectivo publicado
+
+Jerarquía corregida por autorización explícita del usuario: [#3 — H1.2](https://github.com/reos156/livefy/issues/3)
+es el padre del contrato de sesión y transición Clerk/Convex; #4, #5, #6 y #7 son
+sub-issues nativas H1.2a–d, verificadas desde ambos extremos de la relación.
+Se amplió el título/objetivo/alcance del padre preservando su evidencia histórica.
+Todas permanecen abiertas, sin cambios de labels ni aprobación. Para tareas
+futuras, conservar la jerarquía del plan en GitHub, no aplanar sus subtareas.
+
+El usuario adoptó el flujo **issue/tarea → rama → commits coherentes de
+código, tests y documentación → push y PR autorizados → merge explícitamente
+autorizado y cierre**. Para trabajo futuro, registrar la tarea antes de implementar;
+para estas seis tareas históricas, documentar retrospectivamente la evidencia y
+las referencias existentes, sin reescribir historia ni simular una issue previa.
+
+Destino: `github.com/reos156/livefy`, cuya rama predeterminada es `main`.
+El formulario `.github/ISSUE_TEMPLATE/mvp-task.yml` fue integrado por el
+[PR #1](https://github.com/reos156/livefy/pull/1), con excepción inicial explícita
+para abrir ese PR sin issue previa y autorización separada de merge.
+Merge confirmado: `40b6ca0f75684251756c8dc548a070a6f0244a31`.
+Se crearon seis issues retrospectivas con el formulario publicado, búsqueda de
+duplicados abiertos/cerrados y readback de título, cuerpo, estado y labels.
+Todas permanecen abiertas y sin labels: no se concede aprobación ni se simula
+integración de las tareas en main. Solo se publicó la rama del formulario;
+**feat/mvp no fue publicada**. No se reescribió historia ni se modificaron credenciales.
+
+| Tarea de dominio retrospectiva | Commits existentes de referencia | Estado del registro |
+| --- | --- | --- |
+| H1.1 — Bootstrap de escritorio | `b0df6f5` | [#2](https://github.com/reos156/livefy/issues/2) abierta; commit disponible en GitHub; smoke no prueba recorrido completo. |
+| H1.2 — Contrato histórico Convex Auth | `c5d6584` | [#3](https://github.com/reos156/livefy/issues/3) abierta; commit disponible en GitHub; implementación histórica. |
+| H1.2a — Prerrequisitos nativos Clerk DEV | `9839db8` | [#4](https://github.com/reos156/livefy/issues/4) abierta; commit local; entitlement FREE producción pendiente H1.12. |
+| H1.2b — Diseño de transición de identidad | `456516f` | [#5](https://github.com/reos156/livefy/issues/5) abierta; commit local; diseño aceptado, sin ensayo de restauración. |
+| H1.2c — Confianza Clerk y verificador DEV | `f8fd5e5`, `3a022e6` | [#6](https://github.com/reos156/livefy/issues/6) abierta; commits locales; negativos firmados pendientes H1.7. |
+| H1.2d — Bridge nativo y proveedores | `d0954ff`, `8823782` | [#7](https://github.com/reos156/livefy/issues/7) abierta; commits locales; login/reinicio no certificados. |
+
+Son seis tareas de dominio, no una issue por cada commit técnico. Las referencias
+no afirman publicación ni merge: H1.2a–d tienen entrega local verificada según
+la sección anterior; las notas de publicación de H1.1/H1.2 son históricas y no
+sustituyen una verificación remota actual. Al redactar las retrospectivas, separar
+aceptación funcional, evidencia observada, fallos/diferidos y estado de entrega.
+Las secciones históricas siguientes se conservan sin modificación.
+
 ## Authorized scope and constraints
 - User authorized starting H1 after approving vertical milestones.
 - Preserve Electron, React, TanStack Router, Vite, Shadcn, Convex, Turborepo and Bun Workspaces.
