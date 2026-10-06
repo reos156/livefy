@@ -5,30 +5,31 @@ import { convexTest } from 'convex-test'
 import { makeFunctionReference } from 'convex/server'
 import schema from './schema'
 
-// convex-test uses an _generated key only to locate the module root.
-// Alias the real schema loader without creating fictitious generated files.
 const modules = { ...import.meta.glob('./**/*.ts'), './_generated/schema.ts': () => import('./schema') }
 const session = makeFunctionReference<'query'>('session:current')
-describe('trusted session', () => {
+
+describe('trusted Clerk identity contract (not JWT validation)', () => {
   it('rejects anonymous callers', async () => {
     await expect(convexTest(schema, modules).query(session, {})).rejects.toThrow('Unauthorized')
   })
-  it('returns only the existing authenticated user ID', async () => {
+  it('returns only the server-validated tokenIdentifier without a legacy user', async () => {
     const t = convexTest(schema, modules)
-    const id = await t.run(ctx => ctx.db.insert('users', { email: 'private@example.test' }))
-    const result = await t.withIdentity({ subject: `${id}|test-session` }).query(session, {})
-    expect(result).toEqual({ userId: id })
+    const tokenIdentifier = 'https://organic-snake-7233.clerk.accounts.dev|user_fixture'
+    const result = await t.withIdentity({
+      issuer: 'https://organic-snake-7233.clerk.accounts.dev',
+      subject: 'user_fixture',
+      tokenIdentifier,
+      email: 'private@example.test',
+    }).query(session, {})
+    expect(result).toEqual({ tokenIdentifier })
+    expect(await t.run(ctx => ctx.db.query('users').take(1))).toEqual([])
   })
-  it('rejects a deleted user identity', async () => {
+  it('uses the supplied verified identifier rather than reconstructing it', async () => {
     const t = convexTest(schema, modules)
-    const id = await t.run(async ctx => {
-      const id = await ctx.db.insert('users', {})
-      await ctx.db.delete(id)
-      return id
-    })
-    await expect(t.withIdentity({ subject: `${id}|test-session` }).query(session, {})).rejects.toThrow('Unauthorized')
+    const result = await t.withIdentity({ subject: 'same-subject', tokenIdentifier: 'opaque-verified-identifier' }).query(session, {})
+    expect(result).toEqual({ tokenIdentifier: 'opaque-verified-identifier' })
   })
-  it('rejects client-supplied user IDs', async () => {
-    await expect(convexTest(schema, modules).query(session, { userId: 'forged' })).rejects.toThrow()
+  it.each(['userId', 'tokenIdentifier', 'email'])('rejects caller-supplied %s', async key => {
+    await expect(convexTest(schema, modules).query(session, { [key]: 'forged' })).rejects.toThrow()
   })
 })

@@ -1,6 +1,3 @@
-import { Password } from '@convex-dev/auth/providers/Password'
-import { convexAuth } from '@convex-dev/auth/server'
-
-export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
-  providers: [Password],
-})
+// Clerk issues sessions; Convex validates them through auth.config.ts.
+// Legacy auth exports are intentionally retired; schema and helpers remain.
+export {}

@@ -1,6 +1,4 @@
 import { httpRouter } from 'convex/server'
-import { auth } from './auth'
 
-const http = httpRouter()
-auth.addHttpRoutes(http)
-export default http
+// No legacy Convex Auth HTTP routes: Clerk is the sole authentication issuer.
+export default httpRouter()
