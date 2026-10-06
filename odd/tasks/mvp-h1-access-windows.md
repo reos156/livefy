@@ -3,6 +3,37 @@
 ## Objective
 Deliver free email/password registration, sign-in, protected navigation, session persistence, sign-out, and email password recovery in the Windows Electron application.
 
+## Mandatory architecture — Electron first, future web
+
+This authorized amendment governs **all future implementation**, starting with H1.4; it does not reopen or rerun H1.1–H1.3. Their accepted access/registration evidence remains desktop-only, with its recorded gaps. The checklist and Windows acceptance below are unchanged.
+
+The initial MVP delivers video, products and events in Electron. A later responsive browser client delivers products/events **without a video viewer**. No noVNC restoration, browser deployment or cloud runner deployment is authorized now. The [current scope](../../docs/livefy-scope-mvp_20260928.md#arquitectura-obligatoria--electron-primero-web-futura) defines the mandatory boundaries and phased acceptance; the [20260925 scope](../../docs/livefy-scope-mvp_20260925.md) is historical context only. The [architecture task](electron-first-web-ready.md) authorizes documentation, not runtime changes.
+
+### Implementation boundaries for H1.4 onward
+
+- MUST share frontend screens, route definitions, UI, state and product behavior; do not create separate desktop/web screens or duplicate business logic. Convex remains business authority.
+- MUST keep Electron/Node imports out of shared frontend. Isolate native capabilities, secure storage, process supervision and video in platform adapters/shell code.
+- MUST isolate preload and auth bootstrap/providers/persistence behind platform adapters. Use a narrow typed, validated and authorized bridge, not generic IPC or secret-bearing shared state. The accepted native SDK is a desktop adapter, not a required browser dependency.
+- MUST select routing history in platform entry/bootstrap, separate from shared routes, guards, UI and state. Existing hash routing/custom-protocol evidence does not certify future browser deep links or refresh behavior.
+- MUST keep remote video isolated from the product renderer and privileged bridge. Reuse must not weaken sandbox, contextIsolation, CSP, navigation or permissions; preserve recorded desktop exceptions and pending H1.7 verification, not broaden them.
+- MUST keep ingestion an independently runnable executable, initially supervised locally by Electron. Version and validate normalized events, commands, results and health contracts, including scope, correlation, compatibility, errors and sequence/idempotency semantics; do not invent provider API fields.
+- Convex MUST own business rules, persistence, authorization, idempotency and leases/epochs. Client auth UI success and producer claims are not authorization authority.
+
+### Lifecycles and future release gates
+
+Commercial live state, producer session and viewer presence MUST be separate. Closing Electron stops the **LOCAL** runner and finalizes/revokes its producer session; crashes/timeouts expose potential gaps. Closing a viewer/client does not implicitly end commercial business. “End live” is an explicit authorized business action. A future cloud producer must run independently of desktop/browser presence and require explicit start/stop/revoke controls; this is deferred, not current operational evidence.
+
+The later dual-platform release MUST target **≥90% shared owned frontend source**: source lines used by both clients divided by total owned frontend source lines across both clients, counting each file once. Include platform-specific frontend/auth adapters in the denominator; exclude dependencies, generated code and native shell. Record the inventory, classification and reproducible measurement method at that release. **No current measurement or proof exists.**
+
+| Phase | Required acceptance, not new milestone numbering |
+| --- | --- |
+| H1.4+ / Electron MVP | Execute Electron first under these boundaries and preserve each existing H1 acceptance, including Windows persistence/security/packaged gates. Scope changes still require authorization. |
+| Shared extraction and adapters | Verify shared routes/UI/state without native imports, platform auth/history isolation, standalone ingestion and versioned contract compatibility/negative cases. Do not repeat accepted H1.1–H1.3 journeys merely for this amendment. |
+| Future responsive web | Separately authorize and verify browser auth, exact origins, session persistence/logout/revocation, routing/deep links/refresh, mobile products/events without viewer and browser builds; measure ≥90% shared source. Desktop evidence does not accept these gates. |
+| Future cloud operation | Separately authorize and verify deployment, credentials, health/supervision, leases, reconnect/gaps, explicit lifecycle control, observability and recovery independently of client closure. No provider capability or cost promise is made. |
+
+These are mandatory design constraints now and deferred execution gates later, **not silent acceptance** of web authentication or cloud readiness. No service configuration, production origin expansion or new implementation authorization is implied.
+
 ## Problem and rationale
 The repository currently contains prototypes rather than an integrated product. Deliver one complete access milestone before shop setup or commerce features.
 
@@ -121,7 +152,7 @@ Las secciones históricas siguientes se conservan sin modificación.
 - Preserve Electron, React, TanStack Router, Vite, Shadcn, Convex, Turborepo and Bun Workspaces.
 - Target architecture: official Convex + Clerk integration with Clerk FREE and its native Electron SDK. Clerk owns authentication/recovery; Convex owns application data and authorization. This replaces the earlier Convex Auth/Resend plan. User authorized this planning update only; implementation and service configuration require further authorization.
 - Windows is the supported target for this phase; Linux host checks are not Windows runtime evidence.
-- The scope document is a plan, not implementation evidence. Do not modify it as part of bootstrap.
+- The scope document is a plan, not implementation evidence. The authorized architecture-only amendment above updates it; bootstrap implementation does not authorize further scope edits.
 - Preserve pre-existing untracked files and prototypes; do not stage them implicitly.
 - No service account creation, production deployment, publishing, push or merge without explicit authorization. Commits require explicit user instruction.
 - Ask about unresolved product decisions or scope changes before implementing them.
