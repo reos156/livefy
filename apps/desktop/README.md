@@ -1,5 +1,73 @@
 # Base de escritorio de Livefy
 
+## Integración local actual H1.2d — Clerk nativo
+
+Versiones sin cambios: Clerk Electron 0.0.51, Electron 41.10.7 y Convex 1.46.0.
+El proveedor actual es `ClerkProvider` → `ConvexProviderWithClerk(useAuth)` con
+cliente único. Solo `useConvexAuth` confirma acceso; no se monta el registro
+legacy conservado. Registro/inicio de sesión pertenecen a H1.3/H1.4.
+
+Configuración pública requerida al compilar (no son instrucciones de mutación):
+
+- `VITE_CONVEX_URL=https://polite-parrot-887.convex.cloud`
+- `VITE_CLERK_PUBLISHABLE_KEY=<clave pública DEV real del Dashboard>`
+
+No se incluye ni se fabrica una clave. Se valida localmente el host codificado
+`organic-snake-7233.clerk.accounts.dev`, no su validez remota. Configuración
+faltante/incorrecta no crea proveedores ni cliente. Producción necesitará otra
+configuración revisada; no basta con reemplazar estas variables.
+
+Compilar desde `apps/desktop` con `bun run build` genera también `dist/preload.cjs`:
+CJS empaquetado por Vite/Rollup, solo Electron externo, compatible con sandbox.
+Compilar antes de `desktop:dev` también es necesario para disponer de la precarga.
+El origen empaquetado es `livefy://renderer`; el esquema se registra antes de
+readiness y sirve solo archivos contenidos en dist, incluyendo comprobación de
+rutas reales. Desarrollo usa `http://127.0.0.1:5173`.
+
+El bridge usa `createClerkBridge({storage})`, sin renderer/OAuth/passkeys. La SDK
+comprueba el frame principal, no el origen exacto de cada IPC. La ventana controlada,
+la navegación restringida y los popups denegados mantienen ese origen. La precarga
+expone el API fijo público de Clerk y una consulta fija de estado de persistencia;
+no expone IPC genérico. Cleanup retira handlers al salir.
+
+Tokens: electron-store contiene únicamente envelopes versionados cifrados mediante
+safeStorage. Registros raw/desconocidos/corruptos se rechazan sin sobrescribir ni
+borrar, incluso al cerrar sesión. Sin cifrado disponible, tokens solo en memoria;
+la interfaz indica explícitamente que no sobrevivirán reinicio. No se registran
+credenciales. Persistencia real/revocación en Windows siguen pendientes (H1.6).
+
+La CSP permite FAPI DEV exacto, Cloudflare challenges, img.clerk.com y telemetry.
+Solo `*.protect.clerk.com` tiene la excepción aprobada de comodín (connect `:*`).
+Sin `unsafe-eval`, script inline, ni websocket de desarrollo en producción.
+La compatibilidad real del UI/challenges debe verificarse en Windows antes de
+aceptar flujos; build/mocks no demuestran autenticación ni empaquetado.
+
+Los orígenes autorizados de Clerk DEV se inicializaron, con autorización explícita,
+desde `null` a `[http://127.0.0.1:5173, livefy://renderer]`, según el registro del
+worker. La verificación independiente confirmó el estado actual exacto y Native
+API habilitada; no reconstruyó la transición histórica ni el número de PATCH.
+No hay OAuth ni single-instance/deep-link flows en este modo.
+Producción/FREE Native API y publicación pertenecen a H1.12.
+
+H1.2d fue aceptado para DEV: la captura de Windows muestra la interfaz y capacidad
+de almacenamiento cifrado, no inicio de sesión ni token persistido tras reiniciar.
+Los 100 tests en 14 archivos verificados en el checkout actual incluyen 22 tests
+legacy H1.3 excluidos de esta entrega (6 de registro UI y 16 de validación).
+Para el contenido previsto de los commits se esperan 78 tests en 12 archivos;
+la verificación aislada de ese contenido aún no se ha ejecutado. La autorización
+vigente permite solo commits locales, sin push, y requiere avisar al completarlos.
+Verificación aislada e identidades de commits siguen pendientes; no se afirma
+entrega completada. El worktree temporal propio debe limpiarse tras la verificación
+y los commits locales, sin depender de una publicación.
+
+Fuentes oficiales aportadas por el parent, acceso 2026-10-06 (no recuperadas aquí):
+https://clerk.com/docs/electron/getting-started/quickstart ;
+https://clerk.com/docs/guides/development/deployment/electron ;
+https://clerk.com/docs/guides/secure/best-practices/csp-headers ;
+https://docs.convex.dev/auth/clerk . README/tipos de la SDK instalada inspeccionados.
+
+## Historial H1.1/H1.2 (no describe los proveedores actuales)
+
 La base H1.1/H1.2 combina una ventana Electron aislada, una vista previa de acceso en React y un contrato de autenticación correo/contraseña y sesión activado en Convex DEV. La interfaz de registro/inicio de sesión, la recogida de credenciales en el renderizador y el empaquetado no están implementados. Los controles de acceso siguen deshabilitados; inicializar el proveedor no representa una autenticación correcta.
 
 Consulta el [README principal](../../README.md) y el [registro del hito H1](../../odd/tasks/mvp-h1-access-windows.md).

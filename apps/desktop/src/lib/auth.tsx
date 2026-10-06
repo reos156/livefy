@@ -1,20 +1,31 @@
-import { ConvexAuthProvider } from '@convex-dev/auth/react'
+import { ClerkProvider, useAuth } from '@clerk/electron/react'
 import { ConvexReactClient } from 'convex/react'
-import type { ReactNode } from 'react'
+import { ConvexProviderWithClerk } from 'convex/react-clerk'
+import { createContext, useContext, type ReactNode } from 'react'
 
+const AuthConfigured = createContext(false)
+export function useAuthConfigured() { return useContext(AuthConfigured) }
 const expectedEndpoint = 'https://polite-parrot-887.convex.cloud'
 let client: ConvexReactClient | undefined
-
 export function validEndpoint(endpoint: string | undefined): endpoint is string {
   return endpoint === expectedEndpoint
 }
-
-export function AuthBoundary({ endpoint, children }: { endpoint?: string; children: ReactNode }) {
-  if (!validEndpoint(endpoint)) {
+function validKey(key: string | undefined): key is string {
+  if (!key?.startsWith('pk_test_')) return false
+  try {
+    return atob(key.slice(8)) === 'organic-snake-7233.clerk.accounts.dev$'
+  } catch { return false }
+}
+export function AuthBoundary({ endpoint, publishableKey, children }: {
+  endpoint?: string; publishableKey?: string; children: ReactNode
+}) {
+  if (!validEndpoint(endpoint) || !validKey(publishableKey)) {
     return <><p role="status">Authentication unavailable: deployment configuration missing or invalid.</p>{children}</>
   }
-  // One client, including across StrictMode's repeated renders. Password-only:
-  // never consume OAuth codes from a renderer URL.
   client ??= new ConvexReactClient(endpoint)
-  return <ConvexAuthProvider client={client} shouldHandleCode={false}>{children}</ConvexAuthProvider>
+  return <ClerkProvider publishableKey={publishableKey}>
+    <ConvexProviderWithClerk client={client} useAuth={useAuth}>
+      <AuthConfigured.Provider value={true}>{children}</AuthConfigured.Provider>
+    </ConvexProviderWithClerk>
+  </ClerkProvider>
 }

@@ -1,18 +1,18 @@
 // @vitest-environment node
 import { readFileSync } from 'node:fs'
-import { describe, expect, it } from 'vitest'
+import { expect, it } from 'vitest'
 import { productionCsp } from './vite.config'
 const html = readFileSync(new URL('./index.html', import.meta.url), 'utf8')
-describe('deployment CSP', () => {
-  it('permits only exact deployment network origins and local dev websocket', () => {
-    const connect = html.match(/connect-src ([^;]+)/)![1].split(' ')
-    expect(connect).toEqual(["'self'", 'https://polite-parrot-887.convex.cloud', 'wss://polite-parrot-887.convex.cloud', 'https://polite-parrot-887.convex.site', 'ws://127.0.0.1:5173'])
-    expect(html).not.toContain('unsafe-eval')
-    expect(connect.join(' ')).not.toContain('*')
-  })
-  it('removes the Vite websocket in production while retaining deployment origins', () => {
-    const production = productionCsp(html)
-    expect(production).not.toContain('ws://127.0.0.1:5173')
-    expect(production).toContain('wss://polite-parrot-887.convex.cloud')
-  })
+it('permits native Clerk hosts with only the accepted protect wildcard exception', () => {
+  expect(html).toContain('https://organic-snake-7233.clerk.accounts.dev')
+  expect(html).toContain('https://*.protect.clerk.com:*')
+  expect(html).toContain('worker-src \'self\' blob:')
+  expect(html).not.toContain('unsafe-eval')
+  expect(html.match(/script-src ([^;]+)/)![1]).not.toContain('unsafe-inline')
+  expect(html.match(/https?:\/\/[^ ;"*]+|https:\/\/\*[^ ;"]+/g)?.filter(origin => origin.includes('*')))
+    .toEqual(['https://*.protect.clerk.com', 'https://*.protect.clerk.com:*', 'https://*.protect.clerk.com'])
+})
+it('removes development websocket in production', () => {
+  expect(productionCsp(html)).not.toContain('ws://127.0.0.1:5173')
+  expect(productionCsp(html)).toContain('wss://polite-parrot-887.convex.cloud')
 })
