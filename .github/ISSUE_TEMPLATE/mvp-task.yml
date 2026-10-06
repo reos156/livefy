@@ -1,0 +1,59 @@
+name: Tarea MVP — planificada o retrospectiva
+description: Registra alcance, aceptación, evidencia y entrega de una tarea MVP.
+title: "[MVP] "
+body:
+  - type: input
+    id: task_id
+    attributes:
+      label: Identificador de tarea
+      description: Usa el identificador del plan, por ejemplo H1.2c.
+    validations:
+      required: true
+  - type: dropdown
+    id: task_kind
+    attributes:
+      label: Tipo de registro
+      description: Una retrospectiva documenta trabajo previo; no implica una issue previa ni aprobación retroactiva.
+      options:
+        - Planificada — trabajo por realizar
+        - Retrospectiva — trabajo previo documentado
+  - type: textarea
+    id: objective
+    attributes:
+      label: Objetivo
+      description: Describe el resultado esperado y el problema que resuelve.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Alcance y no objetivos
+      description: Delimita cambios, exclusiones y restricciones de autorización.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Criterios de aceptación
+      description: Define criterios comprobables y distingue aceptados, pendientes y diferidos.
+    validations:
+      required: true
+  - type: textarea
+    id: verification
+    attributes:
+      label: Verificación y evidencia
+      description: Registra comandos, resultados, fuentes, fallos y pendientes; si no se ejecutó, indícalo. Un smoke no prueba persistencia ni el recorrido completo en Windows.
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencias
+      description: Identifica tareas o requisitos previos; usa referencias existentes, sin inventar números de issue.
+  - type: textarea
+    id: delivery
+    attributes:
+      label: Referencias y estado de entrega
+      description: Cita commits y PR existentes o indica que no existen. Distingue local, publicado y merge verificado; registra lo pendiente. Para retrospectivas conserva la historia sin reescribirla ni atribuir autorizaciones inexistentes.
+    validations:
+      required: true
