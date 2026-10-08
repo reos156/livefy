@@ -1,10 +1,10 @@
-import { useRef, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useSignUp } from '@clerk/electron/react'
 import { useConvexAuth } from 'convex/react'
 import { Button } from '@/components/ui/button'
 
 type Step = 'credentials' | 'send' | 'verify' | 'finish' | 'done' | 'existing' | 'unsupported'
-const existingCopy = 'An account already exists. Use sign in when available; registration will not sign you in.'
+const existingCopy = 'An account already exists. Use sign in; registration will not sign you in.'
 function safeError(error: unknown): string {
   const value = error as { code?: string; errors?: { code?: string }[] } | null
   const code = value?.errors?.[0]?.code ?? value?.code
@@ -20,10 +20,12 @@ function safeError(error: unknown): string {
 }
 
 // Only mounted under the native provider. Clerk completion is not backend access.
-export function Registration() {
+export function Registration({ onPendingChange }: { onPendingChange?: (pending: boolean) => void }) {
   const { signUp, fetchStatus } = useSignUp()
   const { isAuthenticated, isLoading } = useConvexAuth()
   const lock = useRef(false)
+  const providerPending = useRef(false)
+  providerPending.current = fetchStatus === 'fetching'
   const completed = useRef(false)
   const [pending, setPending] = useState(false)
   const [step, setStep] = useState<Step>('credentials')
@@ -32,6 +34,9 @@ export function Registration() {
   const [password, setPassword] = useState('')
   const [code, setCode] = useState('')
   const disabled = pending || fetchStatus === 'fetching' || isLoading || isAuthenticated
+  useEffect(() => {
+    onPendingChange?.(lock.current || fetchStatus === 'fetching')
+  }, [fetchStatus, onPendingChange])
 
   async function checked(action: () => Promise<{ error: unknown }>) {
     const result = await action()
@@ -68,12 +73,12 @@ export function Registration() {
   }
   async function run(action: () => Promise<void>) {
     if (lock.current || disabled || completed.current) return
-    lock.current = true; setPending(true); setError('')
+    lock.current = true; setPending(true); onPendingChange?.(true); setError('')
     try { await action() } catch (failure) {
       const message = safeError(failure)
       if (message === existingCopy) setStep('existing')
       setError(message)
-    } finally { lock.current = false; setPending(false) }
+    } finally { lock.current = false; setPending(false); onPendingChange?.(providerPending.current) }
   }
   function register(event: FormEvent) {
     event.preventDefault()
@@ -102,7 +107,7 @@ export function Registration() {
   }
   return <section className="flex flex-col gap-4" aria-label="Registration">
     <h2>Register with email and password</h2>
-    <p>Existing accounts are not signed in automatically. Sign in belongs to a later release.</p>
+    <p>Existing accounts are not signed in automatically. Use sign in for an existing account.</p>
     {/* Pinned Clerk React source mounts this target for custom-flow CAPTCHA. */}
     <div id="clerk-captcha" />
     {step === 'credentials' && <form onSubmit={register} noValidate className="flex flex-col gap-4" aria-busy={pending}>

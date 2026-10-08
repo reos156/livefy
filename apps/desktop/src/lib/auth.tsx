@@ -3,6 +3,8 @@ import { ConvexReactClient } from 'convex/react'
 import { ConvexProviderWithClerk } from 'convex/react-clerk'
 import { createContext, useContext, type ReactNode } from 'react'
 
+import { ElectronSignInProvider } from '../platform/electron/sign-in'
+
 const AuthConfigured = createContext(false)
 export function useAuthConfigured() { return useContext(AuthConfigured) }
 const expectedEndpoint = 'https://polite-parrot-887.convex.cloud'
@@ -25,7 +27,7 @@ export function AuthBoundary({ endpoint, publishableKey, children }: {
   client ??= new ConvexReactClient(endpoint)
   return <ClerkProvider publishableKey={publishableKey}>
     <ConvexProviderWithClerk client={client} useAuth={useAuth}>
-      <AuthConfigured.Provider value={true}>{children}</AuthConfigured.Provider>
+      <ElectronSignInProvider><AuthConfigured.Provider value={true}>{children}</AuthConfigured.Provider></ElectronSignInProvider>
     </ConvexProviderWithClerk>
   </ClerkProvider>
 }

@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({ client: vi.fn(), clerk: vi.fn(), convex: vi.fn
 vi.mock('@clerk/electron/react', () => ({
   ClerkProvider: (props: { children: React.ReactNode }) => { mocks.clerk(props); return props.children },
   useAuth: () => ({}),
+  useSignIn: () => ({ signIn: {}, fetchStatus: 'idle' }),
 }))
 vi.mock('convex/react', () => ({ ConvexReactClient: class { constructor(url: string) { mocks.client(url) } } }))
 vi.mock('convex/react-clerk', () => ({ ConvexProviderWithClerk: (props: { children: React.ReactNode }) => { mocks.convex(props); return props.children } }))

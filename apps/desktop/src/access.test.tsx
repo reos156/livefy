@@ -1,5 +1,7 @@
 import { afterEach, expect, it, vi } from 'vitest'
-vi.mock('./registration', () => ({ Registration: () => <label>Registration email<input aria-label="Registration email" /></label> }))
+vi.mock('./registration', () => ({ Registration: ({ onPendingChange }: any) => <label>Registration email<input aria-label="Registration email" onChange={() => onPendingChange(true)} /></label> }))
+vi.mock('./sign-in', () => ({ SignIn: ({ onPendingChange }: any) => <label>Sign-in email<input aria-label="Sign-in email" onChange={() => onPendingChange(true)} /></label> }))
+vi.mock('./lib/sign-in', () => ({ useSignInAdapter: () => ({ fetching: false, persistence: async () => 'encrypted' }) }))
 const state = vi.hoisted(() => ({ configured: false, isLoading: false, isAuthenticated: false }))
 vi.mock('convex/react', () => ({ useConvexAuth: () => state }))
 vi.mock('./lib/auth', () => ({
@@ -21,6 +23,20 @@ it('explains unavailable access and never offers working authentication', () => 
   fireEvent.click(button)
   expect(screen.queryByRole('textbox')).toBeNull()
   expect(screen.queryByText(/signed in|dashboard/i)).toBeNull()
+})
+
+it('switches exclusive forms and excludes switching immediately while pending', () => {
+  state.configured = true
+  render(<AccessLanding />)
+  expect(screen.getByLabelText('Sign-in email')).toBeTruthy()
+  expect(screen.queryByLabelText('Registration email')).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'Create an account' }))
+  expect(screen.queryByLabelText('Sign-in email')).toBeNull()
+  const switchButton = screen.getByRole('button', { name: 'Use an existing account' })
+  fireEvent.change(screen.getByLabelText('Registration email'), { target: { value: 'x' } })
+  fireEvent.click(switchButton)
+  expect(screen.getByLabelText('Registration email')).toBeTruthy()
+  expect(switchButton).toHaveProperty('disabled', true)
 })
 
 it.each([

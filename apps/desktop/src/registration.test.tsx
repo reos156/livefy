@@ -12,6 +12,21 @@ beforeEach(() => {
   Object.assign(mocks.auth, { isLoading: false, isAuthenticated: false })
 })
 afterEach(cleanup)
+it('reports pending synchronously and retains it through finalization', async () => {
+  const pending = vi.fn()
+  let resolve!: (value: any) => void
+  mocks.signup.status = 'complete'; mocks.signup.unverifiedFields = []
+  mocks.signup.finalize.mockImplementation(() => new Promise(r => { resolve = r }))
+  render(<Registration onPendingChange={pending} />)
+  fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'person@example.com' } })
+  fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'valid-password' } })
+  fireEvent.submit(screen.getByLabelText('Email').closest('form')!)
+  expect(pending).toHaveBeenLastCalledWith(true)
+  await act(async () => {})
+  expect(pending).toHaveBeenLastCalledWith(true)
+  await act(async () => resolve({ error: null }))
+  expect(pending).toHaveBeenLastCalledWith(false)
+})
 function start() {
   render(<Registration />)
   fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'person@example.com' } })
@@ -140,7 +155,7 @@ it.each(['transfer', 'session', 'identifier'])('informs only for existing accoun
   if (kind === 'transfer') mocks.signup.isTransferable = true
   if (kind === 'session') mocks.signup.existingSession = { sessionId: 'private' }
   if (kind === 'identifier') mocks.signup.password.mockResolvedValue({ error: { code: 'form_identifier_exists' } })
-  start(); await screen.findByText(/Use sign in when available/)
+  start(); expect(await screen.findByRole('alert')).toHaveProperty('textContent', 'An account already exists. Use sign in; registration will not sign you in.')
   expect(mocks.signup.finalize).not.toHaveBeenCalled()
   expect(mocks.signup.verifications.sendEmailCode).not.toHaveBeenCalled()
 })
