@@ -1,20 +1,35 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-const mocks = vi.hoisted(() => ({ signup: {} as any, auth: { isLoading: false, isAuthenticated: false } }))
-vi.mock('@clerk/electron/react', () => ({ useSignUp: () => ({ signUp: mocks.signup, errors: {}, fetchStatus: 'idle' }) }))
-vi.mock('convex/react', () => ({ useConvexAuth: () => mocks.auth }))
-import { Registration } from './registration'
-const ok = () => Promise.resolve({ error: null })
+import { RegistrationProvider, type RegistrationAttempt } from './lib/registration'
+import { Registration as SharedRegistration } from './registration'
+function attempt() {
+  const missingFields: string[] = []
+  const existingSession: unknown = undefined
+  return {
+    status: 'missing_requirements', missingFields, unverifiedFields: ['email_address'],
+    isTransferable: false, existingSession,
+    password: vi.fn<RegistrationAttempt['password']>(ok), finalize: vi.fn<RegistrationAttempt['finalize']>(ok),
+    verifications: {
+      sendEmailCode: vi.fn<RegistrationAttempt['verifications']['sendEmailCode']>(ok),
+      verifyEmailCode: vi.fn<RegistrationAttempt['verifications']['verifyEmailCode']>(ok),
+    },
+  }
+}
+const mocks = { signup: attempt(), auth: { isLoading: false, isAuthenticated: false } }
+function Registration(props: { onPendingChange?: (pending: boolean) => void }) {
+  return <RegistrationProvider value={{ signUp: mocks.signup, fetchStatus: 'idle', ...mocks.auth }}>
+    <SharedRegistration {...props} />
+  </RegistrationProvider>
+}
+function ok() { return Promise.resolve({ error: null }) }
 beforeEach(() => {
-  mocks.signup = { status: 'missing_requirements', missingFields: [], unverifiedFields: ['email_address'],
-    isTransferable: false, existingSession: undefined, password: vi.fn(ok), reset: vi.fn(ok), finalize: vi.fn(ok),
-    verifications: { sendEmailCode: vi.fn(ok), verifyEmailCode: vi.fn(ok) } }
+  mocks.signup = attempt()
   Object.assign(mocks.auth, { isLoading: false, isAuthenticated: false })
 })
 afterEach(cleanup)
 it('reports pending synchronously and retains it through finalization', async () => {
   const pending = vi.fn()
-  let resolve!: (value: any) => void
+  let resolve!: (value: { error: unknown }) => void
   mocks.signup.status = 'complete'; mocks.signup.unverifiedFields = []
   mocks.signup.finalize.mockImplementation(() => new Promise(r => { resolve = r }))
   render(<Registration onPendingChange={pending} />)
@@ -89,7 +104,7 @@ it.each(['returned', 'thrown'])('redacts %s provider failures', async mode => {
   expect(mocks.signup.finalize).not.toHaveBeenCalled()
 })
 it('excludes same-tick duplicate submissions', async () => {
-  let resolve!: (value: any) => void
+  let resolve!: (value: { error: unknown }) => void
   mocks.signup.password.mockImplementation(() => new Promise(r => { resolve = r }))
   start()
   const form = screen.getByLabelText('Email').closest('form')!
@@ -114,7 +129,7 @@ it.each(['form_code_incorrect', 'verification_expired'])('handles %s safely and 
 })
 it('excludes resend and verification while a resend is pending', async () => {
   await verification()
-  let resolve!: (value: any) => void
+  let resolve!: (value: { error: unknown }) => void
   mocks.signup.verifications.sendEmailCode.mockImplementation(() => new Promise(r => { resolve = r }))
   fireEvent.click(screen.getByRole('button', { name: 'Resend code' }))
   const form = screen.getByLabelText('Email code').closest('form')!

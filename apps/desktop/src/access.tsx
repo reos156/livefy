@@ -6,8 +6,9 @@ import { SignIn } from './sign-in'
 import { useSignInAdapter } from './lib/sign-in'
 import { useAuthConfigured } from './lib/auth'
 
-function ConfiguredAccess() {
-  const { isLoading, isAuthenticated } = useConvexAuth()
+function ConfiguredAccess({ onEnterApp }: { onEnterApp?: () => void }) {
+  const { isLoading, isAuthenticated, isRefreshing } = useConvexAuth()
+  const checking = isLoading || isRefreshing
   const adapter = useSignInAdapter()
   const [view, setView] = useState<'sign-in' | 'registration'>('sign-in')
   const switchLock = useRef(false)
@@ -25,10 +26,11 @@ function ConfiguredAccess() {
     return () => { active = false }
   }, [])
   return <>
-    <p role="status">{isLoading ? 'Checking backend access' : isAuthenticated ?
+    <p role="status">{checking ? 'Checking backend access' : isAuthenticated ?
       'Backend access confirmed' : 'No authenticated session confirmed'}</p>
     <p>{persistence}</p>
-    {!isLoading && !isAuthenticated && <>
+    {!checking && isAuthenticated && onEnterApp && <Button onClick={onEnterApp}>Open app</Button>}
+    {!checking && !isAuthenticated && <>
       {view === 'sign-in' ? <SignIn onPendingChange={onPendingChange} /> : <Registration onPendingChange={onPendingChange} />}
       <Button variant="outline" disabled={pending || adapter.fetching} onClick={() => {
         if (!switchLock.current && !adapter.fetching) setView(view === 'sign-in' ? 'registration' : 'sign-in')
@@ -36,11 +38,11 @@ function ConfiguredAccess() {
     </>}
   </>
 }
-export function AccessLanding() {
+export function AccessLanding({ onEnterApp }: { onEnterApp?: () => void }) {
   const configured = useAuthConfigured()
   return <main className="mx-auto flex min-h-svh max-w-md flex-col justify-center gap-6 p-8">
     <h1 className="text-3xl font-semibold">Livefy</h1>
-    {configured ? <ConfiguredAccess /> : <>
+    {configured ? <ConfiguredAccess onEnterApp={onEnterApp} /> : <>
       <p className="text-muted-foreground">
         Email and password access is not available yet. This desktop preview does not collect credentials.
       </p>

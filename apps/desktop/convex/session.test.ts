@@ -29,6 +29,20 @@ describe('trusted Clerk identity contract (not JWT validation)', () => {
     const result = await t.withIdentity({ subject: 'same-subject', tokenIdentifier: 'opaque-verified-identifier' }).query(session, {})
     expect(result).toEqual({ tokenIdentifier: 'opaque-verified-identifier' })
   })
+  it('isolates two independent verified callers on the same backend', async () => {
+    const t = convexTest(schema, modules)
+    const first = t.withIdentity({ subject: 'first', tokenIdentifier: 'verified-first' })
+    const second = t.withIdentity({ subject: 'second', tokenIdentifier: 'verified-second' })
+    expect(await first.query(session, {})).toEqual({ tokenIdentifier: 'verified-first' })
+    expect(await second.query(session, {})).toEqual({ tokenIdentifier: 'verified-second' })
+    expect(await first.query(session, {})).toEqual({ tokenIdentifier: 'verified-first' })
+    await expect(t.query(session, {})).rejects.toThrow('Unauthorized')
+  })
+  it.each(['userId', 'tokenIdentifier', 'email'])('rejects forged identity even from an authenticated caller: %s', async key => {
+    const caller = convexTest(schema, modules).withIdentity({ subject: 'first', tokenIdentifier: 'verified-first' })
+    await expect(caller.query(session, { [key]: 'verified-second' })).rejects.toThrow()
+    expect(await caller.query(session, {})).toEqual({ tokenIdentifier: 'verified-first' })
+  })
   it.each(['userId', 'tokenIdentifier', 'email'])('rejects caller-supplied %s', async key => {
     await expect(convexTest(schema, modules).query(session, { [key]: 'forged' })).rejects.toThrow()
   })

@@ -2,20 +2,18 @@ import { afterEach, expect, it, vi } from 'vitest'
 vi.mock('./registration', () => ({ Registration: ({ onPendingChange }: any) => <label>Registration email<input aria-label="Registration email" onChange={() => onPendingChange(true)} /></label> }))
 vi.mock('./sign-in', () => ({ SignIn: ({ onPendingChange }: any) => <label>Sign-in email<input aria-label="Sign-in email" onChange={() => onPendingChange(true)} /></label> }))
 vi.mock('./lib/sign-in', () => ({ useSignInAdapter: () => ({ fetching: false, persistence: async () => 'encrypted' }) }))
-const state = vi.hoisted(() => ({ configured: false, isLoading: false, isAuthenticated: false }))
+const state = vi.hoisted(() => ({ configured: false, isLoading: false, isAuthenticated: false, isRefreshing: false }))
 vi.mock('convex/react', () => ({ useConvexAuth: () => state }))
 vi.mock('./lib/auth', () => ({
   useAuthConfigured: () => state.configured,
-  AuthBoundary: ({ children }: { children: React.ReactNode }) => children,
 }))
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { AccessLanding } from './access'
-import { AuthBoundary } from './lib/auth'
 
-afterEach(() => { cleanup(); Object.assign(state, { configured: false, isLoading: false, isAuthenticated: false }) })
+afterEach(() => { cleanup(); Object.assign(state, { configured: false, isLoading: false, isAuthenticated: false, isRefreshing: false }) })
 
 it('explains unavailable access and never offers working authentication', () => {
-  render(<AuthBoundary><AccessLanding /></AuthBoundary>)
+  render(<AccessLanding />)
   expect(screen.getByRole('heading', { name: 'Livefy' })).toBeTruthy()
   expect(screen.getByText(/Email and password access is not available yet/)).toBeTruthy()
   const button = screen.getByRole('button', { name: 'Sign in — coming soon' }) as HTMLButtonElement
@@ -23,6 +21,14 @@ it('explains unavailable access and never offers working authentication', () => 
   fireEvent.click(button)
   expect(screen.queryByRole('textbox')).toBeNull()
   expect(screen.queryByText(/signed in|dashboard/i)).toBeNull()
+})
+
+it('blocks access while a previously confirmed token is being replaced', () => {
+  Object.assign(state, { configured: true, isAuthenticated: true, isRefreshing: true })
+  render(<AccessLanding />)
+  expect(screen.getByText('Checking backend access')).toBeTruthy()
+  expect(screen.queryByText('Backend access confirmed')).toBeNull()
+  expect(screen.queryByRole('textbox')).toBeNull()
 })
 
 it('switches exclusive forms and excludes switching immediately while pending', () => {

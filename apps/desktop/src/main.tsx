@@ -1,24 +1,11 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { createHashHistory, createRootRoute, createRoute, createRouter, Outlet, RouterProvider } from '@tanstack/react-router'
-import { AccessLanding } from './access'
-import { AuthBoundary } from './lib/auth'
+import { createHashHistory, RouterProvider } from '@tanstack/react-router'
+import { AuthBoundary } from './platform/electron/auth'
+import { createAppRouter } from './routes'
 import './styles.css'
 
-const rootRoute = createRootRoute({ component: Outlet })
-const accessRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/',
-  component: AccessLanding,
-})
-const router = createRouter({
-  routeTree: rootRoute.addChildren([accessRoute]),
-  history: createHashHistory(),
-})
-
-declare module '@tanstack/react-router' {
-  interface Register { router: typeof router }
-}
+const router = createAppRouter(createHashHistory())
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

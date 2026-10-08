@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { useSignUp } from '@clerk/electron/react'
-import { useConvexAuth } from 'convex/react'
+import { useRegistrationAdapter } from './lib/registration'
 import { Button } from '@/components/ui/button'
 
 type Step = 'credentials' | 'send' | 'verify' | 'finish' | 'done' | 'existing' | 'unsupported'
@@ -19,10 +18,9 @@ function safeError(error: unknown): string {
   }
 }
 
-// Only mounted under the native provider. Clerk completion is not backend access.
+// Adapter completion is not backend access.
 export function Registration({ onPendingChange }: { onPendingChange?: (pending: boolean) => void }) {
-  const { signUp, fetchStatus } = useSignUp()
-  const { isAuthenticated, isLoading } = useConvexAuth()
+  const { signUp, fetchStatus, isAuthenticated, isLoading } = useRegistrationAdapter()
   const lock = useRef(false)
   const providerPending = useRef(false)
   providerPending.current = fetchStatus === 'fetching'
@@ -61,7 +59,7 @@ export function Registration({ onPendingChange }: { onPendingChange?: (pending: 
     if (requirements() !== 'complete' || completed.current) return
     setStep('finish')
     // Keep navigation local; access is independently confirmed by Convex.
-    await checked(() => signUp.finalize({ navigate: async () => {} }))
+    await checked(() => signUp.finalize())
     completed.current = true
     setStep('done')
   }
