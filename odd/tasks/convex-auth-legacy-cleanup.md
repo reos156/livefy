@@ -31,7 +31,7 @@ Removed @convex-dev/auth and @auth/core pins; schema now defineSchema({}). Remov
 User confirmed successful Electron launch via bun run start and successful login. New registration/browser smoke and current remote records/deployed state not verified. Local cleanup is complete, not evidence of remote retirement. No record-deletion commands executed. Generated DEV preparation can persist pending schemas/index work; final deployment not performed.
 
 ## Delivery
-Issue #11 confirmed: https://github.com/reos156/livefy/issues/11 (retrospective, mvp-task.yml, no labels). User authorized commit and push; work unit: chore(auth): retire legacy Convex Auth artifacts. Commit identity will be recorded after creation. Preserve unrelated local files during any future staging. Rollback local scoped files together; do not assume reverting files clears DEV preparation metadata.
+Issue #11 confirmed: https://github.com/reos156/livefy/issues/11 (retrospective, mvp-task.yml, no labels). User authorized commit and push; work unit: chore(auth): retire legacy Convex Auth artifacts. Implementation commit: 1903f75 (14 files, +92/-301 including tracker/test); all scoped changes staged explicitly, unrelated untracked files excluded. Preserve unrelated local files during any future staging. Rollback local scoped files together; do not assume reverting files clears DEV preparation metadata.
 
 ## Next step
-Create scoped commit referencing #11 and push feat/mvp. No PR/merge authorized. Any remote retirement/deployment remains separately authorized.
+Publish implementation and closure evidence commits to feat/mvp. No PR/merge authorized. Any remote retirement/deployment remains separately authorized.
