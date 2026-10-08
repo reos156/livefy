@@ -1,4 +1,5 @@
 // @vitest-environment node
+import { existsSync } from 'node:fs'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 afterEach(() => { vi.unstubAllEnvs(); vi.resetModules() })
@@ -17,8 +18,8 @@ describe('exclusive Clerk trust configuration', () => {
     const { default: config } = await import('./auth.config')
     expect(config.providers[0].domain).toBeUndefined()
   })
-  it('exports no legacy auth functions or HTTP routes', async () => {
-    expect(Object.keys(await import('./auth'))).toEqual([])
+  it('has no legacy auth module or HTTP routes', async () => {
+    expect(existsSync(new URL('./auth.ts', import.meta.url))).toBe(false)
     const { default: http } = await import('./http')
     expect(http.getRoutes()).toEqual([])
   })

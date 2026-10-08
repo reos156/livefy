@@ -8,8 +8,6 @@
  * @module
  */
 
-import type * as auth from "../auth.js";
-import type * as h1SmokeCleanup from "../h1SmokeCleanup.js";
 import type * as http from "../http.js";
 import type * as lib_requireUser from "../lib/requireUser.js";
 import type * as session from "../session.js";
@@ -21,8 +19,6 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
-  auth: typeof auth;
-  h1SmokeCleanup: typeof h1SmokeCleanup;
   http: typeof http;
   "lib/requireUser": typeof lib_requireUser;
   session: typeof session;
