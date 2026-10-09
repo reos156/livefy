@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { SignIn } from './sign-in'
 import { useSignInAdapter } from './lib/sign-in'
 import { useAuthConfigured } from './lib/auth'
+import { LogoutButton } from './lib/session'
 
 function ConfiguredAccess({ onEnterApp }: { onEnterApp?: () => void }) {
   const { isLoading, isAuthenticated, isRefreshing } = useConvexAuth()
@@ -29,6 +30,7 @@ function ConfiguredAccess({ onEnterApp }: { onEnterApp?: () => void }) {
     <p role="status">{checking ? 'Checking backend access' : isAuthenticated ?
       'Backend access confirmed' : 'No authenticated session confirmed'}</p>
     <p>{persistence}</p>
+    {!checking && isAuthenticated && <LogoutButton />}
     {!checking && isAuthenticated && onEnterApp && <Button onClick={onEnterApp}>Open app</Button>}
     {!checking && !isAuthenticated && <>
       {view === 'sign-in' ? <SignIn onPendingChange={onPendingChange} /> : <Registration onPendingChange={onPendingChange} />}

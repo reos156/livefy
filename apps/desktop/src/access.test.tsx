@@ -9,6 +9,16 @@ vi.mock('./lib/auth', () => ({
 }))
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { AccessLanding } from './access'
+import { SessionBoundary } from './lib/session'
+
+it('offers local logout on backend-confirmed access', () => {
+  Object.assign(state, { configured: true, isAuthenticated: true })
+  const logout = vi.fn(() => new Promise<void>(() => {}))
+  render(<SessionBoundary logout={logout}><AccessLanding /></SessionBoundary>)
+  fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
+  expect(logout).toHaveBeenCalledOnce()
+  expect(screen.queryByText('Backend access confirmed')).toBeNull()
+})
 
 afterEach(() => { cleanup(); Object.assign(state, { configured: false, isLoading: false, isAuthenticated: false, isRefreshing: false }) })
 
