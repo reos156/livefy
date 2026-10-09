@@ -3,6 +3,53 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { SignIn } from './sign-in'
 import { SignInProvider, type SignInAdapter } from './lib/sign-in'
 afterEach(cleanup)
+it('clears unsupported diagnostic during a password retry', async () => {
+  let resolve!: (value: 'invalid') => void
+  const password = vi.fn().mockResolvedValueOnce('challenge').mockImplementationOnce(() => new Promise<'invalid'>(r => { resolve = r }))
+  const { adapter, submit } = setup({ password, diagnostic: () => 'status=needs_second_factor; stage=password; strategy=unsupported' }); submit()
+  await screen.findByText(/Sign-in diagnostic:/)
+  expect(adapter.finalize).not.toHaveBeenCalled(); submit()
+  expect(screen.queryByText(/Sign-in diagnostic:/)).toBeNull()
+  await act(async () => resolve('invalid'))
+})
+it('recovers initial send failure through cancel and a fresh password', async () => {
+  const { adapter, submit } = setup({ password: vi.fn().mockResolvedValueOnce('email-code').mockResolvedValueOnce('complete'), sendEmailCode: vi.fn(async () => 'invalid' as const), verifyEmailCode: vi.fn() }); submit()
+  expect(await screen.findByRole('alert')).toHaveProperty('textContent', 'Verification failed. Try again or resend the code.')
+  expect(adapter.finalize).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByText('Cancel verification')); submit()
+  await screen.findByText('Sign-in completed; waiting for backend access confirmation.')
+  expect(adapter.password).toHaveBeenCalledTimes(2)
+  expect(adapter.verifyEmailCode).not.toHaveBeenCalled()
+})
+it('locks verification/resend/cancel, retries wrong codes and clears state on cancel', async () => {
+  let resolve!: (value: 'invalid') => void
+  const sendEmailCode = vi.fn(async () => 'email-code' as const)
+  const verifyEmailCode = vi.fn(() => new Promise<'invalid'>(r => { resolve = r }))
+  const { adapter, submit } = setup({ password: vi.fn(async () => 'email-code' as const), sendEmailCode, verifyEmailCode }); submit()
+  const input = await screen.findByLabelText('Email verification code')
+  fireEvent.change(input, { target: { value: 'wrong' } })
+  const form = input.closest('form')!
+  act(() => { fireEvent.submit(form); fireEvent.submit(form); fireEvent.click(screen.getByText('Resend code')); fireEvent.click(screen.getByText('Cancel verification')) })
+  expect(verifyEmailCode).toHaveBeenCalledTimes(1)
+  expect(sendEmailCode).toHaveBeenCalledTimes(1)
+  expect(adapter.finalize).not.toHaveBeenCalled()
+  await act(async () => resolve('invalid'))
+  expect(await screen.findByRole('alert')).toHaveProperty('textContent', 'Verification failed. Try again or resend the code.')
+  expect(input).toHaveProperty('value', '')
+  fireEvent.click(screen.getByText('Resend code')); await act(async () => {})
+  expect(sendEmailCode).toHaveBeenCalledTimes(2)
+  fireEvent.change(input, { target: { value: 'secret-code' } })
+  fireEvent.click(screen.getByText('Cancel verification'))
+  expect(screen.getByLabelText('Password')).toHaveProperty('value', '')
+  expect(screen.queryByLabelText('Email verification code')).toBeNull()
+})
+it('finalizes verified codes once and retains backend confirmation gate', async () => {
+  const { adapter, submit } = setup({ password: vi.fn(async () => 'email-code' as const), sendEmailCode: vi.fn(async () => 'email-code' as const), verifyEmailCode: vi.fn(async () => 'complete' as const) }); submit()
+  const input = await screen.findByLabelText('Email verification code')
+  fireEvent.change(input, { target: { value: '123456' } }); fireEvent.submit(input.closest('form')!)
+  await screen.findByText('Sign-in completed; waiting for backend access confirmation.')
+  expect(adapter.finalize).toHaveBeenCalledTimes(1)
+})
 function setup(overrides: Partial<SignInAdapter> = {}) {
   const adapter: SignInAdapter = { fetching: false, password: vi.fn(async () => 'complete' as const), finalize: vi.fn(async () => 'complete' as const), persistence: async () => 'encrypted', ...overrides }
   const pending = vi.fn()

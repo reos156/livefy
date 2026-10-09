@@ -1,7 +1,10 @@
 import { createContext, useContext, type ReactNode } from 'react'
-export type SignInOutcome = 'complete' | 'invalid' | 'challenge'
+export type SignInOutcome = 'complete' | 'invalid' | 'challenge' | 'email-code'
 export interface SignInAdapter {
   fetching: boolean
+  sendEmailCode?(): Promise<SignInOutcome>
+  verifyEmailCode?(code: string): Promise<SignInOutcome>
+  diagnostic?(): string
   password(credentials: { emailAddress: string; password: string }): Promise<SignInOutcome>
   finalize(): Promise<SignInOutcome>
   persistence(): Promise<'encrypted' | 'memory-only'>
