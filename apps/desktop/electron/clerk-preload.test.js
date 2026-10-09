@@ -15,7 +15,11 @@ it('exposes only the supported bridge and fixed persistence status call', () => 
   expect(exposeClerkBridge).toHaveBeenCalledWith()
   const [name, api] = exposeInMainWorld.mock.calls[0]
   expect(name).toBe('livefySession')
-  expect(Object.keys(api)).toEqual(['persistence'])
+  expect(Object.keys(api)).toEqual(['persistence', 'logout', 'preserveAndQuit'])
+  api.logout('untrusted-key')
+  expect(invoke).toHaveBeenCalledWith('livefy:session-logout')
+  api.preserveAndQuit('untrusted-token', true)
+  expect(invoke).toHaveBeenLastCalledWith('livefy:session-preserve-and-quit')
   api.persistence('untrusted-channel')
   expect(invoke).toHaveBeenCalledWith('livefy:session-persistence')
 })
