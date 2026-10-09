@@ -46,3 +46,17 @@ it('unmounts confirmed content on refresh or authentication loss', () => {
   expect(unmount).toHaveBeenCalledTimes(2)
   expect(screen.queryByText('Private child')).toBeNull()
 })
+
+it.each([
+  [false, false, 'Authentication unavailable'],
+  [true, true, 'Checking backend access'],
+  [true, false, 'Authentication required'],
+] as const)('composes private status without assertive alerts or form dividers', (configured, isLoading, copy) => {
+  Object.assign(state, { configured, isLoading })
+  render(<PrivateAccess>Private child</PrivateAccess>)
+  const status = screen.getByRole('status')
+  expect(status.getAttribute('data-slot')).toBe('alert')
+  expect(status.querySelector('[data-slot="alert-description"]')?.textContent).toBe(copy)
+  expect(screen.queryByRole('alert')).toBeNull()
+  expect(screen.queryByRole('separator')).toBeNull()
+})

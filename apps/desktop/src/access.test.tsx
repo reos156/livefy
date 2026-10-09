@@ -65,3 +65,27 @@ it.each([
   expect(screen.getByText(text)).toBeTruthy()
   expect(Boolean(screen.queryByRole('textbox'))).toBe(!isAuthenticated && !isLoading)
 })
+
+it('composes a polite status and divider only before the selected unauthenticated form', () => {
+  state.configured = true
+  const view = render(<AccessLanding />)
+  const status = screen.getByRole('status')
+  expect(status.getAttribute('data-slot')).toBe('alert')
+  expect(status.querySelector('[data-slot="alert-description"]')?.textContent).toBe('No authenticated session confirmed')
+  expect(screen.queryByRole('alert')).toBeNull()
+  const separator = screen.getByRole('separator')
+  expect(separator.getAttribute('data-slot')).toBe('separator')
+  expect(separator.nextElementSibling?.contains(screen.getByLabelText('Sign-in email'))).toBe(true)
+  fireEvent.click(screen.getByRole('button', { name: 'Create an account' }))
+  expect(screen.getAllByRole('separator')).toHaveLength(1)
+  expect(separator.nextElementSibling?.contains(screen.getByLabelText('Registration email'))).toBe(true)
+  state.isLoading = true
+  view.rerender(<AccessLanding />)
+  expect(screen.queryByRole('separator')).toBeNull()
+  state.isLoading = false; state.isAuthenticated = true
+  view.rerender(<AccessLanding />)
+  expect(screen.queryByRole('separator')).toBeNull()
+  state.configured = false
+  view.rerender(<AccessLanding />)
+  expect(screen.queryByRole('separator')).toBeNull()
+})

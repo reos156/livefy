@@ -1,3 +1,6 @@
+import { Separator } from '@/components/ui/separator'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { VisualShell } from './components/visual-shell'
 import { Button } from '@/components/ui/button'
 import { Registration } from './registration'
 import { useConvexAuth } from 'convex/react'
@@ -27,12 +30,13 @@ function ConfiguredAccess({ onEnterApp }: { onEnterApp?: () => void }) {
     return () => { active = false }
   }, [])
   return <>
-    <p role="status">{checking ? 'Checking backend access' : isAuthenticated ?
-      'Backend access confirmed' : 'No authenticated session confirmed'}</p>
+    <Alert role="status"><AlertDescription>{checking ? 'Checking backend access' : isAuthenticated ?
+      'Backend access confirmed' : 'No authenticated session confirmed'}</AlertDescription></Alert>
     <p>{persistence}</p>
     {!checking && isAuthenticated && <LogoutButton />}
     {!checking && isAuthenticated && onEnterApp && <Button onClick={onEnterApp}>Open app</Button>}
     {!checking && !isAuthenticated && <>
+      <Separator />
       {view === 'sign-in' ? <SignIn onPendingChange={onPendingChange} /> : <Registration onPendingChange={onPendingChange} />}
       <Button variant="outline" disabled={pending || adapter.fetching} onClick={() => {
         if (!switchLock.current && !adapter.fetching) setView(view === 'sign-in' ? 'registration' : 'sign-in')
@@ -42,13 +46,12 @@ function ConfiguredAccess({ onEnterApp }: { onEnterApp?: () => void }) {
 }
 export function AccessLanding({ onEnterApp }: { onEnterApp?: () => void }) {
   const configured = useAuthConfigured()
-  return <main className="mx-auto flex min-h-svh max-w-md flex-col justify-center gap-6 p-8">
-    <h1 className="text-3xl font-semibold">Livefy</h1>
+  return <VisualShell title="Livefy">
     {configured ? <ConfiguredAccess onEnterApp={onEnterApp} /> : <>
       <p className="text-muted-foreground">
         Email and password access is not available yet. This desktop preview does not collect credentials.
       </p>
       <Button disabled>Sign in — coming soon</Button>
     </>}
-  </main>
+  </VisualShell>
 }

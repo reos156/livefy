@@ -3,6 +3,66 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { SignIn } from './sign-in'
 import { SignInProvider, type SignInAdapter } from './lib/sign-in'
 afterEach(cleanup)
+function expectOfficialField(label: string, id: string) {
+  const input = screen.getByLabelText(label)
+  expect(input.id).toBe(id)
+  expect(input.getAttribute('data-slot')).toBe('input')
+  const field = input.closest('[data-slot="field"]')!
+  expect(field).not.toBeNull()
+  expect(field.parentElement?.getAttribute('data-slot')).toBe('field-group')
+  expect(field.querySelector('label')?.getAttribute('for')).toBe(id)
+  expect(field.querySelector('label')?.getAttribute('data-slot')).toBe('field-label')
+  return input
+}
+it('composes official credential fields while retaining native input semantics', () => {
+  setup()
+  const email = expectOfficialField('Email', 'sign-in-email')
+  const password = expectOfficialField('Password', 'sign-in-password')
+  expect(email.getAttribute('type')).toBe('text')
+  expect(email.getAttribute('inputmode')).toBe('email')
+  expect(email.getAttribute('autocomplete')).toBe('username')
+  expect(password.getAttribute('type')).toBe('password')
+  expect(password.getAttribute('autocomplete')).toBe('current-password')
+  expect(email).toHaveProperty('required', true)
+  expect(password).toHaveProperty('required', true)
+  expect(email.closest('form')).toHaveProperty('noValidate', true)
+})
+it('uses a destructive official alert description without changing announcements', async () => {
+  setup()
+  fireEvent.submit(screen.getByLabelText('Email').closest('form')!)
+  const alert = await screen.findByRole('alert')
+  expect(alert.getAttribute('data-slot')).toBe('alert')
+  expect(alert.className).toContain('text-destructive')
+  expect(alert.querySelector('[data-slot="alert-description"]')?.textContent).toBe('Enter a valid email address and password.')
+  expect(alert.getAttribute('aria-live')).toBeNull()
+  expect(screen.getByRole('status').getAttribute('data-slot')).toBe('alert')
+  expect(screen.getByRole('status').querySelector('[data-slot="alert-description"]')).toBeTruthy()
+  expect(screen.getAllByRole('alert')).toHaveLength(1)
+  expect(screen.getByRole('status').textContent).toBe('Enter your existing account credentials.')
+})
+it('retains official code composition and pending locks through verification failure', async () => {
+  let resolve!: (value: 'invalid') => void
+  const { adapter, submit } = setup({ password: vi.fn(async () => 'email-code' as const), sendEmailCode: vi.fn(async () => 'email-code' as const), verifyEmailCode: vi.fn(() => new Promise<'invalid'>(r => { resolve = r })) })
+  submit()
+  await screen.findByLabelText('Email verification code')
+  const input = expectOfficialField('Email verification code', 'sign-in-code')
+  expect(input.getAttribute('autocomplete')).toBe('one-time-code')
+  fireEvent.change(input, { target: { value: '123456' } })
+  const form = input.closest('form')!
+  act(() => { fireEvent.submit(form); fireEvent.submit(form) })
+  expect(input).toHaveProperty('disabled', true)
+  expect(input.closest('[data-slot="field"]')?.hasAttribute('data-disabled')).toBe(true)
+  expect(form.getAttribute('aria-busy')).toBe('true')
+  for (const text of ['Verify code', 'Resend code', 'Cancel verification']) expect(screen.getByRole('button', { name: text })).toHaveProperty('disabled', true)
+  expect(screen.getByRole('status').textContent).toBe('Sign-in request in progress.')
+  expect(adapter.verifyEmailCode).toHaveBeenCalledTimes(1)
+  await act(async () => resolve('invalid'))
+  expect(input).toHaveProperty('value', '')
+  expect(input).toHaveProperty('disabled', false)
+  expect(input.closest('[data-slot="field"]')?.hasAttribute('data-disabled')).toBe(false)
+  expect(form.getAttribute('aria-busy')).toBe('false')
+  expect((await screen.findByRole('alert')).querySelector('[data-slot="alert-description"]')?.textContent).toBe('Verification failed. Try again or resend the code.')
+})
 it('clears unsupported diagnostic during a password retry', async () => {
   let resolve!: (value: 'invalid') => void
   const password = vi.fn().mockResolvedValueOnce('challenge').mockImplementationOnce(() => new Promise<'invalid'>(r => { resolve = r }))

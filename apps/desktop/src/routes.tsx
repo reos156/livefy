@@ -1,4 +1,6 @@
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { createRootRoute, createRoute, createRouter, Link, Outlet, useNavigate, type RouterHistory } from '@tanstack/react-router'
+import { VisualShell } from './components/visual-shell'
 import { AccessLanding } from './access'
 import { PrivateAccess } from './private-access'
 import { LogoutButton } from './lib/session'
@@ -8,13 +10,12 @@ function PublicAccess() {
   return <AccessLanding onEnterApp={() => { void navigate({ to: '/app' }) }} />
 }
 function PrivateApp() {
-  return <PrivateAccess rejected={<><p role="status">Authentication required</p><Link to="/">Return to access</Link></>}>
-    <main className="mx-auto flex min-h-svh max-w-md flex-col justify-center gap-6 p-8">
-      <h1 className="text-3xl font-semibold">Livefy app</h1>
+  return <PrivateAccess rejected={<><Alert role="status"><AlertDescription>Authentication required</AlertDescription></Alert><Link to="/">Return to access</Link></>}>
+    <VisualShell title="Livefy app">
       <p>Backend access confirmed.</p>
       <LogoutButton />
       <Link to="/">Return to access</Link>
-    </main>
+    </VisualShell>
   </PrivateAccess>
 }
 export function createAppRouter(history: RouterHistory) {

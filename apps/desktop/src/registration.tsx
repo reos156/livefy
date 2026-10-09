@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useRegistrationAdapter } from './lib/registration'
 import { Button } from '@/components/ui/button'
+import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 
 type Step = 'credentials' | 'send' | 'verify' | 'finish' | 'done' | 'existing' | 'unsupported'
 const existingCopy = 'An account already exists. Use sign in; registration will not sign you in.'
@@ -109,26 +112,36 @@ export function Registration({ onPendingChange }: { onPendingChange?: (pending: 
     {/* Pinned Clerk React source mounts this target for custom-flow CAPTCHA. */}
     <div id="clerk-captcha" />
     {step === 'credentials' && <form onSubmit={register} noValidate className="flex flex-col gap-4" aria-busy={pending}>
-      <label htmlFor="registration-email">Email</label>
-      <input id="registration-email" type="text" inputMode="email" autoComplete="email" required
-        value={email} onChange={event => setEmail(event.target.value)} disabled={disabled} />
-      <label htmlFor="registration-password">Password</label>
-      <input id="registration-password" type="password" autoComplete="new-password" required minLength={8}
-        value={password} onChange={event => setPassword(event.target.value)} disabled={disabled} />
+      <FieldGroup>
+        <Field data-disabled={disabled}>
+          <FieldLabel htmlFor="registration-email">Email</FieldLabel>
+          <Input id="registration-email" type="text" inputMode="email" autoComplete="email" required
+            value={email} onChange={event => setEmail(event.target.value)} disabled={disabled} />
+        </Field>
+        <Field data-disabled={disabled}>
+          <FieldLabel htmlFor="registration-password">Password</FieldLabel>
+          <Input id="registration-password" type="password" autoComplete="new-password" required minLength={8}
+            value={password} onChange={event => setPassword(event.target.value)} disabled={disabled} />
+        </Field>
+      </FieldGroup>
       <p>Use at least 8 characters.</p>
       <Button type="submit" disabled={disabled}>Register</Button>
     </form>}
     {step === 'send' && <Button disabled={disabled} onClick={() => void run(send)}>Send email code</Button>}
     {step === 'verify' && <form onSubmit={verify} className="flex flex-col gap-4" aria-busy={pending}>
-      <label htmlFor="registration-code">Email code</label>
-      <input id="registration-code" autoComplete="one-time-code" value={code}
-        onChange={event => setCode(event.target.value)} disabled={disabled} />
+      <FieldGroup>
+        <Field data-disabled={disabled}>
+          <FieldLabel htmlFor="registration-code">Email code</FieldLabel>
+          <Input id="registration-code" autoComplete="one-time-code" value={code}
+            onChange={event => setCode(event.target.value)} disabled={disabled} />
+        </Field>
+      </FieldGroup>
       <Button type="submit" disabled={disabled}>Verify email</Button>
       <Button type="button" variant="outline" disabled={disabled} onClick={() => void run(send)}>Resend code</Button>
     </form>}
     {step === 'finish' && <Button disabled={disabled} onClick={() => void run(finish)}>Finish registration</Button>}
-    {error && <p role="alert">{error}</p>}
-    <p role="status">{pending ? 'Registration request in progress.' : step === 'done' ?
-      'Registration completed; waiting for backend access confirmation.' : 'No authenticated session confirmed.'}</p>
+    {error && <Alert variant="destructive" role="alert"><AlertDescription>{error}</AlertDescription></Alert>}
+    <Alert role="status"><AlertDescription>{pending ? 'Registration request in progress.' : step === 'done' ?
+      'Registration completed; waiting for backend access confirmation.' : 'No authenticated session confirmed.'}</AlertDescription></Alert>
   </section>
 }

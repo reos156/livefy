@@ -1,5 +1,8 @@
 import { useRef, useState, type FormEvent } from 'react'
 import { Button } from '@/components/ui/button'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
 import { useSignInAdapter } from './lib/sign-in'
 const invalidCopy = 'Unable to sign in. Check your email and password and try again.'
 const challengeCopy = 'Additional verification is required. Contact support to complete sign-in; access has not been confirmed.'
@@ -63,9 +66,13 @@ export function SignIn({ onPendingChange }: { onPendingChange?: (pending: boolea
     <h2>Sign in with email and password</h2>
     <form onSubmit={event => void submit(event)} noValidate aria-busy={pending || adapter.fetching} className="flex flex-col gap-4">
       {verification ? <>
-        <label htmlFor="sign-in-code">Email verification code</label>
-        <input id="sign-in-code" autoComplete="one-time-code" value={code} disabled={disabled}
-          onChange={event => setCode(event.target.value)} />
+        <FieldGroup>
+          <Field data-disabled={disabled || undefined}>
+            <FieldLabel htmlFor="sign-in-code">Email verification code</FieldLabel>
+            <Input id="sign-in-code" autoComplete="one-time-code" value={code} disabled={disabled}
+              onChange={event => setCode(event.target.value)} />
+          </Field>
+        </FieldGroup>
         <Button type="submit" disabled={disabled || !code.trim()}>Verify code</Button>
         <Button type="button" disabled={disabled} onClick={() => void verify(true)}>Resend code</Button>
         <Button type="button" disabled={disabled} onClick={() => {
@@ -73,18 +80,24 @@ export function SignIn({ onPendingChange }: { onPendingChange?: (pending: boolea
           setVerification(false); setPassword(''); setCode(''); setError(''); setDiagnostic('')
         }}>Cancel verification</Button>
       </> : <>
-      <label htmlFor="sign-in-email">Email</label>
-      <input id="sign-in-email" type="text" inputMode="email" autoComplete="username" required
-        value={email} onChange={event => setEmail(event.target.value)} disabled={disabled} />
-      <label htmlFor="sign-in-password">Password</label>
-      <input id="sign-in-password" type="password" autoComplete="current-password" required
-        value={password} onChange={event => setPassword(event.target.value)} disabled={disabled} />
+      <FieldGroup>
+        <Field data-disabled={disabled || undefined}>
+          <FieldLabel htmlFor="sign-in-email">Email</FieldLabel>
+          <Input id="sign-in-email" type="text" inputMode="email" autoComplete="username" required
+            value={email} onChange={event => setEmail(event.target.value)} disabled={disabled} />
+        </Field>
+        <Field data-disabled={disabled || undefined}>
+          <FieldLabel htmlFor="sign-in-password">Password</FieldLabel>
+          <Input id="sign-in-password" type="password" autoComplete="current-password" required
+            value={password} onChange={event => setPassword(event.target.value)} disabled={disabled} />
+        </Field>
+      </FieldGroup>
       <Button type="submit" disabled={disabled}>Sign in</Button>
       </>}
     </form>
-    {error && <p role="alert">{error}</p>}
+    {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
     {diagnostic && <p>Sign-in diagnostic: {diagnostic}</p>}
-    <p role="status">{pending || adapter.fetching ? 'Sign-in request in progress.' : done ?
-      'Sign-in completed; waiting for backend access confirmation.' : 'Enter your existing account credentials.'}</p>
+    <Alert role="status"><AlertDescription>{pending || adapter.fetching ? 'Sign-in request in progress.' : done ?
+      'Sign-in completed; waiting for backend access confirmation.' : 'Enter your existing account credentials.'}</AlertDescription></Alert>
   </section>
 }

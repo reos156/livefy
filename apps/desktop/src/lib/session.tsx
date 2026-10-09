@@ -1,5 +1,7 @@
 import { createContext, useContext, useRef, useState, type ReactNode } from 'react'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
+import { VisualShell } from '@/components/visual-shell'
 
 const Session = createContext<(() => void) | undefined>(undefined)
 export function LogoutButton() {
@@ -22,14 +24,16 @@ export function SessionBoundary({ children, logout }: { children: ReactNode; log
   }
   if (state === 'active') return <Session.Provider value={() => { void endSession() }}>{children}</Session.Provider>
   // Unmount auth consumers immediately, independently of provider promises or stale tokens.
-  return <main className="mx-auto flex min-h-svh max-w-md flex-col justify-center gap-6 p-8">
-    {state === 'pending' && <p role="status">Signing out locally…</p>}
-    {state === 'ended' && <p role="status">Signed out on this device.</p>}
+  return <VisualShell title={{ pending: 'Signing out', ended: 'Signed out', failed: 'Sign-out incomplete' }[state]}>
+    {state === 'pending' && <Alert role="status"><AlertDescription>Signing out locally…</AlertDescription></Alert>}
+    {state === 'ended' && <Alert role="status"><AlertDescription>Signed out on this device.</AlertDescription></Alert>}
     {state === 'failed' && <>
-      <p role="alert">Local sign-out incomplete; restart exclusion is not confirmed. Private access remains blocked.</p>
+      <Alert variant="destructive">
+        <AlertDescription>Local sign-out incomplete; restart exclusion is not confirmed. Private access remains blocked.</AlertDescription>
+      </Alert>
       <Button onClick={() => { void endSession() }}>Retry local sign-out</Button>
     </>}
     <p>Remote session revocation is unconfirmed, including when offline.</p>
     <p>Livefy closes automatically after local sign-out succeeds. Relaunch before signing in again.</p>
-  </main>
+  </VisualShell>
 }
