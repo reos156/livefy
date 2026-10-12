@@ -1,12 +1,16 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
-import { createContext, useContext } from 'react'
+import { createContext, useContext, type ComponentProps } from 'react'
+import type { ClerkProvider } from '@clerk/react'
+type ProviderProps = ComponentProps<typeof ClerkProvider>
+let providerProps: ProviderProps
+const clerk = { loaded: true, session: {} as object | null, signOut: (...args: unknown[]) => state.signOut(...args) }
 import { createMemoryHistory, Outlet, RouterProvider } from '@tanstack/react-router'
 const state = vi.hoisted(() => ({ signedIn: true, confirmed: true, navigated: false, refreshed: false, signOut: vi.fn() }))
 vi.mock('@clerk/react', () => ({
-  ClerkProvider: ({ children }: { children: React.ReactNode }) => children,
+  ClerkProvider: (props: ProviderProps) => { providerProps = props; return props.children },
   useAuth: () => useContext(AuthState),
-  useClerk: () => ({ signOut: state.signOut }),
+  useClerk: () => clerk,
 }))
 vi.mock('../../platform/auth', () => ({
   isNativePlatform: () => false,
@@ -26,6 +30,7 @@ afterEach(() => {
   vi.restoreAllMocks()
   vi.clearAllMocks()
   Object.assign(state, { signedIn: true, confirmed: true, navigated: false, refreshed: false })
+  Object.assign(clerk, { loaded: true, session: {} })
   window.history.replaceState(null, '', '/')
 })
 it.each([
@@ -39,10 +44,13 @@ it.each([
   let remove!: () => void
   const removed = new Promise<void>(resolve => { remove = resolve })
   let attempts = 0
+  const windowNavigate = vi.fn()
   state.signOut.mockImplementation(async (options: { redirectUrl: string }) => {
     await removed
     // Installed clerk-js 6.38: removeSessions, await provider navigation, then refresh session.
-    await navigation.routerReplace(options.redirectUrl)
+    clerk.session = null
+    await providerProps.routerReplace!(options.redirectUrl, { windowNavigate })
+    expect(windowNavigate).toHaveBeenLastCalledWith(browserCompletionUrl(window.location.href))
     state.navigated = true
     if (failFirst && ++attempts === 1) throw new Error('secret sign-out failure')
     state.signedIn = false
@@ -76,6 +84,7 @@ it.each([
   }
   await waitFor(() => expect(state.refreshed).toBe(true))
   expect(state.navigated).toBe(true)
+  expect(windowNavigate).toHaveBeenCalledTimes(failFirst ? 2 : 1)
   view.rerender(tree())
   await screen.findByText('Public sign-in')
   expect(router.state.location.pathname).toBe('/')
@@ -90,13 +99,21 @@ it('wires browser completion to public memory navigation, not native navigation'
   const capturedRender = vi.fn(), navigate = vi.fn(), native = vi.fn(), update = vi.fn()
   vi.doMock('react-dom/client', () => ({ createRoot: () => ({ render: capturedRender }) }))
   vi.doMock('../../routes', () => ({ createAppRouter: () => ({ navigate, routeTree: { update } }) }))
-  vi.doMock('../../platform/auth', () => ({ isNativePlatform: () => false, AuthBoundary: vi.fn() }))
+  vi.doMock('../../platform/auth', () => ({ isNativePlatform: () => false, AuthBoundary }))
   vi.doMock('../electron/auth-ui', () => ({ createModalNavigation: native, publicCompletionUrl: native }))
   document.body.innerHTML = '<div id="root"></div>'
   await import('../../main')
   const boundaryProps = capturedRender.mock.lastCall?.[0].props.children.props.children.props
+  render(<SessionInfrastructure><AuthBoundary {...boundaryProps} {...props}><p>Boundary mounted</p></AuthBoundary></SessionInfrastructure>)
+  const windowNavigate = vi.fn()
+  clerk.session = null
+  await act(async () => providerProps.routerReplace!(`${window.location.origin}/#/`, { windowNavigate }))
+  expect(windowNavigate).toHaveBeenCalledExactlyOnceWith(`${window.location.origin}/#/`)
+  expect(navigate).not.toHaveBeenCalled()
+  clerk.session = {}
   window.history.replaceState(null, '', '/#/sso-callback')
-  await act(async () => boundaryProps.modalNavigation.routerReplace(`${window.location.origin}/#/`))
+  await act(async () => providerProps.routerReplace!(`${window.location.origin}/#/`, { windowNavigate }))
+  expect(windowNavigate).toHaveBeenCalledTimes(1)
   expect(navigate).toHaveBeenCalledExactlyOnceWith({ to: '/', replace: true })
   expect(window.location.hash).toBe('#/')
   expect(native).not.toHaveBeenCalled()

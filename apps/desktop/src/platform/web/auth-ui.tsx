@@ -1,4 +1,8 @@
-import { SignIn } from '@clerk/react'
+import { ClerkProvider, SignIn } from '@clerk/react'
+import { type ComponentProps } from 'react'
+
+type RouterCallback = NonNullable<ComponentProps<typeof ClerkProvider>['routerPush']>
+type NavigationMetadata = Parameters<RouterCallback>[1]
 
 export function browserCompletionUrl(documentUrl: string) {
   const url = new URL(documentUrl)
@@ -12,24 +16,30 @@ export function browserCompletionUrl(documentUrl: string) {
 
 export function createBrowserNavigation(completionUrl: string, navigate: (replace: boolean) => unknown) {
   // Only completion enters the shared memory router; Clerk owns all auth-step hashes.
-  function complete(to: string, replace: boolean) {
+  function complete(to: string, replace: boolean, metadata: NavigationMetadata, hasSession: () => boolean) {
     const completion = new URL(completionUrl)
     // clerk-js navigate supplies same-origin URLs as pathname + search + hash.
     // Compare the canonical spelling, not arbitrary URL-resolved redirects.
     const relativeCompletion = completion.pathname + completion.search + completion.hash
     if (to !== completionUrl && to !== relativeCompletion) throw new Error('Unsupported browser completion target')
     if (browserCompletionUrl(window.location.href) !== completionUrl) throw new Error('Unsupported browser completion document')
+    if (!hasSession()) {
+      if (!metadata?.windowNavigate) throw new Error('Browser navigation metadata unavailable')
+      return metadata.windowNavigate(completionUrl)
+    }
     if (window.location.href !== completionUrl) {
-      const oldURL = window.location.href
       window.history.replaceState(window.history.state, '', completionUrl)
-      window.dispatchEvent(new HashChangeEvent('hashchange', { oldURL, newURL: window.location.href }))
     }
     return navigate(replace)
   }
-  return {
-    routerPush: (to: string) => complete(to, false),
-    routerReplace: (to: string) => complete(to, true),
+  function withSession(hasSession: () => boolean) {
+    return {
+      routerPush: (to: string, metadata?: NavigationMetadata) => complete(to, false, metadata, hasSession),
+      routerReplace: (to: string, metadata?: NavigationMetadata) => complete(to, true, metadata, hasSession),
+    }
   }
+  // An unbound adapter has unknown session state and must not enter the memory router.
+  return { ...withSession(() => false), withSession }
 }
 
 export function BrowserAuthUi() {
