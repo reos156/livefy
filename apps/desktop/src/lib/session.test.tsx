@@ -1,7 +1,32 @@
 import { fireEvent, render, screen, act, cleanup } from '@testing-library/react'
 import { expect, it, vi, afterEach } from 'vitest'
-import { SessionBoundary, LogoutButton } from './session'
+import { SessionBoundary, LogoutButton, SessionInfrastructure, SessionContent } from './session'
+import { useEffect } from 'react'
 afterEach(cleanup)
+
+it('unmounts gated consumers but retains browser navigation infrastructure during failure and retry', async () => {
+  const consumerUnmount = vi.fn(), infrastructureUnmount = vi.fn()
+  let finish!: () => void
+  const logout = vi.fn().mockRejectedValueOnce(new Error('failure')).mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve }))
+  function Consumer() {
+    useEffect(() => consumerUnmount, [])
+    return <><p>Private consumer</p><LogoutButton /></>
+  }
+  function Infrastructure() {
+    useEffect(() => infrastructureUnmount, [])
+    return <SessionContent><Consumer /></SessionContent>
+  }
+  render(<SessionInfrastructure><SessionBoundary browser logout={logout} completedContent={<p>Waiting</p>}><Infrastructure /></SessionBoundary></SessionInfrastructure>)
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Sign out' })))
+  expect(consumerUnmount).toHaveBeenCalledOnce()
+  expect(infrastructureUnmount).not.toHaveBeenCalled()
+  expect(screen.queryByText('Private consumer')).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'Retry sign-out' }))
+  await act(async () => finish())
+  expect(screen.getByText('Waiting')).toBeTruthy()
+  expect(infrastructureUnmount).not.toHaveBeenCalled()
+  expect(screen.queryByText('Private consumer')).toBeNull()
+})
 
 function expectLogoutShell(title: string) {
   const main = screen.getByRole('main')

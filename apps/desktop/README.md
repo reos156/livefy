@@ -1,8 +1,53 @@
 # Base de escritorio de Livefy
 
-## Integración local actual — Clerk nativo
+## Autoridad actual — autenticación DEV aceptada
 
-Clerk gestiona registro e inicio de sesión (H1.3/H1.4). Convex conserva
+El usuario aceptó los flujos reportados de autenticación Google en web y Electron,
+incluido el retorno del navegador a Electron. Google es el único proveedor social
+MVP: el usuario deshabilitó Facebook/TikTok en Clerk y confirmó que desaparecieron
+sus botones. No se ejecutaron cambios remotos en este cierre documental.
+Verificación independiente completa: 178/178 tests focalizados, 300/300 completos,
+typecheck y build aprobados; permanecen 27 advertencias use-client y un chunk
+sobredimensionado. Revisión nativa desactivada; assessment no evaluable por archivos
+untracked ambientales, cubierto por verificación independiente, no por aprobación
+de revisión. Alcance DEV aceptado, sin certificación de producción.
+
+No se observaron individualmente modo empaquetado, reinicio/persistencia Electron,
+revocación/logout tras reinicio, refresh/restauración web, Back y failure/retry,
+descubrimiento/reset/verificación/resend/errores, challenge ni la matriz visual.
+T3 está **diferido**, no aprobado: cierre DEV acotado sin evidencia separada;
+gate: registrar callback/acceso, reinicio/persistencia y logout por modo Windows
+antes de aceptar empaquetado o persistencia. Véanse [OAuth](../../odd/tasks/electron-google-oauth.md)
+y [paridad web](../../odd/tasks/web-auth-parity.md). La matriz visual #14 no cambia.
+Refs auth #8/#10/#12/#13 ya cerradas. Evidencia de commit: pendiente, el parent
+registrará el commit local autorizado; sin push/PR/merge.
+
+Esta autoridad reemplaza notas históricas de Google/browser pendientes. Los
+límites y observaciones históricas de agentes se conservan con atribución.
+
+## Integración local — Clerk
+
+Clerk gestiona registro e inicio de sesión (H1.3/H1.4) mediante `SignIn`
+embebido, `routing="hash"` y `withSignUp`, tanto en desarrollo como en builds
+no DEV. El descubrimiento unificado de cuentas pertenece al proveedor; no hay
+launcher, modal, SignUp separado ni formularios propios. Appearance local usa
+variables compatibles con React 6.17.6, tokens Livefy y Geist ya incluido.
+Clerk decide solo cuándo mostrar el formulario: una sesión Clerk sin confirmación
+Convex muestra espera, nunca entrada privada. Carga/refresh de Convex conserva
+prioridad. Persistencia se consulta al API nativo y se presenta solo con acceso
+confirmado; no se infiere cifrado cuando la consulta falta o falla.
+
+Fuentes oficiales verificadas por el parent el 2026-10-11:
+https://clerk.com/docs/electron/reference/components/authentication/sign-in ;
+https://clerk.com/docs/electron/guides/customizing-clerk/appearance-prop/overview .
+Los tests prueban montaje/props del wrapper instalado, no comportamiento del CDN.
+En Windows quedan pendientes descubrimiento login/registro, volver, reset,
+verificación/resend/errores, tema claro/oscuro, foco/reflow y CAPTCHA si aparece.
+Los agentes no certificaron estos casos individuales. La aceptación humana DEV
+actual incluye los flujos reportados web/Electron y Google; no certifica producción,
+persistencia/reinicio ni protocolo empaquetado.
+
+Convex conserva
 `auth.config.ts`, la autorización de `requireUser`/`session:current` basada en la
 identidad JWT de Clerk y un router HTTP vacío. El esquema de aplicación no declara
 tablas; se retiraron las dependencias, tablas, validación y scripts locales de
@@ -36,11 +81,44 @@ El origen empaquetado es `livefy://renderer`; el esquema se registra antes de
 readiness y sirve solo archivos contenidos en dist, incluyendo comprobación de
 rutas reales. Desarrollo usa `http://127.0.0.1:5173`.
 
-El bridge usa `createClerkBridge({storage})`, sin renderer/OAuth/passkeys. La SDK
-comprueba el frame principal, no el origen exacto de cada IPC. La ventana controlada,
-la navegación restringida y los popups denegados mantienen ese origen. La precarga
-expone el API fijo público de Clerk y una consulta fija de estado de persistencia;
-no expone IPC genérico. Cleanup retira handlers al salir.
+### OAuth bootstrap repair — Clerk Electron 0.0.51
+
+The main process creates `createClerkBridge` before readiness with
+`renderer: { scheme: 'livefy', host: 'renderer' }` and deferred TokenStorage.
+Clerk owns privileged scheme registration, OAuth IPC and single-instance callback
+transport; secondary instances skip ready-time initialization and window creation.
+The encrypted-storage adapter still initializes after readiness, before windows
+open. Deferred token calls delegate to that adapter and reject before initialization.
+Development still loads `http://127.0.0.1:5173/`; the OAuth callback remains
+`livefy://renderer/` in both modes. No passkeys are enabled.
+
+For default Electron launches (`electron .`), the primary instance overrides the
+SDK's executable-only protocol registration after bridge creation with
+`process.execPath` and the absolute desktop application directory derived from
+`__dirname`, never callback-containing launch arguments. Paths are passed as raw
+API arguments, without manual quoting; `--livefy-dev` is retained only for a
+current development launch. Packaged non-default launches keep SDK registration.
+Registration failure emits a fixed diagnostic without callback or launch data.
+Restart Electron after this change before retrying Google sign-in/sign-up.
+The effective Windows registry command has not been inspected, and mocked
+registration tests do not prove that Windows launches the correct app or completes
+the real browser callback. The user subsequently accepted the DEV Google return flow; packaged registration
+and independently inspected Windows registry evidence remain unobserved.
+
+The SDK checks window main frames, not exact IPC origins. Existing restricted
+navigation, denied popups and local protocol containment remain unchanged. The
+fixed Clerk preload API permits the SDK's external-browser OAuth transport, not
+generic IPC. Cleanup removes OAuth/token handlers and callback listeners and
+releases the SDK-owned single-instance lock; logout durability remains unchanged.
+
+Deterministic tests execute the installed CJS SDK with mocked Electron and browser
+transport, including callbacks and cleanup; they do not prove Google provider
+completion or real OS protocol registration. The user subsequently accepted Google sign-in/sign-up and Electron browser return.
+Individual restart/persistence/logout and packaged-mode checks are deferred under T3,
+not passed. During the repair, the agents performed no real login or remote mutation.
+No fetch tool was available to consult
+https://clerk.com/docs/electron/getting-started/quickstart during this repair;
+API details were checked against installed 0.0.51 README, types and CJS source.
 
 Tokens: electron-store contiene únicamente envelopes versionados cifrados mediante
 safeStorage. Registros raw/desconocidos/corruptos se rechazan sin sobrescribir ni
@@ -58,7 +136,9 @@ Los orígenes autorizados de Clerk DEV se inicializaron, con autorización expl�
 desde `null` a `[http://127.0.0.1:5173, livefy://renderer]`, según el registro del
 worker. La verificación independiente confirmó el estado actual exacto y Native
 API habilitada; no reconstruyó la transición histórica ni el número de PATCH.
-No hay OAuth ni single-instance/deep-link flows en este modo.
+OAuth IPC and single-instance/deep-link transport are now configured locally as
+specified above; the user accepted DEV Google browser return. Packaged callback
+and individual persistence evidence remain deferred, not inferred.
 Producción/FREE Native API y publicación pertenecen a H1.12.
 
 H1.2d fue aceptado para DEV: la captura de Windows muestra la interfaz y capacidad
@@ -97,6 +177,62 @@ La base H1.1/H1.2 combina una ventana Electron aislada, una vista previa de acce
 
 Consulta el [README principal](../../README.md) y el [registro del hito H1](../../odd/tasks/mvp-h1-access-windows.md).
 
+## Browser parity — embedded authentication
+
+From `apps/desktop`, run `npm run dev` and open
+`http://127.0.0.1:5173/` in a browser; do not launch Electron for this preview.
+The existing public DEV configuration above is still required. Missing or invalid
+configuration does not construct authentication providers.
+
+W1a selects `@clerk/react` 6.17.6 without the preload session bridge and retains
+`@clerk/electron` 0.0.51 when the bridge is present. Shared routes, theme and
+Convex-confirmed private access are unchanged. Browser logout immediately excludes
+private consumers, supports failure/retry, and returns to public access after
+signed-out confirmation without native IPC, quitting or relaunch instructions.
+Browser storage is not described as native encrypted persistence.
+The browser router stays mounted during sign-out so TanStack can acknowledge
+Clerk's awaited public navigation; the root-route session gate unmounts all
+routed consumers immediately and keeps them excluded on failure/retry. Navigation
+and signed-out confirmation are both awaited before public consumers return.
+The shared web/Electron access landing displays neutral `Loading…` during backend
+loading and refresh instead of `Checking backend access`. Private-route loading
+presentation remains unchanged; Convex confirmation still gates `Open app` and private UI.
+
+Browser authentication mounts the installed `@clerk/react` SignIn with `withSignUp`,
+Livefy appearance and hash routing. OAuth uses browser redirects, not native IPC
+or `livefy:` callbacks. Both sign-in and sign-up force completion to the current
+HTTP(S) document path with query removed and `#/`; only that exact completion
+(or the literal `/#/` when equivalent) enters the public memory route. Clerk owns
+intermediate auth-step hashes. Completion does not grant private access: Convex
+must confirm the session before the existing main-screen entry action is enabled.
+No service settings were changed. SDK 6.17.6 installed types/mount wrapper were
+inspected; official online browser documentation was not fetched here.
+
+Focused checks from `apps/desktop`:
+```sh
+npm run test -- src/access.test.tsx src/private-access.test.tsx src/routes.test.tsx src/lib/session.test.tsx src/platform/electron/auth.test.tsx src/platform/electron/auth-ui.test.tsx src/platform/auth.test.tsx src/platform/web
+npm run typecheck
+```
+
+Human acceptance of reported web/Electron Google flows is complete. The following
+matrix remains a checklist of individually unobserved cases, not a claim that all
+browser authentication is pending or that every item passed (mocks do not certify CDN UI):
+1. On the configured DEV origin, sign in with an existing authorized account,
+   including Google; verify return to the public app, Convex confirmation, then
+   enter the main screen with its existing action.
+2. With separate authorization to create an account, repeat with a fresh account
+   using embedded sign-up/Google and any required verification/challenge steps.
+3. Reload the main screen: public access should restore the browser session,
+   wait for Convex confirmation and offer entry again; do not expect native
+   encrypted-storage guarantees.
+4. Sign out; confirm private content disappears immediately and public access
+   returns after confirmation. Check Back and refresh cannot expose private
+   content, then sign in again without closing the tab. Check failure/retry when
+   sign-out cannot finish.
+5. Check auth-step Back/refresh, clear/dark appearance, keyboard focus and narrow
+   viewport layout. Record actual provider/origin/callback errors; allowed origin
+   or provider configuration changes require separate authorization.
+
 ## Ejecución local
 
 El manifiesto fija Bun 1.2.15. Node 22.23.1 es la versión observada en el entorno de verificación histórica, no un requisito universal obligatorio.
@@ -131,7 +267,10 @@ bun run desktop:dev
 
 `dev` inicia solamente Vite; Electron se inicia con `desktop:dev`. Desde la raíz, `bun run dev` coordina la tarea Vite mediante Turborepo, sin iniciar Electron.
 
-El renderizador utiliza la transformación JSX de Vite sin el preámbulo de Fast Refresh para restringir los scripts de la CSP a archivos locales. TanStack Router usa historial por fragmento; producción carga mediante
+El renderizador utiliza la transformación JSX de Vite sin el preámbulo de Fast Refresh para restringir los scripts de la CSP a archivos locales. TanStack Router usa historial en memoria iniciado en `/`; el fragmento queda
+reservado a Clerk. Navegar a `/app` no modifica el hash. El cambio aceptado por el
+usuario hace que reload vuelva al acceso público **sin borrar la sesión**;
+Convex debe volver a confirmar antes de ofrecer entrada. Producción carga mediante
 `livefy://renderer`. La inicialización estándar de Shadcn seleccionó Base UI / base-nova; su componente Button está incluido en el repositorio.
 
 ## Seguridad y límites de verificación
@@ -139,7 +278,7 @@ El renderizador utiliza la transformación JSX de Vite sin el preámbulo de Fast
 - El aislamiento de contexto y el entorno aislado (sandbox) están habilitados; la integración Node y las vistas web están deshabilitadas.
 - Se deniegan permisos y ventanas emergentes. La navegación y las redirecciones se limitan al documento de entrada exacto, permitiendo cambios de fragmento.
 - Desarrollo carga únicamente `http://127.0.0.1:5173/`; producción sirve `dist` mediante `livefy://renderer`. La CSP bloquea marcos, objetos y envíos de formularios; la compilación elimina el permiso de websocket de desarrollo.
-- La precarga expone solo el bridge fijo de Clerk y el estado de persistencia descritos arriba, no IPC genérico ni apertura de navegador externo. El servidor de desarrollo es código local de confianza, no una frontera de servicio autenticado.
+- The preload exposes only the fixed Clerk bridge (including SDK-managed external-browser OAuth) and persistence status described above, not generic IPC. The development server remains trusted local code, not an authenticated service boundary.
 
 Las pruebas Vitest históricas comprueban políticas deterministas y la interfaz de acceso no disponible, no la seguridad de Electron en ejecución. Un intento histórico en Linux registró caídas de procesos GPU (salida 139) y terminó por límite de tiempo (124); no constituye certificación visual ni demuestra por sí solo que la ventana no se abriera.
 

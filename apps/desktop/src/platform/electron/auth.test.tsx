@@ -9,8 +9,6 @@ vi.mock('@clerk/electron/react', () => ({
   },
   useClerk: () => mocks.resource(),
   useAuth: () => ({}),
-  useSignIn: () => ({ signIn: {}, fetchStatus: 'idle' }),
-  useSignUp: () => ({ signUp: { status: 'missing_requirements' }, fetchStatus: 'idle' }),
 }))
 vi.mock('convex/react', () => ({
   ConvexReactClient: class { constructor(url: string) { mocks.client(url) } },
@@ -18,9 +16,8 @@ vi.mock('convex/react', () => ({
 }))
 vi.mock('convex/react-clerk', () => ({ ConvexProviderWithClerk: (props: { children: React.ReactNode }) => { mocks.convex(props); return props.children } }))
 import { AuthBoundary, validEndpoint } from './auth'
+import { publicCompletionUrl } from './auth-ui'
 import { useAuthConfigured } from '../../lib/auth'
-import { useRegistrationAdapter } from '../../lib/registration'
-import { useSignInAdapter } from '../../lib/sign-in'
 import { LogoutButton } from '../../lib/session'
 afterEach(() => { cleanup(); delete window.livefySession })
 beforeEach(() => { mocks.resource.mockReturnValue({ client: null }); mocks.unmount.mockClear() })
@@ -28,6 +25,26 @@ const endpoint = 'https://polite-parrot-887.convex.cloud'
 const publishableKey = `pk_test_${btoa('organic-snake-7233.clerk.accounts.dev$')}`
 function Configuration() { return <p>{String(useAuthConfigured())}</p> }
 describe('safe native auth configuration', () => {
+  it('passes paired delegates through one existing provider and cleans modals on logout', async () => {
+    const closeSignIn = vi.fn(), closeSignUp = vi.fn()
+    mocks.resource.mockReturnValue({ client: null, closeSignIn, closeSignUp })
+    const modalNavigation = { routerPush: vi.fn(), routerReplace: vi.fn() }
+    window.livefySession = { logout: vi.fn().mockResolvedValue(undefined), persistence: async () => 'encrypted' }
+    const previousCalls = mocks.clerk.mock.calls.length
+    render(<AuthBoundary endpoint={endpoint} publishableKey={publishableKey} modalNavigation={modalNavigation}><LogoutButton /></AuthBoundary>)
+    expect(mocks.clerk.mock.calls.length - previousCalls).toBe(1)
+    expect(mocks.clerk.mock.lastCall?.[0].signInUrl).toBe(publicCompletionUrl(window.location.href))
+    expect(mocks.clerk.mock.lastCall?.[0].routerPush).toBe(modalNavigation.routerPush)
+    expect(mocks.clerk.mock.lastCall?.[0].routerReplace).toBe(modalNavigation.routerReplace)
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Sign out' })))
+    expect(closeSignIn).toHaveBeenCalledOnce()
+    expect(closeSignUp).toHaveBeenCalledOnce()
+  })
+  it('does not invent navigation delegates when none are supplied', () => {
+    render(<AuthBoundary endpoint={endpoint} publishableKey={publishableKey}>Access</AuthBoundary>)
+    expect(mocks.clerk.mock.lastCall?.[0]).not.toHaveProperty('routerPush')
+    expect(mocks.clerk.mock.lastCall?.[0]).not.toHaveProperty('routerReplace')
+  })
   it.each([undefined, '', 'not a URL', 'http://polite-parrot-887.convex.cloud', 'https://evil.test'])('rejects endpoint %s', endpoint => {
     expect(validEndpoint(endpoint)).toBe(false)
     render(<AuthBoundary endpoint={endpoint}><Configuration /></AuthBoundary>)
@@ -35,11 +52,10 @@ describe('safe native auth configuration', () => {
     expect(screen.getByText('false')).toBeTruthy()
   })
   it('does not construct providers without a verified-host publishable key', () => {
+    const counts = [mocks.client.mock.calls.length, mocks.clerk.mock.calls.length, mocks.convex.mock.calls.length]
     render(<AuthBoundary endpoint={endpoint} publishableKey="pk_test_invalid">Preview</AuthBoundary>)
     expect(screen.getByRole('status').textContent).toContain('unavailable')
-    expect(mocks.client).not.toHaveBeenCalled()
-    expect(mocks.clerk).not.toHaveBeenCalled()
-    expect(mocks.convex).not.toHaveBeenCalled()
+    expect([mocks.client.mock.calls.length, mocks.clerk.mock.calls.length, mocks.convex.mock.calls.length]).toEqual(counts)
   })
   it('composes Clerk outside Convex and reuses a singleton client', () => {
     const props = { endpoint, publishableKey }
@@ -53,15 +69,6 @@ describe('safe native auth configuration', () => {
     expect(mocks.convex.mock.calls[0][0].client).toBe(mocks.convex.mock.calls[1][0].client)
     view.rerender(<AuthBoundary><Configuration /></AuthBoundary>)
     expect(screen.getByText('false')).toBeTruthy()
-  })
-  it('supplies both shared adapters only in the configured native composition', () => {
-    function Adapters() {
-      const registration = useRegistrationAdapter()
-      const login = useSignInAdapter()
-      return <p>{String(registration.isAuthenticated)}:{String(login.fetching)}</p>
-    }
-    render(<AuthBoundary endpoint={endpoint} publishableKey={publishableKey}><Adapters /></AuthBoundary>)
-    expect(screen.getByText('false:false')).toBeTruthy()
   })
   it('calls fixed native deletion and removes private consumers when preservation is unavailable', async () => {
     const logout = vi.fn().mockResolvedValue(undefined)

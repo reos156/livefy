@@ -1,6 +1,12 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { createMemoryHistory, RouterProvider } from '@tanstack/react-router'
+import { readFileSync } from 'node:fs'
+vi.mock('./platform/auth', () => ({
+  useAuth: () => ({ isLoaded: true, isSignedIn: false }),
+  isNativePlatform: () => true,
+  AuthUi: () => <p>Official Clerk launchers</p>,
+}))
 const state = vi.hoisted(() => ({ isLoading: false, isAuthenticated: false, isRefreshing: false }))
 const authHook = vi.hoisted(() => vi.fn())
 const listeners = vi.hoisted(() => new Set<() => void>())
@@ -14,14 +20,25 @@ vi.mock('convex/react', async () => {
   } }
 })
 beforeEach(() => { vi.spyOn(window, 'scrollTo').mockImplementation(() => {}) })
-vi.mock('./lib/sign-in', () => ({ useSignInAdapter: () => ({ fetching: false, persistence: async () => 'encrypted' }) }))
-vi.mock('./sign-in', () => ({ SignIn: () => <p>Sign-in form</p> }))
-vi.mock('./registration', () => ({ Registration: () => <p>Registration form</p> }))
 import { AuthConfiguration } from './lib/auth'
 import { createAppRouter } from './routes'
 afterEach(() => {
   cleanup(); vi.clearAllMocks(); vi.restoreAllMocks()
   Object.assign(state, { isLoading: false, isAuthenticated: false, isRefreshing: false })
+})
+it('bootstraps memory navigation independently of Clerk hash and reloads publicly', async () => {
+  const source = readFileSync('src/main.tsx', 'utf8')
+  expect(source).toContain("createMemoryHistory({ initialEntries: ['/'] })")
+  expect(source).not.toContain('createHashHistory')
+  const hash = window.location.hash
+  window.location.hash = '#/sign-in/reset-password'
+  const history = createMemoryHistory({ initialEntries: ['/'] })
+  history.push('/app')
+  expect(window.location.hash).toBe('#/sign-in/reset-password')
+  history.back()
+  expect(history.location.pathname).toBe('/')
+  expect(createMemoryHistory({ initialEntries: ['/'] }).location.pathname).toBe('/')
+  window.location.hash = hash
 })
 function setup(path: string, configured = true) {
   const router = createAppRouter(createMemoryHistory({ initialEntries: [path] }))
@@ -58,6 +75,6 @@ it('allows confirmed public navigation and removes private content on auth loss'
 })
 it('does not offer navigation before backend confirmation', async () => {
   setup('/')
-  expect(await screen.findByText('Sign-in form')).toBeTruthy()
+  expect(await screen.findByText('Official Clerk launchers')).toBeTruthy()
   expect(screen.queryByRole('button', { name: 'Open app' })).toBeNull()
 })

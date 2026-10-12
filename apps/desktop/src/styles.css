@@ -212,6 +212,17 @@
     background: var(--muted);
   }
 
+  .provider-surface {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    width: 100%;
+    max-width: 30rem;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    font-family: 'Geist Variable', ui-sans-serif, sans-serif, system-ui;
+  }
+
   .visual-mark {
     display: grid;
     place-items: center;

@@ -7,15 +7,22 @@ import vm from 'node:vm'
 const require = createRequire(import.meta.url)
 const filename = require.resolve('./main.cjs')
 
-function bootstrap({ development = false, platform = 'win32', loadFailure = false } = {}) {
+function bootstrap({ development = false, platform = 'win32', loadFailure = false, primary = true } = {}) {
   const steps = []
   const events = {}
   const handlers = new Map()
   const windows = []
   let ready
-  const storage = { persistence: 'encrypted', logout: vi.fn(() => Promise.resolve()), preserve: vi.fn(() => Promise.resolve()) }
+  const storage = {
+    getItem: vi.fn(async () => 'stored'),
+    setItem: vi.fn(async () => {}),
+    removeItem: vi.fn(async () => {}),
+    persistence: 'encrypted',
+    logout: vi.fn(() => Promise.resolve()),
+    preserve: vi.fn(() => Promise.resolve()),
+  }
   const cleanup = vi.fn()
-  const bridge = vi.fn(() => { steps.push('bridge'); return { cleanup } })
+  const bridge = vi.fn(() => { steps.push('bridge'); return { cleanup, isPrimaryInstance: primary } })
   const app = {
     isPackaged: !development,
     whenReady: () => new Promise(resolve => { ready = resolve }),
@@ -69,21 +76,30 @@ function bootstrap({ development = false, platform = 'win32', loadFailure = fals
   }, { filename })
   return { steps, events, handlers, windows, storage, cleanup, bridge, app, protocol,
     ipcMain, storeOptions, createTokenStorage, safeStorage, net,
-    ready: async () => { ready(); await Promise.resolve() }, }
+    ready: async () => { ready?.(); await Promise.resolve() }, }
 }
 
 it.each([false, true])('boots after readiness with guarded window (development=%s)', async development => {
   const harness = bootstrap({ development })
-  expect(harness.steps).toEqual(['privileges'])
-  expect(harness.protocol.registerSchemesAsPrivileged).toHaveBeenCalledWith([
-    { scheme: 'livefy', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } },
-  ])
+  expect(harness.steps).toEqual(['bridge'])
+  expect(harness.protocol.registerSchemesAsPrivileged).not.toHaveBeenCalled()
+  expect(harness.bridge).toHaveBeenCalledExactlyOnceWith({
+    storage: expect.objectContaining({ getItem: expect.any(Function), setItem: expect.any(Function), removeItem: expect.any(Function) }),
+    renderer: { scheme: 'livefy', host: 'renderer' },
+  })
+  const deferred = harness.bridge.mock.calls[0][0].storage
+  await expect(deferred.getItem('early')).rejects.toThrow('Token storage is not ready')
   await harness.ready()
-  expect(harness.steps).toEqual(['privileges', 'protocol', 'store', 'storage', 'bridge', 'window'])
+  expect(harness.steps).toEqual(['bridge', 'protocol', 'store', 'storage', 'window'])
   expect(harness.protocol.handle).toHaveBeenCalledWith('livefy', expect.any(Function))
   expect(harness.storeOptions).toHaveBeenCalledWith({ name: 'clerk-tokens', accessPropertiesByDotNotation: false })
   expect(harness.createTokenStorage).toHaveBeenCalledWith({ store: expect.any(Object), safeStorage: harness.safeStorage })
-  expect(harness.bridge).toHaveBeenCalledExactlyOnceWith({ storage: harness.storage })
+  await expect(deferred.getItem('key')).resolves.toBe('stored')
+  await deferred.setItem('key', 'value')
+  await deferred.removeItem('key')
+  expect(harness.storage.getItem).toHaveBeenCalledWith('key')
+  expect(harness.storage.setItem).toHaveBeenCalledWith('key', 'value')
+  expect(harness.storage.removeItem).toHaveBeenCalledWith('key')
   const window = harness.windows[0]
   expect(window.options.webPreferences).toEqual({
     sandbox: true, contextIsolation: true, nodeIntegration: false, webviewTag: false,
@@ -120,6 +136,14 @@ it.each([false, true])('boots after readiness with guarded window (development=%
   expect(harness.ipcMain.removeHandler).toHaveBeenCalledWith('livefy:session-persistence')
   expect(harness.handlers.size).toBe(0)
   expect(harness.protocol.unhandle).toHaveBeenCalledWith('livefy')
+})
+
+it('skips ready-time storage, protocol and windows in a secondary instance', async () => {
+  const harness = bootstrap({ primary: false })
+  await harness.ready()
+  expect(harness.steps).toEqual(['bridge'])
+  expect(harness.handlers.size).toBe(0)
+  expect(harness.windows).toHaveLength(0)
 })
 
 it.each(['logout', 'preserve'])('allows only the exact trusted main renderer to invoke argument-free %s', async operation => {
@@ -219,7 +243,7 @@ it('retains ordinary load-failure quit', async () => {
 it.each(['win32', 'darwin'])('handles early quit and window lifecycle on %s', platform => {
   const harness = bootstrap({ platform })
   expect(() => harness.events['will-quit']()).not.toThrow()
-  expect(harness.cleanup).not.toHaveBeenCalled()
+  expect(harness.cleanup).toHaveBeenCalledOnce()
   harness.events['window-all-closed']()
   expect(harness.app.quit).toHaveBeenCalledTimes(platform === 'darwin' ? 0 : 1)
 })
