@@ -43,3 +43,14 @@ navigates to the private route from an authenticated tree.
 
 - **L1** Defect found by the A2 matrix run, 2026-11-20. Not reported by a user;
   a deep link to the private route is simply broken today.
+- **L2** T1/T2 done. Instrumented Chromium boot on `/#/app` showed Clerk handing
+  `/#/?sign_up_force_redirect_url=…&sign_in_force_redirect_url=…&redirect_url=http%3A%2F%2F127.0.0.1%3A5173%2F%23%2Fapp`
+  to `routerPush`; that same-origin in-app target is now left to the app (no throw,
+  no delegation) in `auth-ui.tsx`, the private route is seeded from the `#/app` hash
+  and the hash hands itself back to `#/` in `routes.tsx`; cross-origin,
+  wrong-protocol and credentialed targets still throw. RED 6 failed/19 passed for
+  `auth-ui.test.tsx` → GREEN 25/25 focused (routes 7, private-access 9), full suite
+  318/318, typecheck and build pass. Browser, dev server: body `L Livefy
+  Authentication required Return to access` with `ninguno` page errors, no private
+  content, at 320/375/1000 in light and dark (zero overflow); `Return to access`
+  lands on the `#/` sign-in surface.

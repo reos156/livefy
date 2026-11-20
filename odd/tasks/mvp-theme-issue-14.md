@@ -97,9 +97,11 @@ Measured:
   auto outline. Trails: 4 steps on sign-in, 6 on registration.
 - **12 of 18 cases accepted**: sign-in and registration, light and dark, at all
   three widths.
-- The private route at `/#/app` unauthenticated renders an empty shell in all 6
-  cases and throws `Unsupported browser completion target`; tracked in
-  `web-private-route-deeplink.md`. Not a theme defect.
+- The private route at `/#/app` unauthenticated rendered an empty shell in 6 of
+  18 cases during this run. Fixed immediately after: it now paints
+  `Authentication required` with `Return to access`, with no page error, and its
+  six cases re-measured green (`web-private-route-deeplink.md`). **18 of 18
+  reachable cases accepted.**
 - **Authenticated `/app` remains unmeasured**: it needs a live session, which this
   harness cannot obtain. Pending human observation.
 

@@ -1,9 +1,11 @@
 import { cleanup, render, waitFor } from '@testing-library/react'
 import { ClerkInstanceContext } from '@clerk/shared/react'
+import { createMemoryHistory } from '@tanstack/react-router'
 import { afterEach, expect, it, vi } from 'vitest'
 const mount = vi.hoisted(() => vi.fn())
 const clerk = { loaded: true, mountSignIn: mount, unmountSignIn: vi.fn(), __internal_updateProps: vi.fn() }
 import { BrowserAuthUi, browserCompletionUrl, createBrowserNavigation } from './auth-ui'
+import { createAppRouter } from '../../routes'
 afterEach(() => { cleanup(); mount.mockClear(); window.history.replaceState(null, '', '/') })
 it('mounts installed combined hash SignIn with local redirects and Livefy tokens', async () => {
   window.history.replaceState(null, '', '/?redirect_url=https://evil.test/#/verify')
@@ -68,7 +70,7 @@ it('reads mutable session at invocation and fails closed without unsigned metada
   expect(windowNavigate).toHaveBeenCalledExactlyOnceWith(completion)
   expect(navigate).not.toHaveBeenCalled()
 })
-it.each(['https://evil.test/#/', '//evil.test/#/', 'livefy://renderer/', 'javascript:alert(1)', '/app', '/#/verify', '/?redirect_url=https://evil.test/#/', '/a/../#/'])('rejects target %s before delegation', target => {
+it.each(['https://evil.test/#/', '//evil.test/#/', 'livefy://renderer/', 'javascript:alert(1)', 'https://user:pass@localhost/#/'])('rejects target %s before delegation', target => {
   window.history.replaceState(null, '', '/#/verify')
   const navigate = vi.fn(), windowNavigate = vi.fn()
   const navigation = createBrowserNavigation(browserCompletionUrl(window.location.href), navigate)
@@ -76,6 +78,40 @@ it.each(['https://evil.test/#/', '//evil.test/#/', 'livefy://renderer/', 'javasc
   expect(navigate).not.toHaveBeenCalled()
   expect(windowNavigate).not.toHaveBeenCalled()
   expect(window.location.hash).toBe('#/verify')
+})
+// Measured in Chromium while booting straight on a private deep link: mounting
+// Clerk's hash SignIn hands this signed-out handshake back to the adapter. It is a
+// same-origin in-app destination, so the app keeps owning the view: no throw, no
+// delegation, no document change.
+const clerkHandshake = '/#/?sign_up_force_redirect_url=http%3A%2F%2F127.0.0.1%3A5173%2F%23%2F&sign_in_force_redirect_url=http%3A%2F%2F127.0.0.1%3A5173%2F%23%2F&redirect_url=http%3A%2F%2F127.0.0.1%3A5173%2F%23%2Fapp'
+it.each([clerkHandshake, '/#/verify', '/app', '/?redirect_url=https://evil.test/#/', '/a/../#/'])('leaves in-app target %s to the app without delegation', target => {
+  window.history.replaceState({ app: 'livefy' }, '', '/#/app')
+  const before = window.location.href, state = window.history.state, length = window.history.length
+  const navigate = vi.fn(), windowNavigate = vi.fn()
+  const navigation = createBrowserNavigation(browserCompletionUrl(before), navigate)
+  expect(() => navigation.routerReplace(target, { windowNavigate })).not.toThrow()
+  expect(() => navigation.routerPush(target, { windowNavigate })).not.toThrow()
+  expect(navigate).not.toHaveBeenCalled()
+  expect(windowNavigate).not.toHaveBeenCalled()
+  expect(window.location.href).toBe(before)
+  expect(window.history.state).toEqual(state)
+  expect(window.history.length).toBe(length)
+})
+// The browser document keeps Clerk's hash routing while in-app routes live in a
+// memory router seeded at "/", so a private deep link only reaches the app as `#/app`.
+it('boots a private deep link at the private in-app route and frees the hash', () => {
+  window.history.replaceState(null, '', '/#/app')
+  const router = createAppRouter(createMemoryHistory({ initialEntries: ['/'] }))
+  expect(router.state.location.pathname).toBe('/app')
+  // The hash stays Clerk's: it returns to the completion step so the access
+  // surface can mount again once the app leaves the private route.
+  expect(window.location.href).toBe(`${window.location.origin}/#/`)
+})
+it.each(['', '#/', '#/sign-in/reset-password'])('boots the public route for non-private hash %s', hash => {
+  window.history.replaceState(null, '', `/${hash}`)
+  const router = createAppRouter(createMemoryHistory({ initialEntries: ['/'] }))
+  expect(router.state.location.pathname).toBe('/')
+  expect(window.location.hash).toBe(hash)
 })
 it('rejects a changed document before delegation', () => {
   const navigate = vi.fn(), windowNavigate = vi.fn()
