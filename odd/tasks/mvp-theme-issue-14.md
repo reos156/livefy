@@ -102,8 +102,11 @@ Measured:
   `Authentication required` with `Return to access`, with no page error, and its
   six cases re-measured green (`web-private-route-deeplink.md`). **18 of 18
   reachable cases accepted.**
-- **Authenticated `/app` remains unmeasured**: it needs a live session, which this
-  harness cannot obtain. Pending human observation.
+- Authenticated `/app` validated by human observation on 2026-11-20 at 1000, 375
+  and 320 CSS px and in both themes: expected content, no horizontal overflow,
+  nothing clipped, legible in dark, focus visible and reachable by keyboard, and
+  sign-out returns to the sign-in surface with no manual reload. **24 of 24 cases
+  accepted.**
 
 This matrix measures layout and focus. It does not judge aesthetics, and it does
 not replace looking at the screens.
