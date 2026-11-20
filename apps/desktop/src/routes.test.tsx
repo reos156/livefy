@@ -62,9 +62,14 @@ it.each(['loading', 'refresh', 'unavailable'] as const)('blocks composed private
   if (mode === 'unavailable') {
     expect(await screen.findByText('Authentication unavailable')).toBeTruthy()
     expect(status.closest('.sr-only')).toBeNull()
+    // A refusal is explained in text; it is not a silent wait.
+    expect(screen.queryByTitle('Loading...')).toBeNull()
   } else {
     expect(status.textContent).toBe('Checking backend access')
     expect(status.classList.contains('sr-only')).toBe(true)
+    // The wait paints the ring cue, and the sr-only status stays the only live region.
+    expect(screen.getByTitle('Loading...').closest('svg')).not.toBeNull()
+    expect(screen.getAllByRole('status')).toHaveLength(1)
   }
   expect(await screen.findByRole('heading', { level: 1, name: 'Livefy' })).toBeTruthy()
   expect(screen.queryByRole('heading', { name: 'Livefy app' })).toBeNull()

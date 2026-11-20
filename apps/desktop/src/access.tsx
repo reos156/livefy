@@ -2,19 +2,16 @@ import { useAuth, AuthUi, isNativePlatform } from './platform/auth'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { VisualShell } from './components/visual-shell'
 import { Button } from '@/components/ui/button'
+import { Spinner } from '@/components/kibo-ui/spinner'
 import { useConvexAuth } from 'convex/react'
 import { useEffect, useState } from 'react'
 import { useAuthConfigured } from './lib/auth'
 import { LogoutButton } from './lib/session'
 
-function ConfiguredAccess({ onEnterApp, onBusyChange }: { onEnterApp?: () => void; onBusyChange?: (busy: boolean) => void }) {
+function ConfiguredAccess({ onEnterApp }: { onEnterApp?: () => void }) {
   const { isLoading, isAuthenticated, isRefreshing } = useConvexAuth()
   const { isLoaded, isSignedIn } = useAuth()
   const checking = isLoading || isRefreshing
-  // The shell owns the mark, so the wait is reported up and the mark pulses there:
-  // motion instead of status text.
-  const waitingForAccess = checking || !isLoaded || (!isAuthenticated && !!isSignedIn)
-  useEffect(() => { onBusyChange?.(waitingForAccess) }, [waitingForAccess, onBusyChange])
   const [persistence, setPersistence] = useState('Session persistence status unavailable')
   useEffect(() => {
     if (!isNativePlatform()) return
@@ -26,8 +23,11 @@ function ConfiguredAccess({ onEnterApp, onBusyChange }: { onEnterApp?: () => voi
     return () => { active = false }
   }, [])
   // Announced to assistive technology only: the shared shell and brand stay on screen
-  // and the operator sees no status text while access is being confirmed.
-  const waiting = <Alert role="status" className="sr-only"><AlertDescription>Loading</AlertDescription></Alert>
+  // and the operator sees a silent ring, not status text, while access is confirmed.
+  const waiting = <>
+    <Alert role="status" className="sr-only"><AlertDescription>Loading</AlertDescription></Alert>
+    <Spinner variant="ring" size={28} className="text-foreground" />
+  </>
   if (checking || !isLoaded) return waiting
   if (isAuthenticated) return <>
     <Alert role="status"><AlertDescription>Backend access confirmed</AlertDescription></Alert>
@@ -41,9 +41,8 @@ function ConfiguredAccess({ onEnterApp, onBusyChange }: { onEnterApp?: () => voi
 }
 export function AccessLanding({ onEnterApp }: { onEnterApp?: () => void }) {
   const configured = useAuthConfigured()
-  const [busy, setBusy] = useState(false)
-  return <VisualShell title="Livefy" providerSurface={configured} busy={busy}>
-    {configured ? <ConfiguredAccess onEnterApp={onEnterApp} onBusyChange={setBusy} /> : <>
+  return <VisualShell title="Livefy" providerSurface={configured}>
+    {configured ? <ConfiguredAccess onEnterApp={onEnterApp} /> : <>
       <p className="text-muted-foreground">
         Email and password access is not available yet. This desktop preview does not collect credentials.
       </p>

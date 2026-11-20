@@ -1,16 +1,12 @@
 import type { ReactNode } from 'react'
 import { Card, CardHeader, CardTitle, CardContent } from './ui/card'
 
-// Presentation only: callers retain ownership of access and session state.
-// `busy` animates the existing mark as an in-progress cue. It is decorative: the
-// screen owning the wait announces its own accessible status.
-export function VisualShell({ title, children, providerSurface = false, busy = false }: {
-  title: string; children: ReactNode; providerSurface?: boolean; busy?: boolean
+// Presentation only: callers retain ownership of access and session state, and of
+// the wait cue they paint inside the content slot.
+export function VisualShell({ title, children, providerSurface = false }: {
+  title: string; children: ReactNode; providerSurface?: boolean
 }) {
-  const mark = <>
-    <span className={busy ? 'visual-mark brand-loader' : 'visual-mark'} aria-hidden="true">L</span>
-    {busy && <span className="brand-dots" aria-hidden="true"><span /><span /><span /></span>}
-  </>
+  const mark = <span className="visual-mark" aria-hidden="true">L</span>
   // Opt-in: the provider owns its card and typography. Other screens stay unchanged.
   if (providerSurface) return <main className="visual-shell">
     <section className="provider-surface">

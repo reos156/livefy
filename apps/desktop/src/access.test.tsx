@@ -20,12 +20,14 @@ it.each([true, false])('uses a neutral backend transition without granting contr
   // Announced only: visually hidden, while the shared shell and brand stay on screen.
   expect(status.classList.contains('sr-only')).toBe(true)
   expect(screen.getByRole('heading', { level: 1, name: 'Livefy' })).toBeTruthy()
-  // The wait is signalled by motion on the existing mark, not by text.
-  const mark = screen.getByRole('heading', { level: 1, name: 'Livefy' }).closest('header')?.querySelector('[aria-hidden="true"]')
-  expect(mark?.classList.contains('brand-loader')).toBe(true)
-  // The mark pulses and three dots cycle next to the brand while the wait lasts.
-  const dots = mark?.parentElement?.querySelector('.brand-dots')
-  expect(dots?.children.length).toBe(3)
+  // The wait is signalled by the ring cue, never by a second live region.
+  expect(screen.getAllByRole('status')).toHaveLength(1)
+  const ring = screen.getByTitle('Loading...').closest('svg')
+  expect(ring).not.toBeNull()
+  expect(ring?.getAttribute('viewBox')).toBe('0 0 44 44')
+  expect(ring?.getAttribute('height')).toBe('28')
+  expect(ring?.classList.contains('text-foreground')).toBe(true)
+  expect(screen.getByRole('main').querySelector('.brand-loader, .brand-dots')).toBeNull()
   expect(screen.queryByText('Checking backend access')).toBeNull()
   expect(screen.queryByText('Backend access confirmed')).toBeNull()
   expect(screen.queryByRole('button', { name: 'Open app' })).toBeNull()
@@ -53,6 +55,9 @@ it.each([
   expect(status.textContent).toBe('Loading')
   expect(status.classList.contains('sr-only')).toBe(true)
   expect(screen.getByRole('heading', { level: 1, name: 'Livefy' })).toBeTruthy()
+  // The cue is painted where the wait is, and announced only by the sr-only status.
+  expect(screen.getByTitle('Loading...').closest('svg')).not.toBeNull()
+  expect(screen.getAllByRole('status')).toHaveLength(1)
   expect(screen.queryByTestId('embedded-auth')).toBeNull()
   expect(screen.queryByRole('button', { name: 'Open app' })).toBeNull()
 })
@@ -85,6 +90,8 @@ it('offers local logout on backend-confirmed access', () => {
   Object.assign(state, { configured: true, isAuthenticated: true })
   const logout = vi.fn(() => new Promise<void>(() => {}))
   render(<SessionBoundary logout={logout}><AccessLanding /></SessionBoundary>)
+  // Confirmed access keeps its visible status and shows no waiting cue.
+  expect(screen.queryByTitle('Loading...')).toBeNull()
   fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
   expect(logout).toHaveBeenCalledOnce()
   expect(screen.queryByText('Backend access confirmed')).toBeNull()

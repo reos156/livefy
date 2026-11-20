@@ -69,3 +69,15 @@ installs, no dependency changes.
   No artboard is chosen and no application source changed; the next step is the
   operator's pick, and the chosen direction also needs its registry item
   installed (`bunx --bun shadcn@latest add spinner|skeleton|progress`).
+- **L4** Loading cue decision (2026-11-20): the hand-written pulse and the three
+  earlier directions were rejected; the cue is the Kibo UI `ring` spinner, no
+  visible text, `text-foreground` with `currentColor` at 1.75rem, rendered in the
+  `ConfiguredAccess` waiting branch and the `ConfirmedAccess` checking branch
+  while the existing `sr-only` `role="status"` Alert stays the only live region.
+  Installed from the official registries only: `npx shadcn@latest add spinner`
+  (`src/components/ui/spinner.tsx`) then
+  `npx shadcn@latest add https://www.kibo-ui.com/r/spinner.json`
+  (`src/components/kibo-ui/spinner/index.tsx`, MIT, imports rewritten to this
+  project's `@/` aliases); `.brand-loader`, `.brand-dots`, `@keyframes
+  brand-pulse` and `@keyframes brand-dot` were removed from `src/styles.css` and
+  `VisualShell` no longer takes `busy`. No commit made.
