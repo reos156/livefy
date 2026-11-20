@@ -171,6 +171,95 @@ https://clerk.com/docs/guides/development/deployment/electron ;
 https://clerk.com/docs/guides/secure/best-practices/csp-headers ;
 https://docs.convex.dev/auth/clerk . README/tipos de la SDK instalada inspeccionados.
 
+## Contrato visual compartido y aceptación de pantallas
+
+Las pantallas actuales comparten presentación; sus estados y acciones siguen
+siendo responsabilidad de cada pantalla. Para tareas futuras, reutilizar este
+contrato y definir la aceptación visual antes de implementar, sin duplicar UI
+para escritorio/web ni modificar autenticación por motivos de estilo.
+
+### Fuentes de verdad
+
+| Aspecto | Contrato existente |
+| --- | --- |
+| Tema | [styles.css](src/styles.css): tokens semánticos de fondo/texto, card, primary, muted, destructive, border/input y ring, además de radios y sombras. Usar estos roles, no colores aislados por pantalla. |
+| Claro/oscuro | `:root` define claro; la clase `.dark` y la variante `dark` activan oscuro. No hay selector persistente ni seguimiento automático del sistema. |
+| Tipografía | Geist Variable se importa como recurso local y se aplica en `html`. Asta Sans y JetBrains Mono están declaradas en los tokens del tema, pero no se cargan sus assets; una declaración no prueba uso efectivo de esas fuentes. No añadir solicitudes remotas. |
+| Estructura | [visual-shell.tsx](src/components/visual-shell.tsx): landmark `main`, marca decorativa `L` con `aria-hidden`, título `h1` dentro de CardTitle y contenido en CardContent/`.visual-content`. Conservar jerarquía de encabezados y semántica al componer una pantalla. |
+| Primitivas | Reutilizar los componentes oficiales shadcn Base UI / base-nova instalados en [ui](src/components/ui): Card, Button, Field/Input/Label, Alert y Separator; no recrear controles o paneles paralelos. |
+| Estados y foco | Los estados dentro del shell usan Alert con `role="status"` (anuncio polite); los errores, Alert destructivo con `role="alert"`. Conservar etiquetas, estados deshabilitados y foco de las primitivas. CSS añade `:focus-visible` a enlaces ordinarios sin `data-slot`; no sustituirlo por un foco global que compita con los controles. |
+
+### Geometría existente, no certificación de reflow
+
+- `body` tiene `min-width: 20rem`: equivale a 320 CSS px **solo con raíz de
+  16px por defecto**. Cambiar el tamaño raíz puede aumentar ese mínimo; no
+  garantiza ausencia de desbordamiento a 320px.
+- `.visual-shell` usa flex centrado, `min-height: 100svh` y padding
+  `clamp(1rem, 4vw, 3rem)`. La card usa ancho completo, máximo `30rem` y
+  `wrap-anywhere`; el contenido se organiza en columna con separación `1.25rem`.
+- 320, 375 y 1000 CSS px son **muestras propuestas para aceptación**, no
+  breakpoints implementados ni viewports ya certificados. El ancho exterior de
+  Electron no es necesariamente el ancho CSS disponible en el renderizador.
+  La altura, zoom, escala de Windows y tamaño raíz también afectan el resultado.
+
+### Checklist manual — Windows y DevTools
+
+Registrar resultados por combinación de pantalla/estado, tema y viewport; no
+marcar toda la matriz aceptada a partir de una captura aislada.
+
+1. Abrir la aplicación Windows del modo que se está evaluando (desarrollo o
+   empaquetado) y anotar versión/commit, modo, escala de Windows y zoom.
+   En DevTools registrar el **ancho y la altura reales del renderizador** en
+   CSS px, por ejemplo `window.innerWidth` y `window.innerHeight`, junto con
+   `getComputedStyle(document.documentElement).fontSize`. Repetir la medición
+   tras redimensionar o acoplar DevTools; no usar solo el tamaño de la ventana.
+2. Probar las muestras propuestas de ancho 320/375/1000 si el entorno permite
+   alcanzarlas y anotar la altura real en cada caso, incluyendo una altura
+   reducida. Si se usa emulación de DevTools, identificarla como tal: no equivale
+   a una ventana Electron nativa de esas dimensiones. Registrar lo no alcanzado
+   como pendiente o diferido, nunca como aprobado.
+3. Repetir en claro y oscuro. Para inspeccionar oscuro puede añadirse
+   temporalmente `dark` al elemento `html` desde DevTools y retirarse después;
+   es una técnica de prueba, no una preferencia guardada ni un selector del
+   producto. Comprobar legibilidad de texto, campos, errores y foco en ambos.
+4. Recorrer los estados relevantes disponibles: acceso sin sesión, login,
+   registro/confirmación de código, solicitudes pendientes, acceso privado,
+   carga/rechazo de acceso y logout pendiente/finalizado/fallido. Especificar
+   cuáles pertenecen a la tarea y cómo se alcanzaron; no provocar mutaciones
+   remotas o crear cuentas sin autorización independiente.
+5. Revisar desbordamiento horizontal, texto largo/errores largos, recortes de
+   card/campos/acciones y acceso vertical: todo contenido y acción debe poder
+   alcanzarse mediante scroll cuando no cabe en altura. `scrollWidth` frente a
+   `clientWidth` puede ayudar, pero no sustituye la inspección de recortes.
+6. Recorrer con Tab/Shift+Tab y activar los controles por teclado: orden lógico,
+   foco visible, acciones alcanzables y exclusión durante estados pendientes.
+   Comprobar que el mensaje de error sigue siendo legible sin depender del color.
+7. Si el proveedor **presenta realmente CAPTCHA**, inspeccionar su ajuste,
+   visibilidad, interacción y acceso por teclado/scroll. Si no aparece, registrar
+   «no presentado; challenge interactivo pendiente», no afirmar que se probó o
+   que está deshabilitado. Clerk gestiona el challenge dentro de su UI oficial.
+
+### Evidencia y requisito para tareas futuras
+
+| Evidencia | Qué puede demostrar / qué no |
+| --- | --- |
+| Tests estructurales Vitest/jsdom | Composición, roles, encabezados, montaje y comportamiento con mocks; no layout, dimensiones, reflow ni ejecución real del challenge. |
+| Layout en navegador/DevTools | Geometría, recortes, scroll y foco en el entorno/viewport registrado; no persistencia nativa, bridge ni sesión Electron Windows. |
+| Ejecución Windows | Solo los recorridos nativos realmente observados, con su modo y evidencias; una captura visual no demuestra reinicio, revocación o seguridad del bridge. |
+
+Toda tarea futura de pantalla debe incluir una matriz explícita de aceptación
+visual: pantalla/estado, claro/oscuro, ancho **y altura** CSS reales, zoom/tamaño
+raíz, entorno/método y resultado. Para cada caso registrar **aceptado, pendiente
+o diferido**, referencia a captura/observación/comando y sus límites; los diferidos
+necesitan motivo y gate/tarea de seguimiento. Separar resultados estructurales,
+layout y bridge/sesión Windows, sin convertir uno en prueba de los otros.
+
+La [evidencia de issue #14](../../odd/tasks/mvp-theme-issue-14.md) conserva las
+aceptaciones humanas históricas de pantallas actuales y sus límites: no certifica
+una matriz completa estrecha/ancha ni un challenge real. Esta guía no añade
+aceptación actual, no reabre los casos aceptados y no acepta el futuro cliente
+web; sus gates siguen siendo independientes en el [hito H1](../../odd/tasks/mvp-h1-access-windows.md).
+
 ## Historial H1.1/H1.2 (no describe los proveedores actuales)
 
 La base H1.1/H1.2 combina una ventana Electron aislada, una vista previa de acceso en React y un contrato de autenticación correo/contraseña y sesión activado en Convex DEV. La interfaz de registro/inicio de sesión, la recogida de credenciales en el renderizador y el empaquetado no están implementados. Los controles de acceso siguen deshabilitados; inicializar el proveedor no representa una autenticación correcta.

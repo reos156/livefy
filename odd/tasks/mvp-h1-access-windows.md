@@ -3,6 +3,39 @@
 ## Objective
 Deliver free email/password registration, sign-in, protected navigation, session persistence, sign-out, and email password recovery in the Windows Electron application.
 
+## Latest authorized override — H1.7 MVP acceptance and official recovery
+
+This documentation-only amendment supersedes conflicting pending/scope statements
+below, without rewriting their historical evidence or delivery status.
+
+- **H1.7 accepted for MVP by explicit human acceptance**, using existing narrow
+  IPC, sandbox/isolation, guarded navigation/origin, Convex token-trust and
+  backend-authoritative access evidence, together with the current official Clerk
+  UI and existing Google DEV evidence. These are accepted existing observations,
+  not fresh verification in this amendment; Google DEV evidence does not certify
+  production OAuth or waive provider/packaged prerequisites.
+- Actual Electron boundary attestation is **deferred by the user**, not passed.
+  No blanket guarantee of credential safety, absence of passwords/tokens from all
+  logs/IPC, or production security certification is claimed. Genuine signed
+  wrong-issuer/wrong-audience negatives (with positive controls, attribution and
+  scoped cleanup) and production CSP verification remain mandatory preproduction
+  gates, **not waived for publishing**. Any execution or mutation needs separate
+  bounded authorization.
+- **H1.8 remains pending**: validate visibility/accessibility of the recovery entry
+  in the current official Clerk screens and access to the provider-managed flow.
+  A missing recovery option is a hypothesis, not an observed defect. Clerk owns
+  recovery; no custom request/reset UI or separate Resend implementation is
+  authorized by this amendment.
+- Historical H1.9–H1.10 implementation obligations consolidate into H1.8 as
+  **superseded, not passed**. Their IDs and historical criteria remain below for
+  traceability; this is no claim of delivered reset email, successful reset or
+  negative-challenge coverage. H1.11/H1.12 remain open with their real Windows,
+  failure-case, packaged and production prerequisites; theme tasks are unchanged.
+
+No new tests, runtime checks, services, issues, commits or publishing were performed
+or authorized here. This passive amendment has no meaningful behavioral RED;
+validation is limited to document structure and scoped diff checks.
+
 ## Mandatory architecture — Electron first, future web
 
 This authorized amendment governs **all future implementation**, starting with H1.4; it does not reopen or rerun H1.1–H1.3. Their accepted access/registration evidence remains desktop-only, with its recorded gaps. The checklist and Windows acceptance below are unchanged.
@@ -33,6 +66,23 @@ The later dual-platform release MUST target **≥90% shared owned frontend sourc
 | Future cloud operation | Separately authorize and verify deployment, credentials, health/supervision, leases, reconnect/gaps, explicit lifecycle control, observability and recovery independently of client closure. No provider capability or cost promise is made. |
 
 These are mandatory design constraints now and deferred execution gates later, **not silent acceptance** of web authentication or cloud readiness. No service configuration, production origin expansion or new implementation authorization is implied.
+
+### Aceptación visual obligatoria para futuras pantallas
+
+Toda tarea futura de pantalla debe aplicar el [contrato visual compartido y la
+checklist Windows/DevTools](../../apps/desktop/README.md#contrato-visual-compartido-y-aceptación-de-pantallas)
+y especificar su matriz de estados, claro/oscuro y viewports: ancho **y altura**
+CSS reales del renderizador, zoom/tamaño raíz y entorno/método. Registrar cada
+caso como **aceptado, pendiente o diferido**, con evidencia y límites; todo
+diferido requiere motivo y gate/tarea de seguimiento. Las muestras 320/375/1000
+son propuestas de aceptación, no breakpoints certificados. Separar tests
+estructurales jsdom, layout de navegador y bridge/sesión Windows; incluir errores
+largos, teclado y CAPTCHA solo si se presenta realmente. No inferir aceptación
+web de resultados de escritorio.
+
+Este requisito rige tareas futuras: conserva sin cambios la aceptación histórica
+H1 y los límites de [issue #14](mvp-theme-issue-14.md); no marca nuevos casos
+aceptados ni reabre recorridos ya aceptados.
 
 ## Problem and rationale
 The repository currently contains prototypes rather than an integrated product. Deliver one complete access milestone before shop setup or commerce features.
@@ -204,10 +254,10 @@ Social Login is deferred by explicit user decision to a later MVP version. It is
 - [x] H1.4 — Complete Clerk sign-in. Closed for DEV in 9c203db2af2d55dc33c38d9a6ecb0256123fd076: user-confirmed Windows valid login/backend access, invalid-password safe rejection and pending duplicate/form-switch exclusion; independent 53 focused/136 full tests, typecheck/build PASS. Commit/push explicitly authorized; no PR/merge or production acceptance. See mvp-h1-sign-in.md. Browser challenges and restart/logout remain outside this acceptance.
 - [x] H1.5 — Protect routes and Convex data. Accepted DEV: private /app requires Convex-confirmed access; anonymous direct navigation and Clerk revocation rejection human-confirmed on Windows; pending form switching blocked. Independent 84 focused/143 full tests, frontend/backend types and build PASS. Shared registration/login isolated from Electron through adapters. User authorized commit; see mvp-h1-route-protection.md for identity isolation and evidence. Schema empty: persisted document ownership not applicable/not certified, mandatory with first owned business resources. Browser auth and H1.6/H1.7 remain excluded.
 - [x] H1.6 — Persist and end native sessions. Closed for DEV by explicit user acceptance of Windows login/logout and authorization to commit/push. Encrypted restart restoration previously reported; automatic exit and remembered-device flow accepted after retest. Independent 194 tests/21 files, frontend/backend types, build and whitespace PASS. Commits ab7ad34 (native terminal operations), bad3c8a (logout coordination/device continuity), 6a3b786 (Device Trust continuation), all Refs #13. See mvp-h1-native-sessions.md. Separate offline, revoked-session and memory-only Windows checks remain unverified; this closure is not packaged/production/security certification.
-- [ ] H1.7 — Verify desktop credential boundaries. Acceptance: sandbox/isolation intact; no passwords/tokens in logs or generic IPC; callback/origin validation and production CSP checked. Includes signed wrong-issuer and wrong-audience rejection tests deferred from H1.2c by explicit user acceptance; use genuine signed tokens, positive controls, attribution and scoped cleanup. Mandatory pre-production gate; source/configuration mutations require their own bounded authorization.
-- [ ] H1.8 — Configure Clerk password recovery. Acceptance: FREE-compatible built-in recovery/email delivery verified; no separate Resend integration required unless a later approved requirement establishes it.
-- [ ] H1.9 — Request password recovery. Acceptance: usable feedback avoids account enumeration; supported provider abuse protection and error handling verified.
-- [ ] H1.10 — Complete Clerk password reset. Acceptance: invalid/expired/reused challenges fail; new password works and old password fails; session policy documented and tested.
+- [x] H1.7 — Verify desktop credential boundaries. Accepted for MVP by explicit human acceptance of existing IPC/isolation/navigation, Convex trust, current official Clerk UI and Google DEV evidence; see latest authorized override. Actual Electron boundary attestation deferred, not passed; no blanket credential-safety or production certification. Genuine signed wrong-issuer/wrong-audience negatives and production CSP remain mandatory preproduction/pre-publication gates, not waived; execution/mutations require separate bounded authorization.
+- [ ] H1.8 — Validate official Clerk recovery entry. Pending visibility/accessibility of the recovery option in current official screens and access to the provider-managed flow. Missing option is a hypothesis. Consolidates superseded H1.9–H1.10 implementation obligations; no custom recovery UI or Resend integration authorized. Real recovery/email/failure-case evidence remains subject to H1.11/H1.12 acceptance, not claimed here.
+- [ ] H1.9 — Request password recovery. Superseded into H1.8, not passed; retained historical implementation criterion: usable feedback avoids account enumeration; supported provider abuse protection and error handling verified.
+- [ ] H1.10 — Complete Clerk password reset. Superseded into H1.8, not passed; retained historical implementation criterion: invalid/expired/reused challenges fail; new password works and old password fails; session policy documented and tested.
 - [ ] H1.11 — Verify real registration and recovery on Windows. Acceptance: delivered email, signup/verification and reset journeys pass, including failure cases, on explicitly authorized DEV.
 - [ ] H1.12 — Verify packaged Windows access journey and retire legacy auth. Acceptance: registration, login, restart, logout and recovery work against real Convex + Clerk; production-domain prerequisites checked; explicitly confirm Native API entitlement on FREE in production before publishing, without assuming DEV availability proves it. Retire Convex Auth endpoints/dependencies only after accepted identity transition, inventory and rollback; no blind data deletion.
 
