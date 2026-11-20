@@ -13,6 +13,12 @@ Every Livefy screen is built on the official shadcn/ui components. Adding an off
 - Follow the shared visual contract in `apps/desktop/README.md` (section "Contrato visual compartido y aceptación de pantallas"): semantic tokens from `src/styles.css` only, `.dark` for the dark theme, the installed primitives, and the per-screen acceptance matrix.
 - Application-specific composition, layout and product logic stay ours; this premise does not authorize installing the whole catalog or rewriting business logic.
 
+## Git and delivery — standing premises
+
+- **An issue closes with the pull request that resolves it**, never on the agent's own initiative. Reference it from the PR that carries the work (`Closes #N`) and let the merge close it. A premature close must be reopened, not argued.
+- **Publish only in the approved form**: `git -C <absolute worktree path> push <named-https-remote> <branch>`. The delivery guard rejects compound forms such as `cd <path> && git push`, and the SSH remote `origin` is not usable by the agent, so push through the named HTTPS remote authenticated by the `gh` credential helper. Never read, copy or relocate the user's SSH keys.
+- **Never discard the error output of a command whose number decides a delivery.** A fetch with its stderr redirected reported a stale remote ref, which produced a wrong "commits unpublished" count and a pull-request branch with no commits of its own. Let the error surface or check the exit status, and re-read the remote ref before sizing or slicing a delivery.
+
 <!-- BEGIN:turborepo-agent-rules -->
 
 # This is NOT the Turborepo you know
