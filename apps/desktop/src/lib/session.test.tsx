@@ -43,6 +43,41 @@ it.each(['pending', 'ended', 'failed'] as const)('gives %s logout the shared she
   expectLogoutShell({ pending: 'Signing out', ended: 'Signed out', failed: 'Sign-out incomplete' }[state])
 })
 
+it('shows no intermediate surface while the browser signs out', async () => {
+  const logout = vi.fn(() => new Promise<void>(() => {}))
+  render(<SessionBoundary browser logout={logout}><p>Private content</p><LogoutButton /></SessionBoundary>)
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Sign out' })))
+  expect(logout).toHaveBeenCalledOnce()
+  expect(screen.queryByText('Private content')).toBeNull()
+  expect(screen.queryByText('Signing out locally…')).toBeNull()
+  expect(screen.queryByRole('heading', { level: 1, name: 'Signing out' })).toBeNull()
+  expect(screen.queryByRole('main')).toBeNull()
+  // Announced, never flashed: the wait stays in the accessibility tree.
+  const status = screen.getByRole('status')
+  expect(status.textContent).toBe('Signing out')
+  expect(status.classList.contains('sr-only')).toBe(true)
+})
+it('shows no ended surface in the browser once the session is gone', async () => {
+  render(<SessionBoundary browser completedContent={<p>Waiting</p>} logout={() => Promise.resolve()}>
+    <p>Private content</p><LogoutButton />
+  </SessionBoundary>)
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Sign out' })))
+  expect(screen.getByText('Waiting')).toBeTruthy()
+  expect(screen.queryByText('Signed out on this device.')).toBeNull()
+  expect(screen.queryByRole('heading', { level: 1, name: 'Signed out' })).toBeNull()
+  expect(screen.queryByText('Private content')).toBeNull()
+})
+it('keeps the browser sign-out failure destructive with its retry action', async () => {
+  const logout = vi.fn().mockRejectedValue(new Error('failure'))
+  render(<SessionBoundary browser logout={logout}><p>Private content</p><LogoutButton /></SessionBoundary>)
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Sign out' })))
+  const alert = screen.getByRole('alert')
+  expect(alert.classList.contains('text-destructive')).toBe(true)
+  expect(alert.textContent).toBe('Sign-out incomplete. Private access remains blocked.')
+  expect(screen.queryByText('Private content')).toBeNull()
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Retry sign-out' })))
+  expect(logout).toHaveBeenCalledTimes(2)
+})
 it('excludes access immediately, excludes duplicates and confirms only native completion', async () => {
   let finish!: () => void
   const logout = vi.fn(() => new Promise<void>(resolve => { finish = resolve }))

@@ -1,35 +1,53 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
-import { createContext, useContext, type ComponentProps } from 'react'
+import { createContext, useContext, useRef, type ComponentProps } from 'react'
 import type { ClerkProvider } from '@clerk/react'
 type ProviderProps = ComponentProps<typeof ClerkProvider>
 let providerProps: ProviderProps
 const clerk = { loaded: true, session: {} as object | null, signOut: (...args: unknown[]) => state.signOut(...args) }
 import { createMemoryHistory, Outlet, RouterProvider } from '@tanstack/react-router'
-const state = vi.hoisted(() => ({ signedIn: true, confirmed: true, navigated: false, refreshed: false, signOut: vi.fn() }))
+const state = vi.hoisted(() => ({ signedIn: true, confirmed: true, navigated: false, refreshed: false, staleBinding: false, signOut: vi.fn() }))
+type TestBinding = { isLoaded: boolean; isSignedIn: boolean; isAuthenticated: boolean; isLoading: boolean; isRefreshing: boolean }
+let providerBinding: TestBinding = { isLoaded: true, isSignedIn: true, isAuthenticated: true, isLoading: false, isRefreshing: false }
 vi.mock('@clerk/react', () => ({
-  ClerkProvider: (props: ProviderProps) => { providerProps = props; return props.children },
-  useAuth: () => useContext(AuthState),
+  // Measured in Chromium: the stale value lives in the provider context, so the
+  // snapshot is taken when the PROVIDER mounts. Remounting a consumer re-reads
+  // that same snapshot, no matter how often it is remounted.
+  ClerkProvider: (props: ProviderProps) => {
+    providerProps = props
+    const bound = useRef<TestBinding | null>(null)
+    if (!bound.current) bound.current = { ...authState(), isSignedIn: !!clerk.session, isAuthenticated: !!clerk.session }
+    providerBinding = bound.current
+    return props.children
+  },
+  useAuth: () => state.staleBinding ? providerBinding : useLiveAuth(),
   useClerk: () => clerk,
 }))
 vi.mock('../../platform/auth', () => ({
   isNativePlatform: () => false,
-  useAuth: () => useContext(AuthState),
+  useAuth: useLiveAuth,
   AuthUi: () => <p>Public sign-in</p>,
 }))
-vi.mock('convex/react', () => ({ ConvexReactClient: class {}, useConvexAuth: () => useContext(AuthState) }))
+vi.mock('convex/react', () => ({ ConvexReactClient: class {}, useConvexAuth: useLiveAuth }))
 vi.mock('convex/react-clerk', () => ({ ConvexProviderWithClerk: ({ children }: { children: React.ReactNode }) => children }))
 import { AuthBoundary } from './auth'
-import { SessionContent, SessionInfrastructure } from '../../lib/session'
+import { LogoutButton, SessionContent, SessionInfrastructure } from '../../lib/session'
 import { createAppRouter } from '../../routes'
 import { createBrowserNavigation, browserCompletionUrl } from './auth-ui'
-const AuthState = createContext({ isLoaded: true, isSignedIn: true, isLoading: false, isRefreshing: false, isAuthenticated: true })
+const authState = () => ({ isLoaded: true, isSignedIn: state.signedIn, isLoading: false, isRefreshing: false, isAuthenticated: state.confirmed })
+// Stands in for the auth stores: consumers re-render when the tree re-renders and
+// read the live store values, like a working subscription.
+const AuthState = createContext(authState())
+function useLiveAuth() {
+  useContext(AuthState)
+  return authState()
+}
 const props = { endpoint: 'https://polite-parrot-887.convex.cloud', publishableKey: `pk_test_${btoa('organic-snake-7233.clerk.accounts.dev$')}` }
 afterEach(() => {
   cleanup()
   vi.restoreAllMocks()
   vi.clearAllMocks()
-  Object.assign(state, { signedIn: true, confirmed: true, navigated: false, refreshed: false })
+  Object.assign(state, { signedIn: true, confirmed: true, navigated: false, refreshed: false, staleBinding: false })
   Object.assign(clerk, { loaded: true, session: {} })
   window.history.replaceState(null, '', '/')
 })
@@ -57,10 +75,7 @@ it.each([
     state.confirmed = false
     state.refreshed = true
   })
-  const tree = () => <AuthState.Provider value={{
-    isLoaded: true, isSignedIn: state.signedIn,
-    isLoading: false, isRefreshing: false, isAuthenticated: state.confirmed,
-  }}>
+  const tree = () => <AuthState.Provider value={authState()}>
     <SessionInfrastructure>
       <AuthBoundary {...props} modalNavigation={navigation}
         onSignedOut={() => router.navigate({ to: '/', replace: true })}>
@@ -72,6 +87,9 @@ it.each([
   await screen.findByRole('button', { name: 'Sign out' })
   fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
   expect(screen.queryByRole('button', { name: 'Open app' })).toBeNull()
+  // Nothing is painted between the click and the document reset.
+  expect(screen.queryByText('Signing out locally…')).toBeNull()
+  expect(screen.queryByRole('heading', { level: 1, name: 'Signing out' })).toBeNull()
   expect(screen.queryByText('Backend access confirmed.')).toBeNull()
   expect(screen.queryByText('Backend access confirmed')).toBeNull()
   await act(async () => remove())
@@ -124,4 +142,74 @@ it('wires browser completion to public memory navigation, not native navigation'
   vi.doUnmock('../../routes')
   vi.doUnmock('../../platform/auth')
   vi.doUnmock('../electron/auth-ui')
+})
+// Measured in Chromium against the real dev instance: Clerk.loaded stays true and
+// Clerk.session becomes null within 300ms, yet the 6.17.6 React binding keeps the
+// value its provider subscribed with, and the Convex client inherits the same stale
+// session. The stale snapshot belongs to the provider mount, so nothing inside the
+// tree can re-read it: completion therefore normalizes the URL and resets the
+// document. This case never re-renders the tree from the outside.
+it('resets the document instead of rendering a transient surface when the binding is stale', async () => {
+  state.staleBinding = true
+  window.history.replaceState(null, '', '/app')
+  const router = createAppRouter(createMemoryHistory({ initialEntries: ['/app'] }))
+  router.routeTree.update({ component: () => <SessionContent><Outlet /></SessionContent> })
+  vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
+  const documentUrl = window.location.href
+  let remove!: () => void
+  const removed = new Promise<void>(resolve => { remove = resolve })
+  const windowNavigate = vi.fn()
+  state.signOut.mockImplementation(async (options: { redirectUrl: string }) => {
+    await removed
+    clerk.session = null
+    await providerProps.routerReplace!(options.redirectUrl, { windowNavigate })
+    state.signedIn = false
+    state.confirmed = false
+  })
+  const tree = () => <AuthState.Provider value={authState()}>
+    <SessionInfrastructure>
+      <AuthBoundary {...props} modalNavigation={createBrowserNavigation(browserCompletionUrl(window.location.href), replace => router.navigate({ to: '/', replace }))}
+        onSignedOut={() => router.navigate({ to: '/', replace: true })}>
+        <RouterProvider router={router} />
+      </AuthBoundary>
+    </SessionInfrastructure>
+  </AuthState.Provider>
+  render(tree())
+  await screen.findByRole('button', { name: 'Sign out' })
+  fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
+  await act(async () => remove())
+  // The session is gone from the SDK while the binding observed at mount is stale.
+  expect(clerk.session).toBeNull()
+  expect(windowNavigate).toHaveBeenCalledExactlyOnceWith(browserCompletionUrl(documentUrl))
+  expect(window.location.href).toBe(browserCompletionUrl(documentUrl))
+  expect(screen.queryByText('Waiting for signed-out session confirmation')).toBeNull()
+  expect(screen.queryByRole('heading', { level: 1, name: 'Signed out' })).toBeNull()
+  expect(screen.queryByText('Confirming signed-out session.')).toBeNull()
+  expect(router.state.location.pathname).toBe('/')
+})
+it('keeps private content hidden and renders no placeholder while Clerk still reports a session', async () => {
+  state.staleBinding = true
+  window.history.replaceState(null, '', '/app')
+  vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
+  let remove!: () => void
+  const removed = new Promise<void>(resolve => { remove = resolve })
+  state.signOut.mockImplementation(async (options: { redirectUrl: string }) => {
+    await removed
+    await providerProps.routerReplace!(options.redirectUrl)
+  })
+  render(<AuthState.Provider value={authState()}>
+    <SessionInfrastructure>
+      <AuthBoundary {...props} modalNavigation={createBrowserNavigation(browserCompletionUrl(window.location.href), vi.fn())} onSignedOut={vi.fn()}>
+        <SessionContent><p>Private route content</p><LogoutButton /></SessionContent>
+      </AuthBoundary>
+    </SessionInfrastructure>
+  </AuthState.Provider>)
+  await screen.findByRole('button', { name: 'Sign out' })
+  fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
+  await act(async () => remove())
+  // Nothing to show while the session is unconfirmed: no private content, no jargon.
+  expect(screen.queryByText('Private route content')).toBeNull()
+  expect(screen.queryByText('Waiting for signed-out session confirmation')).toBeNull()
+  expect(screen.queryByText('Confirming signed-out session.')).toBeNull()
+  expect(screen.queryByRole('heading', { level: 1, name: 'Signed out' })).toBeNull()
 })

@@ -47,7 +47,9 @@ function setup(path: string, configured = true) {
 }
 it('rejects anonymous direct navigation and provides a public return', async () => {
   const { router } = setup('/app')
-  expect(await screen.findByText('Authentication required')).toBeTruthy()
+  const required = await screen.findByText('Authentication required')
+  // A real refusal stays fully visible; only transient waits are announced-only.
+  expect(required.closest('.sr-only')).toBeNull()
   expect(screen.queryByRole('heading', { name: 'Livefy app' })).toBeNull()
   fireEvent.click(screen.getByRole('link', { name: 'Return to access' }))
   expect(await screen.findByRole('heading', { name: 'Livefy' })).toBeTruthy()
@@ -56,7 +58,27 @@ it('rejects anonymous direct navigation and provides a public return', async () 
 it.each(['loading', 'refresh', 'unavailable'] as const)('blocks composed private route when %s', async mode => {
   Object.assign(state, { isAuthenticated: true, isLoading: mode === 'loading', isRefreshing: mode === 'refresh' })
   setup('/app', mode !== 'unavailable')
-  expect(await screen.findByText(mode === 'unavailable' ? 'Authentication unavailable' : 'Checking backend access')).toBeTruthy()
+  const status = await screen.findByRole('status')
+  if (mode === 'unavailable') {
+    expect(await screen.findByText('Authentication unavailable')).toBeTruthy()
+    expect(status.closest('.sr-only')).toBeNull()
+    // A refusal is explained in text; it is not a silent wait.
+    expect(screen.queryByTitle('Loading...')).toBeNull()
+    // A refusal keeps the shell, the brand mark and the title.
+    expect(await screen.findByRole('heading', { level: 1, name: 'Livefy' })).toBeTruthy()
+    expect(screen.getByText('L').getAttribute('aria-hidden')).toBe('true')
+  } else {
+    expect(status.textContent).toBe('Checking backend access')
+    expect(status.classList.contains('sr-only')).toBe(true)
+    // The wait paints the ring alone: no title, no brand mark, no card around it.
+    expect(screen.queryByRole('heading')).toBeNull()
+    expect(screen.queryByText('L')).toBeNull()
+    expect(screen.getByRole('main').querySelector('[data-slot="card"]')).toBeNull()
+    expect(screen.getByRole('main').classList.contains('visual-shell')).toBe(true)
+    // The sr-only status stays the only live region.
+    expect(screen.getByTitle('Loading...').closest('svg')).not.toBeNull()
+    expect(screen.getAllByRole('status')).toHaveLength(1)
+  }
   expect(screen.queryByRole('heading', { name: 'Livefy app' })).toBeNull()
   if (mode === 'unavailable') expect(authHook).not.toHaveBeenCalled()
 })

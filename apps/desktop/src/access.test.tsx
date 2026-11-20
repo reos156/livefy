@@ -15,7 +15,25 @@ afterEach(() => {
 it.each([true, false])('uses a neutral backend transition without granting controls (native=%s)', native => {
   Object.assign(state, { native, configured: true, isSignedIn: true, isAuthenticated: true, isRefreshing: true })
   render(<SessionBoundary logout={async () => {}}><AccessLanding onEnterApp={vi.fn()} /></SessionBoundary>)
-  expect(screen.getByRole('status').textContent).toBe('Loading…')
+  const status = screen.getByRole('status')
+  expect(status.textContent).toBe('Loading')
+  // Announced only: visually hidden while the ring alone is painted on the shell.
+  expect(status.classList.contains('sr-only')).toBe(true)
+  // No brand mark, no title and no card around the cue.
+  expect(screen.queryByRole('heading')).toBeNull()
+  expect(screen.queryByText('L')).toBeNull()
+  expect(screen.getByRole('main').querySelector('[data-slot="card"]')).toBeNull()
+  expect(screen.getByRole('main').querySelector('.visual-mark')).toBeNull()
+  // Centring still comes from the shared shell layout.
+  expect(screen.getByRole('main').classList.contains('visual-shell')).toBe(true)
+  // The wait is signalled by the ring cue, never by a second live region.
+  expect(screen.getAllByRole('status')).toHaveLength(1)
+  const ring = screen.getByTitle('Loading...').closest('svg')
+  expect(ring).not.toBeNull()
+  expect(ring?.getAttribute('viewBox')).toBe('0 0 44 44')
+  expect(ring?.getAttribute('height')).toBe('28')
+  expect(ring?.classList.contains('text-foreground')).toBe(true)
+  expect(screen.getByRole('main').querySelector('.brand-loader, .brand-dots')).toBeNull()
   expect(screen.queryByText('Checking backend access')).toBeNull()
   expect(screen.queryByText('Backend access confirmed')).toBeNull()
   expect(screen.queryByRole('button', { name: 'Open app' })).toBeNull()
@@ -26,20 +44,31 @@ it('embeds authentication by default without technical diagnostics or persistenc
   state.configured = true
   render(<AccessLanding />)
   expect(screen.getByTestId('embedded-auth')).toBeTruthy()
+  // A settled screen, not a wait: the shell keeps the brand mark and the title.
+  expect(screen.getByRole('heading', { level: 1, name: 'Livefy' })).toBeTruthy()
+  expect(screen.getByText('L').getAttribute('aria-hidden')).toBe('true')
   expect(screen.queryByRole('status')).toBeNull()
   expect(screen.queryByRole('separator')).toBeNull()
   expect(screen.queryByText(/persistence|No authenticated session/)).toBeNull()
   expect(screen.queryByRole('button', { name: 'Open app' })).toBeNull()
 })
 it.each([
-  { isLoaded: false, text: 'Loading authentication' },
-  { isSignedIn: true, text: 'Your session is ready. Waiting for backend access.' },
-  { isLoading: true, text: 'Loading…' },
-  { isRefreshing: true, isAuthenticated: true, text: 'Loading…' },
+  { isLoaded: false },
+  { isSignedIn: true },
+  { isLoading: true },
+  { isRefreshing: true, isAuthenticated: true },
 ])('does not embed or enter while guarded: %j', guarded => {
   Object.assign(state, { configured: true }, guarded)
   render(<AccessLanding onEnterApp={vi.fn()} />)
-  expect(screen.getByText(guarded.text)).toBeTruthy()
+  const status = screen.getByRole('status')
+  expect(status.textContent).toBe('Loading')
+  expect(status.classList.contains('sr-only')).toBe(true)
+  // The wait paints the ring alone, with no heading and no brand mark to pair it with.
+  expect(screen.queryByRole('heading')).toBeNull()
+  expect(screen.getByRole('main').querySelector('.visual-mark')).toBeNull()
+  // The cue is painted where the wait is, and announced only by the sr-only status.
+  expect(screen.getByTitle('Loading...').closest('svg')).not.toBeNull()
+  expect(screen.getAllByRole('status')).toHaveLength(1)
   expect(screen.queryByTestId('embedded-auth')).toBeNull()
   expect(screen.queryByRole('button', { name: 'Open app' })).toBeNull()
 })
@@ -72,6 +101,10 @@ it('offers local logout on backend-confirmed access', () => {
   Object.assign(state, { configured: true, isAuthenticated: true })
   const logout = vi.fn(() => new Promise<void>(() => {}))
   render(<SessionBoundary logout={logout}><AccessLanding /></SessionBoundary>)
+  // Confirmed access keeps its visible status and shows no waiting cue.
+  expect(screen.queryByTitle('Loading...')).toBeNull()
+  expect(screen.getByRole('heading', { level: 1, name: 'Livefy' })).toBeTruthy()
+  expect(screen.getByText('L').getAttribute('aria-hidden')).toBe('true')
   fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
   expect(logout).toHaveBeenCalledOnce()
   expect(screen.queryByText('Backend access confirmed')).toBeNull()
@@ -83,11 +116,13 @@ it('keeps browser restoration backend-gated and omits native persistence claims'
   window.livefySession = { persistence, logout: vi.fn() }
   const view = render(<AccessLanding onEnterApp={enter} />)
   expect(screen.queryByRole('button', { name: 'Open app' })).toBeNull()
-  expect(screen.getByText(/Waiting for backend access/)).toBeTruthy()
+  expect(screen.getByRole('status').classList.contains('sr-only')).toBe(true)
+  expect(screen.queryByText(/Waiting for backend access/)).toBeNull()
   state.isAuthenticated = true
   state.isRefreshing = true
   view.rerender(<AccessLanding onEnterApp={enter} />)
-  expect(screen.getByText('Loading…')).toBeTruthy()
+  expect(screen.getByRole('status').textContent).toBe('Loading')
+  expect(screen.getByRole('status').classList.contains('sr-only')).toBe(true)
   expect(screen.queryByText('Checking backend access')).toBeNull()
   expect(screen.queryByRole('button', { name: 'Open app' })).toBeNull()
   state.isRefreshing = false
@@ -101,6 +136,7 @@ it('keeps browser restoration backend-gated and omits native persistence claims'
 it('explains unavailable access without mounting authentication', () => {
   render(<AccessLanding />)
   expect(screen.getByRole('heading', { name: 'Livefy' })).toBeTruthy()
+  expect(screen.getByText('L').getAttribute('aria-hidden')).toBe('true')
   expect(screen.getByText(/Email and password access is not available yet/)).toBeTruthy()
   expect((screen.getByRole('button', { name: 'Sign in — coming soon' }) as HTMLButtonElement).disabled).toBe(true)
   expect(screen.queryByTestId('embedded-auth')).toBeNull()

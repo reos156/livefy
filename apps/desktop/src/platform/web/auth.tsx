@@ -12,17 +12,30 @@ function BrowserSession({ children, onSignedOut, clerkRef }: {
   children: ReactNode; onSignedOut?: () => unknown; clerkRef: MutableRefObject<BrowserClerk | undefined>
 }) {
   const clerk = useClerk()
+  const { isLoaded, isSignedIn } = useAuth()
   useEffect(() => {
     clerkRef.current = clerk
     return () => { if (clerkRef.current === clerk) clerkRef.current = undefined }
   }, [clerk, clerkRef])
-  const { isLoaded, isSignedIn } = useAuth()
   async function logout() {
     await clerk.signOut({ redirectUrl: browserCompletionUrl(window.location.href) })
     await onSignedOut?.()
+    resetToCompletion()
   }
-  return <SessionBoundary browser logout={logout} completedReady={isLoaded && !isSignedIn} completedContent={isLoaded && !isSignedIn ? children :
-    <p role="status">Waiting for signed-out session confirmation</p>}>
+  function resetToCompletion() {
+    // The installed Clerk binding keeps serving the value its provider subscribed with,
+    // and the Convex client inherits the same stale session, so no partial read inside
+    // this document reaches the sign-in surface. A fresh document re-initializes both.
+    // Normalize the URL first so the reload lands on the public completion route, and
+    // replace state so the signed-out private view stays out of history.
+    try { window.history.replaceState(null, '', browserCompletionUrl(window.location.href)) } catch { /* keep current URL */ }
+    try { window.location.reload() } catch { /* blocked reload: nothing private is rendered either way */ }
+  }
+  // Nothing is rendered while the binding is stale: the document is being replaced, and
+  // rendering the access landing first would flash its loading state. A binding that does
+  // report the closed session keeps rendering the public surface as before.
+  const bindingSignedOut = isLoaded && !isSignedIn
+  return <SessionBoundary browser logout={logout} completedReady={bindingSignedOut} completedContent={bindingSignedOut ? children : null}>
     {children}
   </SessionBoundary>
 }

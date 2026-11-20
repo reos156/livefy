@@ -1,0 +1,28 @@
+{
+  "title": "Livefy silent loading states",
+  "brief": "Replace the wait while Clerk and Convex initialize with loading options that feel alive and belong to Livefy, for one operator running a live-commerce session on Windows. No visible status text, judged in light and dark at 320 and 1000 CSS px, and every mechanism must be an official shadcn/ui item: Spinner, Skeleton or Progress.",
+  "feature": "odd/tasks/silent-loading-states.md",
+  "artboards": [
+    {
+      "file": "01-spinner-lockup.html",
+      "title": "Spinner in the brand lockup",
+      "tradeoff": "Install registry item `spinner`. The artboard emulates only the primitive's rendered glyph and its own animate-spin; production renders <Spinner /> inside the existing Card header, so the mark, the \"Livefy\" wordmark and the card are the surrounding layout, not the mechanism. Most legible of the three (currentColor on --card measures 14.35:1 light / 12.36:1 dark) and alive indefinitely, but the least branded: nothing in it is Livefy-specific. Honours prefers-reduced-motion by dropping the rotation, which is stricter than the project decision that the product animates regardless (apps/desktop/README.md rule 7).",
+      "width": 1000,
+      "height": 800
+    },
+    {
+      "file": "02-skeleton-body.html",
+      "title": "Skeleton in the card body",
+      "tradeoff": "Install registry item `skeleton`. The artboard emulates only the primitive's block and its own animate-pulse; production renders <Skeleton /> inside the existing Card body, with the mark, the \"Livefy\" wordmark and the card as the surrounding layout. Best at reserving the space real content will take and the calmest of the three, but the weakest in the light theme: the registry paints blocks with a muted surface token, and --muted measures 1.05:1 against --card in light (1.23:1 dark), --accent 1.19:1 (1.26:1) if the installed item uses that token, below the 3:1 non-text target. Choosing it means accepting a documented primitive surface change or a pulse that is barely perceptible in light. Honours prefers-reduced-motion by dropping the pulse (stricter than README rule 7).",
+      "width": 1000,
+      "height": 800
+    },
+    {
+      "file": "03-progress-milestones.html",
+      "title": "Progress from real milestones",
+      "tradeoff": "Install registry item `progress`. The artboard emulates only the primitive's track and indicator and its own transition; production renders <Progress value={value} /> inside the existing Card body driven by real signals (Clerk isLoaded 35, Convex auth settled 75, access confirmed 100), with the mark, the \"Livefy\" wordmark and the card as the surrounding layout. The only option that reports real progress, and the only one that can look frozen: if a step takes many seconds the bar stops moving, which is the \"did it hang?\" feeling this task exists to remove. Contrast of the registry defaults is also weak: --primary on a --primary/20 track is 1.14:1 light / 3.74:1 dark. Honours prefers-reduced-motion by removing the transition only, since a value step is information rather than decoration.",
+      "width": 1000,
+      "height": 800
+    }
+  ]
+}

@@ -4,6 +4,15 @@
 
 When working on TikTools integrations (`api.tik.tools`, `@tiktool/live`, or the TikTools MCP server), consult the relevant section of the official documentation at https://tik.tools/docs before relying on API shapes, event fields, authentication, or plan limits. Search for the specific topic and read only the relevant section; do not load or paste the entire documentation into the agent context. Record the source URL and access date in findings, and check the installed SDK version against version-specific guidance when applicable. Treat MCP tool descriptions and examples as distinct from the full REST/WebSocket/SDK reference. If the official documentation is unavailable, state what could not be verified rather than guessing.
 
+## Frontend and UI — standing premise
+
+Every Livefy screen is built on the official shadcn/ui components. Adding an official registry component is authorized; building a competing hand-made visual control is not.
+
+- Read `.pi/skills/shadcn/SKILL.md` and the `rules/` page that matches the work before implementing any frontend surface. It governs loading states (`Spinner`, `Skeleton`, `Progress`; no `animate-pulse` divs), buttons (`Button` has no `isPending`; compose `Spinner` + `data-icon` + `disabled`), feedback, overlays and composition.
+- Compose with the primitives installed under `apps/desktop/src/components/ui` (today: alert, button, card, field, input, label, separator) plus any official registry item the work genuinely needs. Name the component to install; never emulate a primitive with custom CSS.
+- Follow the shared visual contract in `apps/desktop/README.md` (section "Contrato visual compartido y aceptación de pantallas"): semantic tokens from `src/styles.css` only, `.dark` for the dark theme, the installed primitives, and the per-screen acceptance matrix.
+- Application-specific composition, layout and product logic stay ours; this premise does not authorize installing the whole catalog or rewriting business logic.
+
 <!-- BEGIN:turborepo-agent-rules -->
 
 # This is NOT the Turborepo you know
