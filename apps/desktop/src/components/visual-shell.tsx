@@ -7,7 +7,10 @@ import { Card, CardHeader, CardTitle, CardContent } from './ui/card'
 export function VisualShell({ title, children, providerSurface = false, busy = false }: {
   title: string; children: ReactNode; providerSurface?: boolean; busy?: boolean
 }) {
-  const mark = <span className={busy ? 'visual-mark brand-loader' : 'visual-mark'} aria-hidden="true">L</span>
+  const mark = <>
+    <span className={busy ? 'visual-mark brand-loader' : 'visual-mark'} aria-hidden="true">L</span>
+    {busy && <span className="brand-dots" aria-hidden="true"><span /><span /><span /></span>}
+  </>
   // Opt-in: the provider owns its card and typography. Other screens stay unchanged.
   if (providerSurface) return <main className="visual-shell">
     <section className="provider-surface">

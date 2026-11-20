@@ -23,6 +23,9 @@ it.each([true, false])('uses a neutral backend transition without granting contr
   // The wait is signalled by motion on the existing mark, not by text.
   const mark = screen.getByRole('heading', { level: 1, name: 'Livefy' }).closest('header')?.querySelector('[aria-hidden="true"]')
   expect(mark?.classList.contains('brand-loader')).toBe(true)
+  // The mark pulses and three dots cycle next to the brand while the wait lasts.
+  const dots = mark?.parentElement?.querySelector('.brand-dots')
+  expect(dots?.children.length).toBe(3)
   expect(screen.queryByText('Checking backend access')).toBeNull()
   expect(screen.queryByText('Backend access confirmed')).toBeNull()
   expect(screen.queryByRole('button', { name: 'Open app' })).toBeNull()
