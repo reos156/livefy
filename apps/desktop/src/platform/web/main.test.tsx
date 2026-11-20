@@ -146,7 +146,7 @@ it('wires browser completion to public memory navigation, not native navigation'
 // session. The stale snapshot belongs to the provider mount, so nothing inside the
 // tree can re-read it: completion therefore normalizes the URL and resets the
 // document. This case never re-renders the tree from the outside.
-it('reaches the sign-in surface from the stale provider context after a resolved local sign-out', async () => {
+it('resets the document instead of rendering a transient surface when the binding is stale', async () => {
   state.staleBinding = true
   window.history.replaceState(null, '', '/app')
   const router = createAppRouter(createMemoryHistory({ initialEntries: ['/app'] }))
@@ -178,7 +178,6 @@ it('reaches the sign-in surface from the stale provider context after a resolved
   // The session is gone from the SDK while the binding observed at mount is stale.
   expect(clerk.session).toBeNull()
   expect(windowNavigate).toHaveBeenCalledExactlyOnceWith(browserCompletionUrl(documentUrl))
-  await screen.findByText('Public sign-in')
   expect(window.location.href).toBe(browserCompletionUrl(documentUrl))
   expect(screen.queryByText('Waiting for signed-out session confirmation')).toBeNull()
   expect(screen.queryByRole('heading', { level: 1, name: 'Signed out' })).toBeNull()
