@@ -1,0 +1,558 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Livefy — design system</title>
+<style>
+  /* Tokens copied verbatim from apps/desktop/src/styles.css (:root = light). */
+  :root {
+    --background: oklch(1.0000 0 0);
+    --foreground: oklch(0.2850 0 0);
+    --card: oklch(1.0000 0 0);
+    --card-foreground: oklch(0.2850 0 0);
+    --popover: oklch(1.0000 0 0);
+    --popover-foreground: oklch(0.2850 0 0);
+    --primary: oklch(0.9347 0.1825 120.5229);
+    --primary-foreground: oklch(0 0 0);
+    --secondary: oklch(0.9692 0.0121 96.4218);
+    --secondary-foreground: oklch(0.2850 0 0);
+    --muted: oklch(0.9845 0.0026 106.4477);
+    --muted-foreground: oklch(0.5103 0 0);
+    --accent: oklch(0.9353 0.1021 109.4248);
+    --accent-foreground: oklch(0.2994 0.0327 118.0959);
+    --destructive: oklch(0.5771 0.2152 27.3250);
+    --border: oklch(0.9269 0.0160 110.5685);
+    --input: oklch(0.9448 0.0134 115.8392);
+    --ring: oklch(0.9347 0.1825 120.5229);
+    --chart-1: oklch(0 0 0);
+    --chart-2: oklch(0.9347 0.1825 120.5229);
+    --chart-3: oklch(0.6959 0.1491 162.4796);
+    --chart-4: oklch(0.6962 0.1306 112.3662);
+    --chart-5: oklch(0.5103 0 0);
+    --radius: 1rem;
+    --sidebar: oklch(0.9845 0.0026 106.4477);
+    --sidebar-foreground: oklch(0.2850 0 0);
+    --sidebar-primary: oklch(0 0 0);
+    --sidebar-primary-foreground: oklch(1.0000 0 0);
+    --sidebar-accent: oklch(0.9353 0.1021 109.4248);
+    --sidebar-accent-foreground: oklch(0.2994 0.0327 118.0959);
+    --sidebar-border: oklch(0.9269 0.0160 110.5685);
+    --sidebar-ring: oklch(0.9347 0.1825 120.5229);
+    --destructive-foreground: oklch(1.0000 0 0);
+    --font-sans: Asta Sans, ui-sans-serif, sans-serif, system-ui;
+    --font-serif: Georgia, serif;
+    --font-mono: JetBrains Mono, monospace;
+    --shadow-color: hsl(0 0% 0% / 0.08);
+    --shadow-opacity: 0.12;
+    --shadow-blur: 20px;
+    --shadow-spread: 0px;
+    --shadow-offset-x: 0px;
+    --shadow-offset-y: 8px;
+    --letter-spacing: 0em;
+    --spacing: 0.25rem;
+    --shadow-2xs: 0px 8px 20px 0px hsl(0 0% 0% / 0.06);
+    --shadow-xs: 0px 8px 20px 0px hsl(0 0% 0% / 0.06);
+    --shadow-sm: 0px 8px 20px 0px hsl(0 0% 0% / 0.12), 0px 1px 2px -1px hsl(0 0% 0% / 0.12);
+    --shadow: 0px 8px 20px 0px hsl(0 0% 0% / 0.12), 0px 1px 2px -1px hsl(0 0% 0% / 0.12);
+    --shadow-md: 0px 8px 20px 0px hsl(0 0% 0% / 0.12), 0px 2px 4px -1px hsl(0 0% 0% / 0.12);
+    --shadow-lg: 0px 8px 20px 0px hsl(0 0% 0% / 0.12), 0px 4px 6px -1px hsl(0 0% 0% / 0.12);
+    --shadow-xl: 0px 8px 20px 0px hsl(0 0% 0% / 0.12), 0px 8px 10px -1px hsl(0 0% 0% / 0.12);
+    --shadow-2xl: 0px 8px 20px 0px hsl(0 0% 0% / 0.30);
+    --tracking-normal: 0em;
+    /* Bridge values from `@theme inline`, restated so the board can show them. */
+    --radius-sm: calc(var(--radius) * 0.6);
+    --radius-md: calc(var(--radius) * 0.8);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) * 1.4);
+    --radius-2xl: calc(var(--radius) * 1.8);
+    --radius-3xl: calc(var(--radius) * 2.2);
+    --radius-4xl: calc(var(--radius) * 2.6);
+  }
+
+  /* Tokens copied verbatim from apps/desktop/src/styles.css (.dark). */
+  .dark {
+    --background: oklch(0.2679 0.0036 106.6427);
+    --foreground: oklch(0.9576 0.0027 106.4494);
+    --card: oklch(0.2928 0.0018 106.5092);
+    --card-foreground: oklch(0.9818 0.0054 95.0986);
+    --popover: oklch(0.3085 0.0035 106.6039);
+    --popover-foreground: oklch(0.9211 0.0040 106.4781);
+    --primary: oklch(0.9347 0.1825 120.5229);
+    --primary-foreground: oklch(0.1913 0 0);
+    --secondary: oklch(0.9818 0.0054 95.0986);
+    --secondary-foreground: oklch(0.3085 0.0035 106.6039);
+    --muted: oklch(0.2213 0.0038 106.7070);
+    --muted-foreground: oklch(0.7713 0.0169 99.0657);
+    --accent: oklch(0.2130 0.0078 95.4245);
+    --accent-foreground: oklch(0.9663 0.0080 98.8792);
+    --destructive: oklch(0.6368 0.2078 25.3313);
+    --border: oklch(0.3618 0.0101 106.8928);
+    --input: oklch(0.4336 0.0113 100.2195);
+    --ring: oklch(0.9347 0.1825 120.5229);
+    --chart-1: oklch(0.9347 0.1825 120.5229);
+    --chart-2: oklch(0.6959 0.1491 162.4796);
+    --chart-3: oklch(0.8734 0.1029 210.3009);
+    --chart-4: oklch(0.6962 0.1306 112.3662);
+    --chart-5: oklch(0.8699 0 0);
+    --sidebar: oklch(0.2357 0.0024 67.7077);
+    --sidebar-foreground: oklch(0.8074 0.0142 93.0137);
+    --sidebar-primary: oklch(0.9347 0.1825 120.5229);
+    --sidebar-primary-foreground: oklch(0 0 0);
+    --sidebar-accent: oklch(0.1680 0.0020 106.6177);
+    --sidebar-accent-foreground: oklch(0.8074 0.0142 93.0137);
+    --sidebar-border: oklch(0.9401 0 0);
+    --sidebar-ring: oklch(0.7731 0 0);
+    --destructive-foreground: oklch(1.0000 0 0);
+    --font-sans: Asta Sans, ui-sans-serif, sans-serif, system-ui;
+    --font-serif: Georgia, serif;
+    --font-mono: JetBrains Mono, monospace;
+    --shadow-color: hsl(0 0% 0% / 0.3);
+    --shadow-opacity: 0.24;
+    --shadow-blur: 28px;
+    --shadow-spread: 0px;
+    --shadow-offset-x: 0px;
+    --shadow-offset-y: 10px;
+    --letter-spacing: 0em;
+    --spacing: 0.25rem;
+    --shadow-2xs: 0px 10px 28px 0px hsl(0 0% 0% / 0.12);
+    --shadow-xs: 0px 10px 28px 0px hsl(0 0% 0% / 0.12);
+    --shadow-sm: 0px 10px 28px 0px hsl(0 0% 0% / 0.24), 0px 1px 2px -1px hsl(0 0% 0% / 0.24);
+    --shadow: 0px 10px 28px 0px hsl(0 0% 0% / 0.24), 0px 1px 2px -1px hsl(0 0% 0% / 0.24);
+    --shadow-md: 0px 10px 28px 0px hsl(0 0% 0% / 0.24), 0px 2px 4px -1px hsl(0 0% 0% / 0.24);
+    --shadow-lg: 0px 10px 28px 0px hsl(0 0% 0% / 0.24), 0px 4px 6px -1px hsl(0 0% 0% / 0.24);
+    --shadow-xl: 0px 10px 28px 0px hsl(0 0% 0% / 0.24), 0px 8px 10px -1px hsl(0 0% 0% / 0.24);
+    --shadow-2xl: 0px 10px 28px 0px hsl(0 0% 0% / 0.60);
+  }
+
+  html {
+    /* Project stack; the Geist Variable file is not available to a standalone artboard. */
+    font-family: 'Geist Variable', ui-sans-serif, sans-serif, system-ui;
+    letter-spacing: var(--letter-spacing);
+    background: var(--muted);
+  }
+  body {
+    margin: 0;
+    min-width: 20rem;
+    color: var(--foreground);
+    background: var(--muted);
+    font-size: 0.875rem;
+    line-height: 1.6;
+  }
+  * { box-sizing: border-box; }
+
+  .board { display: flex; flex-direction: column; gap: 2rem; padding: 2rem; }
+  .board-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.5rem 1rem; }
+  .board-head h1 { margin: 0; font-size: 1.25rem; font-weight: 600; }
+  .board-head p { margin: 0; color: var(--muted-foreground); font-size: 0.875rem; }
+  .board-head code { font-family: var(--font-mono); font-size: 0.8125rem; }
+
+  section { display: flex; flex-direction: column; gap: 1rem; }
+  h2 { margin: 0; font-size: 1rem; font-weight: 600; }
+  h3 { margin: 0; font-size: 0.875rem; font-weight: 500; color: var(--muted-foreground); }
+  .note { margin: 0; max-width: 68rem; color: var(--muted-foreground); font-size: 0.8125rem; }
+
+  .panes { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+  .pane {
+    display: flex; flex-direction: column; gap: 1rem;
+    padding: 1.25rem;
+    border-radius: var(--radius-xl);
+    background: var(--background);
+    color: var(--foreground);
+    box-shadow: 0 0 0 1px color-mix(in oklab, var(--foreground) 10%, transparent);
+  }
+  .pane > h3 { color: var(--muted-foreground); }
+
+  .swatches { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.75rem; }
+  .swatch {
+    display: flex; flex-direction: column; gap: 0.5rem;
+    padding: 0.75rem;
+    border-radius: var(--radius-md);
+    background: var(--card);
+    color: var(--card-foreground);
+    box-shadow: 0 0 0 1px color-mix(in oklab, var(--foreground) 10%, transparent);
+    min-width: 0;
+  }
+  .chip {
+    height: 3.25rem;
+    border-radius: var(--radius-sm);
+    background: var(--sw);
+    box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--foreground) 12%, transparent);
+  }
+  .token { font-family: var(--font-mono); font-size: 0.75rem; font-weight: 500; overflow-wrap: anywhere; }
+  .value { font-family: var(--font-mono); font-size: 0.6875rem; color: var(--muted-foreground); overflow-wrap: anywhere; }
+
+  .type-row { display: grid; grid-template-columns: 11rem 1fr; align-items: baseline; gap: 1rem; padding-block: 0.5rem; border-top: 1px solid var(--border); }
+  .type-row:first-of-type { border-top: 0; }
+  .type-meta { font-family: var(--font-mono); font-size: 0.6875rem; color: var(--muted-foreground); }
+  .t-mark { font-size: 1.25rem; font-weight: 700; }
+  .t-title { font-size: 1rem; line-height: 1.375; font-weight: 500; }
+  .t-body { font-size: 0.875rem; line-height: 1.6; color: var(--muted-foreground); }
+  .t-button { font-size: 0.875rem; font-weight: 500; }
+  .t-label { font-size: 0.875rem; line-height: 1; font-weight: 500; }
+  .t-meta { font-size: 0.75rem; color: var(--muted-foreground); }
+
+  .space-row { display: grid; grid-template-columns: 8rem 1fr; align-items: center; gap: 1rem; }
+  .space-bar { height: 0.75rem; border-radius: 999px; background: var(--primary); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--foreground) 55%, transparent); }
+  .space-meta { font-family: var(--font-mono); font-size: 0.75rem; color: var(--muted-foreground); }
+
+  .radius-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 0.75rem; }
+  .radius-card { display: flex; flex-direction: column; gap: 0.5rem; }
+  .radius-box { height: 4.5rem; background: var(--primary); box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--foreground) 45%, transparent); }
+
+  .shadow-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1.25rem; }
+  .shadow-tile { height: 4rem; border-radius: var(--radius-md); background: var(--card); }
+
+  .components { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; align-items: start; }
+  .component-stack { display: flex; flex-direction: column; gap: 1.25rem; min-width: 0; }
+  .component-label { margin: 0; font-family: var(--font-mono); font-size: 0.6875rem; color: var(--muted-foreground); }
+
+  /* Shared shell, from styles.css */
+  .visual-shell {
+    display: flex; min-height: 22rem; align-items: center; justify-content: center;
+    padding: clamp(1rem, 4vw, 3rem); background: var(--muted);
+    border-radius: var(--radius-lg);
+    box-shadow: inset 0 0 0 1px var(--border);
+  }
+  .provider-surface { display: flex; flex-direction: column; gap: 1.25rem; width: 100%; max-width: 30rem; min-width: 0; overflow-wrap: anywhere; }
+
+  /* Card primitive */
+  .card {
+    display: flex; flex-direction: column; gap: 1rem;
+    padding-block: 1rem; --card-spacing: 1rem;
+    border-radius: var(--radius-xl);
+    background: var(--card); color: var(--card-foreground);
+    box-shadow: 0 0 0 1px color-mix(in oklab, var(--foreground) 10%, transparent);
+    overflow: hidden; font-size: 0.875rem; width: 100%; max-width: 30rem;
+    overflow-wrap: anywhere;
+  }
+  .card-header { display: flex; flex-direction: row; align-items: center; gap: 0.875rem; padding-inline: var(--card-spacing); }
+  .card-title { margin: 0; font-size: 1rem; line-height: 1.375; font-weight: 500; }
+  .card-content { padding-inline: var(--card-spacing); display: flex; flex-direction: column; gap: 1.25rem; }
+  .card-content p { margin: 0; color: var(--muted-foreground); font-size: 0.875rem; line-height: 1.6; }
+
+  /* Brand mark */
+  .visual-mark {
+    display: grid; place-items: center; width: 2.75rem; height: 2.75rem; flex-shrink: 0;
+    border-radius: calc(var(--radius) * 0.6);
+    background: var(--primary); color: var(--primary-foreground);
+    font-size: 1.25rem; font-weight: 700; line-height: 1;
+  }
+
+  /* Button primitive: default size h-8 px-2.5 rounded-lg text-sm font-medium */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 0.375rem;
+    height: 2rem; padding-inline: 0.625rem; border: 1px solid transparent;
+    border-radius: var(--radius-lg); font: inherit; font-size: 0.875rem; font-weight: 500;
+    white-space: nowrap; background: none;
+  }
+  .btn--default { background: var(--primary); color: var(--primary-foreground); }
+  .btn--outline { border-color: var(--border); background: var(--background); color: var(--foreground); }
+  .btn--secondary { background: var(--secondary); color: var(--secondary-foreground); }
+  .btn--ghost { color: var(--foreground); }
+  .btn--destructive { background: color-mix(in oklab, var(--destructive) 10%, transparent); color: var(--destructive); }
+  .btn--link { color: var(--primary); text-decoration: underline; text-underline-offset: 4px; height: auto; padding: 0; }
+  .btn:disabled { opacity: 0.5; pointer-events: none; }
+  .btn:focus-visible { outline: 2px solid var(--foreground); outline-offset: 2px; }
+  .button-row { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+
+  /* Alert primitive */
+  .alert {
+    display: grid; gap: 0.125rem; width: 100%; text-align: left;
+    padding: 0.5rem 0.625rem; border: 1px solid var(--border);
+    border-radius: var(--radius-lg); background: var(--card); color: var(--card-foreground);
+    font-size: 0.875rem;
+  }
+  .alert-description { font-size: 0.875rem; color: var(--muted-foreground); }
+  .alert--destructive { color: var(--destructive); }
+  .alert--destructive .alert-description { color: color-mix(in oklab, var(--destructive) 90%, transparent); }
+
+  /* Field / Input / Label primitives */
+  .field { display: flex; flex-direction: column; gap: 0.5rem; width: 100%; }
+  .label { display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; line-height: 1; font-weight: 500; }
+  .input {
+    height: 2rem; width: 100%; min-width: 0; padding: 0.25rem 0.625rem;
+    border: 1px solid var(--input); border-radius: var(--radius-lg);
+    background: transparent; color: var(--foreground); font: inherit; font-size: 0.875rem;
+  }
+  .input:focus-visible { outline: none; border-color: var(--input); box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 50%, transparent); }
+  .field-description { margin: 0; font-size: 0.875rem; line-height: normal; color: var(--muted-foreground); }
+  .field-error { margin: 0; font-size: 0.875rem; color: var(--destructive); }
+
+  /* Separator primitive */
+  .separator { height: 1px; width: 100%; background: var(--border); }
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+</style>
+</head>
+<body>
+<div class="board">
+  <header class="board-head">
+    <h1>Livefy design system</h1>
+    <p>Source: <code>apps/desktop/src/styles.css</code></p>
+    <p>53 light tokens · 52 dark tokens · 66 bridge entries · 7 installed primitives</p>
+  </header>
+
+  <section aria-labelledby="colors-heading">
+    <h2 id="colors-heading">Colors</h2>
+    <p class="note">Palette roles, not isolated values. Dark activates through the <code>.dark</code> class on an ancestor; there is no persisted selector and no automatic system following.</p>
+    <div class="panes">
+      <div class="pane">
+        <h3>Light — <code>:root</code></h3>
+        <div class="swatches">
+          <div class="swatch"><span class="chip" style="--sw: var(--background)"></span><span class="token">--background</span><span class="value">oklch(1.0000 0 0)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--foreground)"></span><span class="token">--foreground</span><span class="value">oklch(0.2850 0 0)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--card)"></span><span class="token">--card</span><span class="value">oklch(1.0000 0 0)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--card-foreground)"></span><span class="token">--card-foreground</span><span class="value">oklch(0.2850 0 0)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--popover)"></span><span class="token">--popover</span><span class="value">oklch(1.0000 0 0)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--popover-foreground)"></span><span class="token">--popover-foreground</span><span class="value">oklch(0.2850 0 0)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--primary)"></span><span class="token">--primary</span><span class="value">oklch(0.9347 0.1825 120.5229)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--primary-foreground)"></span><span class="token">--primary-foreground</span><span class="value">oklch(0 0 0)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--secondary)"></span><span class="token">--secondary</span><span class="value">oklch(0.9692 0.0121 96.4218)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--secondary-foreground)"></span><span class="token">--secondary-foreground</span><span class="value">oklch(0.2850 0 0)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--muted)"></span><span class="token">--muted</span><span class="value">oklch(0.9845 0.0026 106.4477)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--muted-foreground)"></span><span class="token">--muted-foreground</span><span class="value">oklch(0.5103 0 0)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--accent)"></span><span class="token">--accent</span><span class="value">oklch(0.9353 0.1021 109.4248)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--accent-foreground)"></span><span class="token">--accent-foreground</span><span class="value">oklch(0.2994 0.0327 118.0959)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--destructive)"></span><span class="token">--destructive</span><span class="value">oklch(0.5771 0.2152 27.3250)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--destructive-foreground)"></span><span class="token">--destructive-foreground</span><span class="value">oklch(1.0000 0 0)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--border)"></span><span class="token">--border</span><span class="value">oklch(0.9269 0.0160 110.5685)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--input)"></span><span class="token">--input</span><span class="value">oklch(0.9448 0.0134 115.8392)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--ring)"></span><span class="token">--ring</span><span class="value">oklch(0.9347 0.1825 120.5229)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--chart-1)"></span><span class="token">--chart-1</span><span class="value">oklch(0 0 0)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--chart-2)"></span><span class="token">--chart-2</span><span class="value">oklch(0.9347 0.1825 120.5229)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--chart-3)"></span><span class="token">--chart-3</span><span class="value">oklch(0.6959 0.1491 162.4796)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--chart-4)"></span><span class="token">--chart-4</span><span class="value">oklch(0.6962 0.1306 112.3662)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--chart-5)"></span><span class="token">--chart-5</span><span class="value">oklch(0.5103 0 0)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--sidebar)"></span><span class="token">--sidebar</span><span class="value">oklch(0.9845 0.0026 106.4477)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--sidebar-foreground)"></span><span class="token">--sidebar-foreground</span><span class="value">oklch(0.2850 0 0)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--sidebar-primary)"></span><span class="token">--sidebar-primary</span><span class="value">oklch(0 0 0)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--sidebar-primary-foreground)"></span><span class="token">--sidebar-primary-foreground</span><span class="value">oklch(1.0000 0 0)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--sidebar-accent)"></span><span class="token">--sidebar-accent</span><span class="value">oklch(0.9353 0.1021 109.4248)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--sidebar-accent-foreground)"></span><span class="token">--sidebar-accent-foreground</span><span class="value">oklch(0.2994 0.0327 118.0959)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--sidebar-border)"></span><span class="token">--sidebar-border</span><span class="value">oklch(0.9269 0.0160 110.5685)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--sidebar-ring)"></span><span class="token">--sidebar-ring</span><span class="value">oklch(0.9347 0.1825 120.5229)</span></div>
+        </div>
+      </div>
+      <div class="pane dark">
+        <h3>Dark — <code>.dark</code></h3>
+        <div class="swatches">
+          <div class="swatch"><span class="chip" style="--sw: var(--background)"></span><span class="token">--background</span><span class="value">oklch(0.2679 0.0036 106.6427)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--foreground)"></span><span class="token">--foreground</span><span class="value">oklch(0.9576 0.0027 106.4494)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--card)"></span><span class="token">--card</span><span class="value">oklch(0.2928 0.0018 106.5092)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--card-foreground)"></span><span class="token">--card-foreground</span><span class="value">oklch(0.9818 0.0054 95.0986)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--popover)"></span><span class="token">--popover</span><span class="value">oklch(0.3085 0.0035 106.6039)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--popover-foreground)"></span><span class="token">--popover-foreground</span><span class="value">oklch(0.9211 0.0040 106.4781)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--primary)"></span><span class="token">--primary</span><span class="value">oklch(0.9347 0.1825 120.5229)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--primary-foreground)"></span><span class="token">--primary-foreground</span><span class="value">oklch(0.1913 0 0)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--secondary)"></span><span class="token">--secondary</span><span class="value">oklch(0.9818 0.0054 95.0986)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--secondary-foreground)"></span><span class="token">--secondary-foreground</span><span class="value">oklch(0.3085 0.0035 106.6039)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--muted)"></span><span class="token">--muted</span><span class="value">oklch(0.2213 0.0038 106.7070)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--muted-foreground)"></span><span class="token">--muted-foreground</span><span class="value">oklch(0.7713 0.0169 99.0657)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--accent)"></span><span class="token">--accent</span><span class="value">oklch(0.2130 0.0078 95.4245)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--accent-foreground)"></span><span class="token">--accent-foreground</span><span class="value">oklch(0.9663 0.0080 98.8792)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--destructive)"></span><span class="token">--destructive</span><span class="value">oklch(0.6368 0.2078 25.3313)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--destructive-foreground)"></span><span class="token">--destructive-foreground</span><span class="value">oklch(1.0000 0 0)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--border)"></span><span class="token">--border</span><span class="value">oklch(0.3618 0.0101 106.8928)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--input)"></span><span class="token">--input</span><span class="value">oklch(0.4336 0.0113 100.2195)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--ring)"></span><span class="token">--ring</span><span class="value">oklch(0.9347 0.1825 120.5229)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--chart-1)"></span><span class="token">--chart-1</span><span class="value">oklch(0.9347 0.1825 120.5229)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--chart-2)"></span><span class="token">--chart-2</span><span class="value">oklch(0.6959 0.1491 162.4796)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--chart-3)"></span><span class="token">--chart-3</span><span class="value">oklch(0.8734 0.1029 210.3009)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--chart-4)"></span><span class="token">--chart-4</span><span class="value">oklch(0.6962 0.1306 112.3662)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--chart-5)"></span><span class="token">--chart-5</span><span class="value">oklch(0.8699 0 0)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--sidebar)"></span><span class="token">--sidebar</span><span class="value">oklch(0.2357 0.0024 67.7077)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--sidebar-foreground)"></span><span class="token">--sidebar-foreground</span><span class="value">oklch(0.8074 0.0142 93.0137)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--sidebar-primary)"></span><span class="token">--sidebar-primary</span><span class="value">oklch(0.9347 0.1825 120.5229)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--sidebar-primary-foreground)"></span><span class="token">--sidebar-primary-foreground</span><span class="value">oklch(0 0 0)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--sidebar-accent)"></span><span class="token">--sidebar-accent</span><span class="value">oklch(0.1680 0.0020 106.6177)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--sidebar-accent-foreground)"></span><span class="token">--sidebar-accent-foreground</span><span class="value">oklch(0.8074 0.0142 93.0137)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--sidebar-border)"></span><span class="token">--sidebar-border</span><span class="value">oklch(0.9401 0 0)</span></div>
+          <div class="swatch"><span class="chip" style="--sw: var(--sidebar-ring)"></span><span class="token">--sidebar-ring</span><span class="value">oklch(0.7731 0 0)</span></div>
+        </div>
+      </div>
+    </div>
+    <p class="note">Measured contrast: <code>--foreground</code> on <code>--card</code> 14.35 light / 12.36 dark; <code>--muted-foreground</code> on <code>--card</code> 5.74 / 6.79; <code>--primary-foreground</code> on <code>--primary</code> 17.91 / 15.71. <code>--primary</code> on a light card is 1.17, so lime never carries information alone.</p>
+  </section>
+
+  <section aria-labelledby="type-heading">
+    <h2 id="type-heading">Typography</h2>
+    <p class="note">Effective family: <code>'Geist Variable', ui-sans-serif, sans-serif, system-ui</code> from <code>@layer base</code>. <code>--font-sans</code> names Asta Sans and <code>--font-mono</code> names JetBrains Mono, but those assets are not loaded.</p>
+    <div class="pane">
+      <div class="type-row"><span class="type-meta">1.25rem / 700<br>brand mark</span><span class="t-mark">L</span></div>
+      <div class="type-row"><span class="type-meta">1rem / 1.375 / 500<br>CardTitle</span><span class="t-title">Livefy</span></div>
+      <div class="type-row"><span class="type-meta">0.875rem / 1.6<br>.visual-content p</span><span class="t-body">Session stays open on this device. Sign in to start the next live.</span></div>
+      <div class="type-row"><span class="type-meta">0.875rem / 500<br>Button</span><span class="t-button">Open app</span></div>
+      <div class="type-row"><span class="type-meta">0.875rem / 1 / 500<br>Label</span><span class="t-label">Email address</span></div>
+      <div class="type-row"><span class="type-meta">0.75rem<br>metadata</span><span class="t-meta">Memory-only session: encryption unavailable.</span></div>
+      <div class="type-row"><span class="type-meta">--font-serif<br>declared, unused</span><span style="font-family: var(--font-serif)">Georgia sample</span></div>
+      <div class="type-row"><span class="type-meta">--font-mono<br>declared, unused</span><span style="font-family: var(--font-mono)">JetBrains Mono sample</span></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="space-heading">
+    <h2 id="space-heading">Spacing</h2>
+    <p class="note">Single unit <code>--spacing: 0.25rem</code>. Only the multiples the shell and primitives actually use are drawn.</p>
+    <div class="pane">
+      <div class="space-row"><span class="space-meta">--spacing × 1 = 0.25rem</span><span class="space-bar" style="width: calc(var(--spacing) * 1)"></span></div>
+      <div class="space-row"><span class="space-meta">gap-3.5 = 0.875rem</span><span class="space-bar" style="width: calc(var(--spacing) * 3.5)"></span></div>
+      <div class="space-row"><span class="space-meta">--card-spacing = 1rem</span><span class="space-bar" style="width: calc(var(--spacing) * 4)"></span></div>
+      <div class="space-row"><span class="space-meta">gap-5 = 1.25rem</span><span class="space-bar" style="width: calc(var(--spacing) * 5)"></span></div>
+      <div class="space-row"><span class="space-meta">shell padding 3rem</span><span class="space-bar" style="width: calc(var(--spacing) * 12)"></span></div>
+      <div class="space-row"><span class="space-meta">shell max-width 30rem</span><span class="space-bar" style="width: calc(var(--spacing) * 120)"></span></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="radius-heading">
+    <h2 id="radius-heading">Radius</h2>
+    <p class="note">Base <code>--radius: 1rem</code>. The brand mark uses <code>calc(var(--radius) * 0.6)</code> = 0.6rem; Card uses <code>--radius-xl</code>; Button, Alert and Input use <code>--radius-lg</code>.</p>
+    <div class="radius-grid">
+      <div class="radius-card"><span class="radius-box" style="border-radius: var(--radius-sm)"></span><span class="space-meta">--radius-sm<br>calc(var(--radius) * 0.6)<br>0.6rem · mark</span></div>
+      <div class="radius-card"><span class="radius-box" style="border-radius: var(--radius-md)"></span><span class="space-meta">--radius-md<br>calc(var(--radius) * 0.8)<br>0.8rem</span></div>
+      <div class="radius-card"><span class="radius-box" style="border-radius: var(--radius-lg)"></span><span class="space-meta">--radius-lg<br>var(--radius)<br>1rem · button</span></div>
+      <div class="radius-card"><span class="radius-box" style="border-radius: var(--radius-xl)"></span><span class="space-meta">--radius-xl<br>calc(var(--radius) * 1.4)<br>1.4rem · card</span></div>
+      <div class="radius-card"><span class="radius-box" style="border-radius: var(--radius-2xl)"></span><span class="space-meta">--radius-2xl<br>calc(var(--radius) * 1.8)<br>1.8rem</span></div>
+      <div class="radius-card"><span class="radius-box" style="border-radius: var(--radius-3xl)"></span><span class="space-meta">--radius-3xl<br>calc(var(--radius) * 2.2)<br>2.2rem</span></div>
+      <div class="radius-card"><span class="radius-box" style="border-radius: var(--radius-4xl)"></span><span class="space-meta">--radius-4xl<br>calc(var(--radius) * 2.6)<br>2.6rem</span></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="shadow-heading">
+    <h2 id="shadow-heading">Shadows</h2>
+    <p class="note">Recorded values; no shared-shell rule currently applies a shadow token — the card boundary is <code>ring-1 ring-foreground/10</code>.</p>
+    <div class="pane">
+      <h3>Light</h3>
+      <div class="shadow-grid">
+        <div class="shadow-tile" style="box-shadow: var(--shadow-2xs)"></div>
+        <div class="shadow-tile" style="box-shadow: var(--shadow-xs)"></div>
+        <div class="shadow-tile" style="box-shadow: var(--shadow-sm)"></div>
+        <div class="shadow-tile" style="box-shadow: var(--shadow)"></div>
+        <div class="shadow-tile" style="box-shadow: var(--shadow-md)"></div>
+        <div class="shadow-tile" style="box-shadow: var(--shadow-lg)"></div>
+        <div class="shadow-tile" style="box-shadow: var(--shadow-xl)"></div>
+        <div class="shadow-tile" style="box-shadow: var(--shadow-2xl)"></div>
+      </div>
+      <div class="shadow-grid">
+        <span class="space-meta">--shadow-2xs</span><span class="space-meta">--shadow-xs</span><span class="space-meta">--shadow-sm</span><span class="space-meta">--shadow</span>
+        <span class="space-meta">--shadow-md</span><span class="space-meta">--shadow-lg</span><span class="space-meta">--shadow-xl</span><span class="space-meta">--shadow-2xl</span>
+      </div>
+    </div>
+    <div class="pane dark">
+      <h3>Dark</h3>
+      <div class="shadow-grid">
+        <div class="shadow-tile" style="box-shadow: var(--shadow-2xs)"></div>
+        <div class="shadow-tile" style="box-shadow: var(--shadow-xs)"></div>
+        <div class="shadow-tile" style="box-shadow: var(--shadow-sm)"></div>
+        <div class="shadow-tile" style="box-shadow: var(--shadow)"></div>
+        <div class="shadow-tile" style="box-shadow: var(--shadow-md)"></div>
+        <div class="shadow-tile" style="box-shadow: var(--shadow-lg)"></div>
+        <div class="shadow-tile" style="box-shadow: var(--shadow-xl)"></div>
+        <div class="shadow-tile" style="box-shadow: var(--shadow-2xl)"></div>
+      </div>
+      <div class="shadow-grid">
+        <span class="space-meta">--shadow-2xs</span><span class="space-meta">--shadow-xs</span><span class="space-meta">--shadow-sm</span><span class="space-meta">--shadow</span>
+        <span class="space-meta">--shadow-md</span><span class="space-meta">--shadow-lg</span><span class="space-meta">--shadow-xl</span><span class="space-meta">--shadow-2xl</span>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="components-heading">
+    <h2 id="components-heading">Components</h2>
+    <p class="note">Appearance of the installed base-nova primitives: <code>card</code>, <code>button</code>, <code>alert</code>, <code>field</code>, <code>input</code>, <code>label</code>, <code>separator</code>. The production app renders the React primitives; this board restates their geometry with the same tokens.</p>
+    <div class="components">
+      <div class="component-stack">
+        <div class="visual-shell">
+          <div class="provider-surface" style="max-width: 26rem">
+            <div class="card">
+              <div class="card-header">
+                <span class="visual-mark" aria-hidden="true">L</span>
+                <h3 class="card-title" style="color: var(--card-foreground); font-size: 1rem">Livefy</h3>
+              </div>
+              <div class="card-content">
+                <p>Session stays open on this device. Sign in to start the next live.</p>
+                <div class="button-row">
+                  <button class="btn btn--default" type="button">Open app</button>
+                  <button class="btn btn--outline" type="button">Sign out</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="component-label">Card · visual-mark · h1 · card-content — light</p>
+
+        <div class="button-row">
+          <button class="btn btn--default" type="button">Default</button>
+          <button class="btn btn--outline" type="button">Outline</button>
+          <button class="btn btn--secondary" type="button">Secondary</button>
+          <button class="btn btn--ghost" type="button">Ghost</button>
+          <button class="btn btn--destructive" type="button">Destructive</button>
+          <button class="btn btn--link" type="button">Link</button>
+          <button class="btn btn--default" type="button" disabled>Disabled</button>
+        </div>
+        <p class="component-label">Button variants · h-8 · px-2.5 · --radius-lg · text-sm/500</p>
+
+        <div class="alert" role="status"><span class="alert-description">Backend access confirmed</span></div>
+        <div class="alert alert--destructive" role="alert"><span class="alert-description">Sign out failed. Try again.</span></div>
+        <p class="component-label">Alert · role="status" (polite) and destructive Alert · role="alert"</p>
+
+        <div class="field">
+          <label class="label" for="ds-email">Email address</label>
+          <input class="input" id="ds-email" type="email" value="operador@livefy.app">
+          <p class="field-description">Used for the Clerk sign-in on this device.</p>
+        </div>
+        <p class="component-label">Field · Label · Input · description</p>
+        <div class="separator" role="separator"></div>
+        <p class="component-label">Separator · h-px · --border</p>
+      </div>
+
+      <div class="component-stack dark">
+        <div class="visual-shell">
+          <div class="provider-surface" style="max-width: 26rem">
+            <div class="card">
+              <div class="card-header">
+                <span class="visual-mark" aria-hidden="true">L</span>
+                <h3 class="card-title" style="color: var(--card-foreground); font-size: 1rem">Livefy</h3>
+              </div>
+              <div class="card-content">
+                <p>Session stays open on this device. Sign in to start the next live.</p>
+                <div class="button-row">
+                  <button class="btn btn--default" type="button">Open app</button>
+                  <button class="btn btn--outline" type="button">Sign out</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="component-label">Card · visual-mark · h1 · card-content — dark</p>
+
+        <div class="button-row">
+          <button class="btn btn--default" type="button">Default</button>
+          <button class="btn btn--outline" type="button">Outline</button>
+          <button class="btn btn--secondary" type="button">Secondary</button>
+          <button class="btn btn--ghost" type="button">Ghost</button>
+          <button class="btn btn--destructive" type="button">Destructive</button>
+          <button class="btn btn--link" type="button">Link</button>
+          <button class="btn btn--default" type="button" disabled>Disabled</button>
+        </div>
+        <p class="component-label">Button variants — dark</p>
+
+        <div class="alert" role="status"><span class="alert-description">Backend access confirmed</span></div>
+        <div class="alert alert--destructive" role="alert"><span class="alert-description">Sign out failed. Try again.</span></div>
+        <p class="component-label">Alert states — dark</p>
+
+        <div class="field">
+          <label class="label" for="ds-email-dark">Email address</label>
+          <input class="input" id="ds-email-dark" type="email" value="operador@livefy.app">
+          <p class="field-description">Used for the Clerk sign-in on this device.</p>
+        </div>
+        <p class="component-label">Field · Label · Input · description — dark</p>
+        <div class="separator" role="separator"></div>
+        <p class="component-label">Separator — dark</p>
+      </div>
+    </div>
+  </section>
+</div>
+</body>
+</html>

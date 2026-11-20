@@ -60,3 +60,12 @@ installs, no dependency changes.
   pantalla de sigout y la de loading de forma muy rapida y finalmente la
   pantalla de inicio de sesion, en verdad son necesarias esas pantallas ?»
 - **L2** User decision (verbatim): «A - Silencioso, sin textos de estado».
+- **L3** Loading design exploration (2026-11-20): produced `design/livefy-loading/`
+  with three alternatives for the initial wait, all built from official shadcn/ui
+  items — `01-spinner-lockup.html` (registry `spinner`),
+  `02-skeleton-body.html` (registry `skeleton`) and
+  `03-progress-milestones.html` (registry `progress`) — plus `design/system.md`
+  and `design/system.html` synced read-only from `apps/desktop/src/styles.css`.
+  No artboard is chosen and no application source changed; the next step is the
+  operator's pick, and the chosen direction also needs its registry item
+  installed (`bunx --bun shadcn@latest add spinner|skeleton|progress`).
