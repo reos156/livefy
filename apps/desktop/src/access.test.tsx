@@ -17,9 +17,15 @@ it.each([true, false])('uses a neutral backend transition without granting contr
   render(<SessionBoundary logout={async () => {}}><AccessLanding onEnterApp={vi.fn()} /></SessionBoundary>)
   const status = screen.getByRole('status')
   expect(status.textContent).toBe('Loading')
-  // Announced only: visually hidden, while the shared shell and brand stay on screen.
+  // Announced only: visually hidden while the ring alone is painted on the shell.
   expect(status.classList.contains('sr-only')).toBe(true)
-  expect(screen.getByRole('heading', { level: 1, name: 'Livefy' })).toBeTruthy()
+  // No brand mark, no title and no card around the cue.
+  expect(screen.queryByRole('heading')).toBeNull()
+  expect(screen.queryByText('L')).toBeNull()
+  expect(screen.getByRole('main').querySelector('[data-slot="card"]')).toBeNull()
+  expect(screen.getByRole('main').querySelector('.visual-mark')).toBeNull()
+  // Centring still comes from the shared shell layout.
+  expect(screen.getByRole('main').classList.contains('visual-shell')).toBe(true)
   // The wait is signalled by the ring cue, never by a second live region.
   expect(screen.getAllByRole('status')).toHaveLength(1)
   const ring = screen.getByTitle('Loading...').closest('svg')
@@ -38,6 +44,9 @@ it('embeds authentication by default without technical diagnostics or persistenc
   state.configured = true
   render(<AccessLanding />)
   expect(screen.getByTestId('embedded-auth')).toBeTruthy()
+  // A settled screen, not a wait: the shell keeps the brand mark and the title.
+  expect(screen.getByRole('heading', { level: 1, name: 'Livefy' })).toBeTruthy()
+  expect(screen.getByText('L').getAttribute('aria-hidden')).toBe('true')
   expect(screen.queryByRole('status')).toBeNull()
   expect(screen.queryByRole('separator')).toBeNull()
   expect(screen.queryByText(/persistence|No authenticated session/)).toBeNull()
@@ -54,7 +63,9 @@ it.each([
   const status = screen.getByRole('status')
   expect(status.textContent).toBe('Loading')
   expect(status.classList.contains('sr-only')).toBe(true)
-  expect(screen.getByRole('heading', { level: 1, name: 'Livefy' })).toBeTruthy()
+  // The wait paints the ring alone, with no heading and no brand mark to pair it with.
+  expect(screen.queryByRole('heading')).toBeNull()
+  expect(screen.getByRole('main').querySelector('.visual-mark')).toBeNull()
   // The cue is painted where the wait is, and announced only by the sr-only status.
   expect(screen.getByTitle('Loading...').closest('svg')).not.toBeNull()
   expect(screen.getAllByRole('status')).toHaveLength(1)
@@ -92,6 +103,8 @@ it('offers local logout on backend-confirmed access', () => {
   render(<SessionBoundary logout={logout}><AccessLanding /></SessionBoundary>)
   // Confirmed access keeps its visible status and shows no waiting cue.
   expect(screen.queryByTitle('Loading...')).toBeNull()
+  expect(screen.getByRole('heading', { level: 1, name: 'Livefy' })).toBeTruthy()
+  expect(screen.getByText('L').getAttribute('aria-hidden')).toBe('true')
   fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
   expect(logout).toHaveBeenCalledOnce()
   expect(screen.queryByText('Backend access confirmed')).toBeNull()
@@ -123,6 +136,7 @@ it('keeps browser restoration backend-gated and omits native persistence claims'
 it('explains unavailable access without mounting authentication', () => {
   render(<AccessLanding />)
   expect(screen.getByRole('heading', { name: 'Livefy' })).toBeTruthy()
+  expect(screen.getByText('L').getAttribute('aria-hidden')).toBe('true')
   expect(screen.getByText(/Email and password access is not available yet/)).toBeTruthy()
   expect((screen.getByRole('button', { name: 'Sign in — coming soon' }) as HTMLButtonElement).disabled).toBe(true)
   expect(screen.queryByTestId('embedded-auth')).toBeNull()

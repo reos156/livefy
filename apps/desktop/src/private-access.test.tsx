@@ -49,7 +49,6 @@ it('unmounts confirmed content on refresh or authentication loss', () => {
 
 it.each([
   [false, false, 'Authentication unavailable'],
-  [true, true, 'Checking backend access'],
   [true, false, 'Authentication required'],
 ] as const)('composes private status without assertive alerts or form dividers', (configured, isLoading, copy) => {
   Object.assign(state, { configured, isLoading })
@@ -59,4 +58,17 @@ it.each([
   expect(status.querySelector('[data-slot="alert-description"]')?.textContent).toBe(copy)
   expect(screen.queryByRole('alert')).toBeNull()
   expect(screen.queryByRole('separator')).toBeNull()
+})
+
+it('announces the checking state without painting it', () => {
+  Object.assign(state, { configured: true, isLoading: true })
+  render(<PrivateAccess>Private child</PrivateAccess>)
+  // Not an Alert: the primitive's `relative` and `w-full` beat `sr-only`, so a
+  // hidden Alert is clipped but still occupies the full width of the layout.
+  const status = screen.getByRole('status')
+  expect(status.getAttribute('data-slot')).toBeNull()
+  expect(status.className).toBe('sr-only')
+  expect(status.textContent).toBe('Checking backend access')
+  expect(screen.queryByText('Private child')).toBeNull()
+  expect(screen.queryByRole('alert')).toBeNull()
 })

@@ -64,14 +64,21 @@ it.each(['loading', 'refresh', 'unavailable'] as const)('blocks composed private
     expect(status.closest('.sr-only')).toBeNull()
     // A refusal is explained in text; it is not a silent wait.
     expect(screen.queryByTitle('Loading...')).toBeNull()
+    // A refusal keeps the shell, the brand mark and the title.
+    expect(await screen.findByRole('heading', { level: 1, name: 'Livefy' })).toBeTruthy()
+    expect(screen.getByText('L').getAttribute('aria-hidden')).toBe('true')
   } else {
     expect(status.textContent).toBe('Checking backend access')
     expect(status.classList.contains('sr-only')).toBe(true)
-    // The wait paints the ring cue, and the sr-only status stays the only live region.
+    // The wait paints the ring alone: no title, no brand mark, no card around it.
+    expect(screen.queryByRole('heading')).toBeNull()
+    expect(screen.queryByText('L')).toBeNull()
+    expect(screen.getByRole('main').querySelector('[data-slot="card"]')).toBeNull()
+    expect(screen.getByRole('main').classList.contains('visual-shell')).toBe(true)
+    // The sr-only status stays the only live region.
     expect(screen.getByTitle('Loading...').closest('svg')).not.toBeNull()
     expect(screen.getAllByRole('status')).toHaveLength(1)
   }
-  expect(await screen.findByRole('heading', { level: 1, name: 'Livefy' })).toBeTruthy()
   expect(screen.queryByRole('heading', { name: 'Livefy app' })).toBeNull()
   if (mode === 'unavailable') expect(authHook).not.toHaveBeenCalled()
 })

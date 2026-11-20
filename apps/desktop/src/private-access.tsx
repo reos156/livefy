@@ -1,17 +1,14 @@
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { VisualShell } from './components/visual-shell'
-import { Spinner } from '@/components/kibo-ui/spinner'
+import { WaitingScreen } from './components/waiting-screen'
 import { useConvexAuth } from 'convex/react'
 import type { ReactNode } from 'react'
 import { useAuthConfigured } from './lib/auth'
 
 function ConfirmedAccess({ children, rejected }: { children: ReactNode; rejected?: ReactNode }) {
   const { isLoading, isAuthenticated, isRefreshing } = useConvexAuth()
-  // Announced only: the shell and brand stay on screen, no status text is painted.
-  if (isLoading || isRefreshing) return <VisualShell title="Livefy">
-    <Alert role="status" className="sr-only"><AlertDescription>Checking backend access</AlertDescription></Alert>
-    <Spinner variant="ring" size={28} className="text-foreground" />
-  </VisualShell>
+  // Announced only: the ring is the only painted element, no status text is shown.
+  if (isLoading || isRefreshing) return <WaitingScreen label="Checking backend access" />
   if (!isAuthenticated) return <VisualShell title="Livefy">{rejected ?? <Alert role="status"><AlertDescription>Authentication required</AlertDescription></Alert>}</VisualShell>
   return <>{children}</>
 }

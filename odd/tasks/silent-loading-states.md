@@ -81,3 +81,11 @@ installs, no dependency changes.
   project's `@/` aliases); `.brand-loader`, `.brand-dots`, `@keyframes
   brand-pulse` and `@keyframes brand-dot` were removed from `src/styles.css` and
   `VisualShell` no longer takes `busy`. No commit made.
+- **L5** Ring-only wait (2026-11-20): the mark, the brand word and the ring read as three
+  unrelated objects during the wait, so the wait now paints the ring alone on the
+  shared `.visual-shell` background — no `visual-mark`, no `h1`, no card — through a
+  small shared `src/components/waiting-screen.tsx` used by the `ConfiguredAccess`
+  waiting branch (`access.tsx`, which now owns the shell so the ring can stand alone)
+  and the `ConfirmedAccess` checking branch (`private-access.tsx`); the `sr-only`
+  `role="status"` Alert stays the only live region, the ring keeps its Kibo size and
+  colour, and every non-waiting surface renders byte-identical DOM to the base commit.

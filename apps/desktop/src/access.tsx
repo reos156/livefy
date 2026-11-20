@@ -1,8 +1,8 @@
 import { useAuth, AuthUi, isNativePlatform } from './platform/auth'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { VisualShell } from './components/visual-shell'
+import { WaitingScreen } from './components/waiting-screen'
 import { Button } from '@/components/ui/button'
-import { Spinner } from '@/components/kibo-ui/spinner'
 import { useConvexAuth } from 'convex/react'
 import { useEffect, useState } from 'react'
 import { useAuthConfigured } from './lib/auth'
@@ -22,31 +22,28 @@ function ConfiguredAccess({ onEnterApp }: { onEnterApp?: () => void }) {
     }).catch(() => { /* Keep explicit unavailable status; never infer persistence. */ })
     return () => { active = false }
   }, [])
-  // Announced to assistive technology only: the shared shell and brand stay on screen
-  // and the operator sees a silent ring, not status text, while access is confirmed.
-  const waiting = <>
-    <Alert role="status" className="sr-only"><AlertDescription>Loading</AlertDescription></Alert>
-    <Spinner variant="ring" size={28} className="text-foreground" />
-  </>
+  // Announced to assistive technology only: the ring is the only painted element
+  // while access is confirmed, and no status text is shown.
+  const waiting = <WaitingScreen label="Loading" />
   if (checking || !isLoaded) return waiting
-  if (isAuthenticated) return <>
+  if (isAuthenticated) return <VisualShell title="Livefy" providerSurface>
     <Alert role="status"><AlertDescription>Backend access confirmed</AlertDescription></Alert>
     {isNativePlatform() && <p>{persistence}</p>}
     <LogoutButton />
     {onEnterApp && <Button onClick={onEnterApp}>Open app</Button>}
-  </>
+  </VisualShell>
   // Clerk controls only UI eligibility; it never grants private access.
   if (isSignedIn) return waiting
-  return <AuthUi />
+  return <VisualShell title="Livefy" providerSurface><AuthUi /></VisualShell>
 }
 export function AccessLanding({ onEnterApp }: { onEnterApp?: () => void }) {
   const configured = useAuthConfigured()
-  return <VisualShell title="Livefy" providerSurface={configured}>
-    {configured ? <ConfiguredAccess onEnterApp={onEnterApp} /> : <>
-      <p className="text-muted-foreground">
-        Email and password access is not available yet. This desktop preview does not collect credentials.
-      </p>
-      <Button disabled>Sign in — coming soon</Button>
-    </>}
+  // ConfiguredAccess owns the shell so the wait can paint the ring alone on it.
+  if (configured) return <ConfiguredAccess onEnterApp={onEnterApp} />
+  return <VisualShell title="Livefy">
+    <p className="text-muted-foreground">
+      Email and password access is not available yet. This desktop preview does not collect credentials.
+    </p>
+    <Button disabled>Sign in — coming soon</Button>
   </VisualShell>
 }
