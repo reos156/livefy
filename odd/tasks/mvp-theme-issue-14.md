@@ -79,3 +79,34 @@ Forecast: approximately 250–380 authored lines, advisory only. Strategy: ask-o
 
 ## Next step
 Final independent verification confirms 53 light and 52 dark registry values and all authorized checks pass. It finds incomplete logout coverage in apps/desktop/src/lib/session.tsx:27–39: pending/ended/failed screens do not use VisualShell or visual-content. Logout correction completed in session.tsx and session.test.tsx: shared VisualShell and headings cover all three branches. Three new regression cases failed before correction (RED), then five session cases passed (GREEN); full197tests/typecheck/build/diff-check passed. Correction20 changed lines; overall382 source/test lines reported. Final independent verification mv0i2s6e-5-jpz2 passed: five session tests, 197 full tests across 21 files, typecheck and diff-check. Shared shells/headings/content verified for all three logout branches; retry, exclusion, duplicate-call lock and handlers unchanged. No blocker found. Build was not repeated by this final verifier; the correction writer already observed build passing with the documented warnings. Independent verifier also flags global 320px minimum width as a pending human reflow/CAPTCHA check, not a verified failure. Rerun checks after correction. User supplied a light sign-in screenshot and explicitly confirmed the theme applied. First-screen visual acceptance observed: Livefy panel, green primary action, fields and secondary action. This does not establish other states, dark mode, narrow/wide reflow or CAPTCHA fit; those cases remain pending. No issue closure or publishing yet.
+
+## A2 measured matrix — 2026-11-20
+
+Automated in Chromium against the dev web build, measuring rather than judging:
+`scrollingElement.scrollWidth` vs `clientWidth`, every control rect against
+`innerWidth`, real heights, root font size, and a six-step keyboard focus trail.
+
+Scope: 18 cases = 3 surfaces (sign-in, registration, private route) × 3 viewports
+(320×640, 375×667, 1000×700) × 2 themes (light, and dark via the `.dark` class).
+
+Measured:
+- Root font size 16px in every case.
+- **Zero horizontal overflow and zero off-screen controls in all 18 cases.**
+- Keyboard focus visible in every traversed case: buttons expose it as a ring
+  (box-shadow) because the primitive owns it, inputs as a 2px outline, links as an
+  auto outline. Trails: 4 steps on sign-in, 6 on registration.
+- **12 of 18 cases accepted**: sign-in and registration, light and dark, at all
+  three widths.
+- The private route at `/#/app` unauthenticated rendered an empty shell in 6 of
+  18 cases during this run. Fixed immediately after: it now paints
+  `Authentication required` with `Return to access`, with no page error, and its
+  six cases re-measured green (`web-private-route-deeplink.md`). **18 of 18
+  reachable cases accepted.**
+- Authenticated `/app` validated by human observation on 2026-11-20 at 1000, 375
+  and 320 CSS px and in both themes: expected content, no horizontal overflow,
+  nothing clipped, legible in dark, focus visible and reachable by keyboard, and
+  sign-out returns to the sign-in surface with no manual reload. **24 of 24 cases
+  accepted.**
+
+This matrix measures layout and focus. It does not judge aesthetics, and it does
+not replace looking at the screens.

@@ -14,6 +14,17 @@ export function browserCompletionUrl(documentUrl: string) {
   return url.href
 }
 
+// clerk-js resolves its auth steps inside this document's hash, and the app's own
+// routes live in a memory router that never writes that hash. A same-origin http(s)
+// target without credentials is therefore an in-app destination the app already owns:
+// it must never abort the render, and it is deliberately not delegated here.
+function isInAppTarget(to: string) {
+  let target: URL
+  try { target = new URL(to, window.location.href) } catch { return false }
+  return ['http:', 'https:'].includes(target.protocol) && !target.username && !target.password &&
+    target.origin === window.location.origin
+}
+
 export function createBrowserNavigation(completionUrl: string, navigate: (replace: boolean) => unknown) {
   // Only completion enters the shared memory router; Clerk owns all auth-step hashes.
   function complete(to: string, replace: boolean, metadata: NavigationMetadata, hasSession: () => boolean) {
@@ -21,7 +32,12 @@ export function createBrowserNavigation(completionUrl: string, navigate: (replac
     // clerk-js navigate supplies same-origin URLs as pathname + search + hash.
     // Compare the canonical spelling, not arbitrary URL-resolved redirects.
     const relativeCompletion = completion.pathname + completion.search + completion.hash
-    if (to !== completionUrl && to !== relativeCompletion) throw new Error('Unsupported browser completion target')
+    if (to !== completionUrl && to !== relativeCompletion) {
+      // Leave in-app targets to the app instead of throwing; only genuinely
+      // unsupported destinations below stay refused.
+      if (isInAppTarget(to)) return
+      throw new Error('Unsupported browser completion target')
+    }
     if (browserCompletionUrl(window.location.href) !== completionUrl) throw new Error('Unsupported browser completion document')
     if (!hasSession()) {
       if (!metadata?.windowNavigate) throw new Error('Browser navigation metadata unavailable')
