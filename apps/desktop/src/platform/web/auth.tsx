@@ -1,13 +1,16 @@
 import { ClerkProvider, useAuth, useClerk } from '@clerk/react'
 import { ConvexReactClient } from 'convex/react'
 import { ConvexProviderWithClerk } from 'convex/react-clerk'
-import { type ReactNode, type MutableRefObject, useEffect, useMemo, useRef } from 'react'
+import { type ReactNode, type MutableRefObject, useEffect, useMemo, useRef, useState } from 'react'
 import { AuthConfiguration } from '../../lib/auth'
 import { SessionBoundary } from '../../lib/session'
 import { browserCompletionUrl, createBrowserNavigation } from './auth-ui'
 export { BrowserAuthUi } from './auth-ui'
 
 type BrowserClerk = ReturnType<typeof useClerk>
+type BrowserBinding = { isLoaded: boolean; isSignedIn: boolean }
+// The binding is fail-closed until it reports: only a loaded, signed-out read confirms completion.
+const unconfirmedBinding: BrowserBinding = { isLoaded: false, isSignedIn: true }
 function BrowserSession({ children, onSignedOut, clerkRef }: {
   children: ReactNode; onSignedOut?: () => unknown; clerkRef: MutableRefObject<BrowserClerk | undefined>
 }) {
@@ -17,12 +20,28 @@ function BrowserSession({ children, onSignedOut, clerkRef }: {
     return () => { if (clerkRef.current === clerk) clerkRef.current = undefined }
   }, [clerk, clerkRef])
   const { isLoaded, isSignedIn } = useAuth()
+  // The installed binding keeps serving the value its provider subscribed with, so a
+  // resolved local sign-out may never reach it. Completion recorded from the instance
+  // the component already holds closes the transition without a remount or a reload.
+  const [instanceSignedOut, setInstanceSignedOut] = useState(false)
   async function logout() {
     await clerk.signOut({ redirectUrl: browserCompletionUrl(window.location.href) })
     await onSignedOut?.()
+    setInstanceSignedOut(!!(clerk.loaded && !clerk.session))
+    resetToCompletion()
   }
-  return <SessionBoundary browser logout={logout} completedReady={isLoaded && !isSignedIn} completedContent={isLoaded && !isSignedIn ? children :
-    <p role="status">Waiting for signed-out session confirmation</p>}>
+  function resetToCompletion() {
+    // A hash-only change does not reload the document, and both the Clerk React binding
+    // and the Convex client keep the stale session in this one, which leaves the access
+    // landing stuck on its loading state. Only a fresh document re-initializes both.
+    // Normalize the URL first so the reload lands on the public completion route, and
+    // replace state so the signed-out private view stays out of history.
+    try { window.history.replaceState(null, '', browserCompletionUrl(window.location.href)) } catch { /* keep current URL */ }
+    try { window.location.reload() } catch { /* blocked reload: the confirmation surface stays */ }
+  }
+  const binding: BrowserBinding = isLoaded ? { isLoaded, isSignedIn: !!isSignedIn } : unconfirmedBinding
+  const completedReady = instanceSignedOut || (binding.isLoaded && !binding.isSignedIn)
+  return <SessionBoundary browser logout={logout} completedReady={completedReady} completedContent={completedReady ? children : null}>
     {children}
   </SessionBoundary>
 }
