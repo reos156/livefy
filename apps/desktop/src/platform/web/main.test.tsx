@@ -87,6 +87,9 @@ it.each([
   await screen.findByRole('button', { name: 'Sign out' })
   fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
   expect(screen.queryByRole('button', { name: 'Open app' })).toBeNull()
+  // Nothing is painted between the click and the document reset.
+  expect(screen.queryByText('Signing out locally…')).toBeNull()
+  expect(screen.queryByRole('heading', { level: 1, name: 'Signing out' })).toBeNull()
   expect(screen.queryByText('Backend access confirmed.')).toBeNull()
   expect(screen.queryByText('Backend access confirmed')).toBeNull()
   await act(async () => remove())

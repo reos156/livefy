@@ -43,17 +43,22 @@ export function SessionBoundary({ children, logout, browser = false, completedCo
   if (visible) return <Session.Provider value={() => { void endSession() }}><Content.Provider value={{ visible: true, fallback: null }}>{children}</Content.Provider></Session.Provider>
   if (!infrastructure && browser && state === 'ended') return <Session.Provider value={() => { void endSession() }}>{completedContent}</Session.Provider>
   // Unmount auth consumers immediately, independently of provider promises or stale tokens.
-  const fallback = browser && state === 'ended' ? completedContent : <VisualShell title={{ pending: 'Signing out', ended: 'Signed out', failed: 'Sign-out incomplete' }[state]}>
-    {state === 'pending' && <Alert role="status"><AlertDescription>Signing out locally…</AlertDescription></Alert>}
-    {state === 'ended' && <Alert role="status"><AlertDescription>Signed out on this device.</AlertDescription></Alert>}
-    {state === 'failed' && <>
-      <Alert variant="destructive">
-        <AlertDescription>{browser ? 'Sign-out incomplete. Private access remains blocked.' : 'Local sign-out incomplete; restart exclusion is not confirmed. Private access remains blocked.'}</AlertDescription>
-      </Alert>
-      <Button onClick={() => { void endSession() }}>{browser ? 'Retry sign-out' : 'Retry local sign-out'}</Button>
-    </>}
-    <p>Remote session revocation is unconfirmed, including when offline.</p>
-    {!browser && <p>Livefy closes automatically after local sign-out succeeds. Relaunch before signing in again.</p>}
-  </VisualShell>
+  // Browser: the document resets after a successful sign-out, so no intermediate screen is
+  // painted between the click and the reload. Only a real failure keeps a visible surface,
+  // and the wait itself stays announced to assistive technology.
+  const fallback = !browser || state === 'failed'
+    ? <VisualShell title={{ pending: 'Signing out', ended: 'Signed out', failed: 'Sign-out incomplete' }[state]}>
+      {state === 'pending' && <Alert role="status"><AlertDescription>Signing out locally…</AlertDescription></Alert>}
+      {state === 'ended' && <Alert role="status"><AlertDescription>Signed out on this device.</AlertDescription></Alert>}
+      {state === 'failed' && <>
+        <Alert variant="destructive">
+          <AlertDescription>{browser ? 'Sign-out incomplete. Private access remains blocked.' : 'Local sign-out incomplete; restart exclusion is not confirmed. Private access remains blocked.'}</AlertDescription>
+        </Alert>
+        <Button onClick={() => { void endSession() }}>{browser ? 'Retry sign-out' : 'Retry local sign-out'}</Button>
+      </>}
+      <p>Remote session revocation is unconfirmed, including when offline.</p>
+      {!browser && <p>Livefy closes automatically after local sign-out succeeds. Relaunch before signing in again.</p>}
+    </VisualShell>
+    : state === 'ended' ? completedContent : <span role="status" className="sr-only">Signing out</span>
   return infrastructure ? <Session.Provider value={undefined}><Content.Provider value={{ visible: false, fallback }}>{children}</Content.Provider></Session.Provider> : fallback
 }

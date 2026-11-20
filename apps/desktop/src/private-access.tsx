@@ -6,7 +6,8 @@ import { useAuthConfigured } from './lib/auth'
 
 function ConfirmedAccess({ children, rejected }: { children: ReactNode; rejected?: ReactNode }) {
   const { isLoading, isAuthenticated, isRefreshing } = useConvexAuth()
-  if (isLoading || isRefreshing) return <VisualShell title="Livefy"><Alert role="status"><AlertDescription>Checking backend access</AlertDescription></Alert></VisualShell>
+  // Announced only: the shell and brand stay on screen, no status text is painted.
+  if (isLoading || isRefreshing) return <VisualShell title="Livefy" busy><Alert role="status" className="sr-only"><AlertDescription>Checking backend access</AlertDescription></Alert></VisualShell>
   if (!isAuthenticated) return <VisualShell title="Livefy">{rejected ?? <Alert role="status"><AlertDescription>Authentication required</AlertDescription></Alert>}</VisualShell>
   return <>{children}</>
 }

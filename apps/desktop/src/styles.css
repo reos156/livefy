@@ -272,3 +272,17 @@
     text-decoration-thickness: 2px;
   }
 }
+/* In-progress cue for the brand mark. Purely decorative: the accessible state is
+   announced by the screen that owns it, never by this animation. */
+.brand-loader {
+  animation: brand-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes brand-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brand-loader { animation: none; }
+}

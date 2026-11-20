@@ -47,7 +47,9 @@ function setup(path: string, configured = true) {
 }
 it('rejects anonymous direct navigation and provides a public return', async () => {
   const { router } = setup('/app')
-  expect(await screen.findByText('Authentication required')).toBeTruthy()
+  const required = await screen.findByText('Authentication required')
+  // A real refusal stays fully visible; only transient waits are announced-only.
+  expect(required.closest('.sr-only')).toBeNull()
   expect(screen.queryByRole('heading', { name: 'Livefy app' })).toBeNull()
   fireEvent.click(screen.getByRole('link', { name: 'Return to access' }))
   expect(await screen.findByRole('heading', { name: 'Livefy' })).toBeTruthy()
@@ -56,7 +58,15 @@ it('rejects anonymous direct navigation and provides a public return', async () 
 it.each(['loading', 'refresh', 'unavailable'] as const)('blocks composed private route when %s', async mode => {
   Object.assign(state, { isAuthenticated: true, isLoading: mode === 'loading', isRefreshing: mode === 'refresh' })
   setup('/app', mode !== 'unavailable')
-  expect(await screen.findByText(mode === 'unavailable' ? 'Authentication unavailable' : 'Checking backend access')).toBeTruthy()
+  const status = await screen.findByRole('status')
+  if (mode === 'unavailable') {
+    expect(await screen.findByText('Authentication unavailable')).toBeTruthy()
+    expect(status.closest('.sr-only')).toBeNull()
+  } else {
+    expect(status.textContent).toBe('Checking backend access')
+    expect(status.classList.contains('sr-only')).toBe(true)
+  }
+  expect(await screen.findByRole('heading', { level: 1, name: 'Livefy' })).toBeTruthy()
   expect(screen.queryByRole('heading', { name: 'Livefy app' })).toBeNull()
   if (mode === 'unavailable') expect(authHook).not.toHaveBeenCalled()
 })

@@ -15,7 +15,14 @@ afterEach(() => {
 it.each([true, false])('uses a neutral backend transition without granting controls (native=%s)', native => {
   Object.assign(state, { native, configured: true, isSignedIn: true, isAuthenticated: true, isRefreshing: true })
   render(<SessionBoundary logout={async () => {}}><AccessLanding onEnterApp={vi.fn()} /></SessionBoundary>)
-  expect(screen.getByRole('status').textContent).toBe('Loading…')
+  const status = screen.getByRole('status')
+  expect(status.textContent).toBe('Loading')
+  // Announced only: visually hidden, while the shared shell and brand stay on screen.
+  expect(status.classList.contains('sr-only')).toBe(true)
+  expect(screen.getByRole('heading', { level: 1, name: 'Livefy' })).toBeTruthy()
+  // The wait is signalled by motion on the existing mark, not by text.
+  const mark = screen.getByRole('heading', { level: 1, name: 'Livefy' }).closest('header')?.querySelector('[aria-hidden="true"]')
+  expect(mark?.classList.contains('brand-loader')).toBe(true)
   expect(screen.queryByText('Checking backend access')).toBeNull()
   expect(screen.queryByText('Backend access confirmed')).toBeNull()
   expect(screen.queryByRole('button', { name: 'Open app' })).toBeNull()
@@ -32,14 +39,17 @@ it('embeds authentication by default without technical diagnostics or persistenc
   expect(screen.queryByRole('button', { name: 'Open app' })).toBeNull()
 })
 it.each([
-  { isLoaded: false, text: 'Loading authentication' },
-  { isSignedIn: true, text: 'Your session is ready. Waiting for backend access.' },
-  { isLoading: true, text: 'Loading…' },
-  { isRefreshing: true, isAuthenticated: true, text: 'Loading…' },
+  { isLoaded: false },
+  { isSignedIn: true },
+  { isLoading: true },
+  { isRefreshing: true, isAuthenticated: true },
 ])('does not embed or enter while guarded: %j', guarded => {
   Object.assign(state, { configured: true }, guarded)
   render(<AccessLanding onEnterApp={vi.fn()} />)
-  expect(screen.getByText(guarded.text)).toBeTruthy()
+  const status = screen.getByRole('status')
+  expect(status.textContent).toBe('Loading')
+  expect(status.classList.contains('sr-only')).toBe(true)
+  expect(screen.getByRole('heading', { level: 1, name: 'Livefy' })).toBeTruthy()
   expect(screen.queryByTestId('embedded-auth')).toBeNull()
   expect(screen.queryByRole('button', { name: 'Open app' })).toBeNull()
 })
@@ -83,11 +93,13 @@ it('keeps browser restoration backend-gated and omits native persistence claims'
   window.livefySession = { persistence, logout: vi.fn() }
   const view = render(<AccessLanding onEnterApp={enter} />)
   expect(screen.queryByRole('button', { name: 'Open app' })).toBeNull()
-  expect(screen.getByText(/Waiting for backend access/)).toBeTruthy()
+  expect(screen.getByRole('status').classList.contains('sr-only')).toBe(true)
+  expect(screen.queryByText(/Waiting for backend access/)).toBeNull()
   state.isAuthenticated = true
   state.isRefreshing = true
   view.rerender(<AccessLanding onEnterApp={enter} />)
-  expect(screen.getByText('Loading…')).toBeTruthy()
+  expect(screen.getByRole('status').textContent).toBe('Loading')
+  expect(screen.getByRole('status').classList.contains('sr-only')).toBe(true)
   expect(screen.queryByText('Checking backend access')).toBeNull()
   expect(screen.queryByRole('button', { name: 'Open app' })).toBeNull()
   state.isRefreshing = false
