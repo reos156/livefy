@@ -36,6 +36,27 @@ type BindingSnapshot = { isLoaded: boolean; isSignedIn: boolean | undefined }
 // never observed to converge on the reset path) before the same document reset happened.
 const EntryConfirmationWindow = 400
 const EntryConfirmationInterval = 100
+// How often a document that reports neither a session nor a way in re-reads the instance it holds.
+// A completed reset leaves the state it reports unchanged (measured: 12s on the ring), so the look
+// can be coarse; it is only short enough that a recovered stall replaces the ring promptly.
+const StallRecoveryInterval = 500
+// A stall that outlived its own document reset must not reset again, and every replacement starts a
+// fresh component with empty refs, so the bound belongs to the tab. Claimed before a stall reset,
+// and cleared as soon as an authenticated session is observed, which is the whole condition for a
+// later reset in the same tab to recover again.
+const StallRecoveryMarker = 'livefy.web.entry-stall-reset'
+function claimStallRecovery() {
+  try {
+    // Read and write together, and never reset without the claim: a reload that lands still
+    // stalled would otherwise loop forever in a tab whose storage is unavailable.
+    if (window.sessionStorage.getItem(StallRecoveryMarker)) return false
+    window.sessionStorage.setItem(StallRecoveryMarker, '1')
+    return true
+  } catch { return false }
+}
+function clearStallRecovery() {
+  try { window.sessionStorage.removeItem(StallRecoveryMarker) } catch { /* nothing was stored */ }
+}
 
 function resetToCompletion() {
   // The installed Clerk binding keeps serving the value its provider subscribed with,
@@ -60,6 +81,15 @@ function BrowserSession({ children, onSignedOut, clerkRef, bindingRef, signingOu
   // replaced, so nothing is rendered in the meantime.
   const [resetting, setResetting] = useState(false)
   const entryResetDone = useRef(false)
+  // The one document reset this document owns, whichever trigger decides it first: the entry
+  // window or the stalled-state observation below. Single-shot, so two armed triggers can never
+  // add two resets to the same document.
+  function requestReset() {
+    if (entryResetDone.current) return
+    entryResetDone.current = true
+    setResetting(true)
+    resetToCompletion()
+  }
   useEffect(() => {
     clerkRef.current = clerk
     return () => { if (clerkRef.current === clerk) clerkRef.current = undefined }
@@ -113,9 +143,7 @@ function BrowserSession({ children, onSignedOut, clerkRef, bindingRef, signingOu
         // Bounded: one document reset per transition. The instance can keep reporting the
         // same session forever inside this document, and that must not become a reload loop.
         if ((instance?.loaded && instance.session) || Date.now() >= deadline) {
-          entryResetDone.current = true
-          setResetting(true)
-          resetToCompletion()
+          requestReset()
           return
         }
       }
@@ -125,6 +153,44 @@ function BrowserSession({ children, onSignedOut, clerkRef, bindingRef, signingOu
     settle()
     return () => { cancelled = true; clearTimeout(timer) }
   }, [bindingRef, clerkRef, entryAttempt, isLoaded, isSignedIn, signingOutRef])
+  // The second trigger, and the one the operator's flow actually needs: it does not depend on any
+  // completion navigation. Measured (L1-L7 and the Playwright run) the reset creates a session on
+  // the client but never activates it, so clerk-js issues no completion navigation and
+  // `entryAttempt` stays 0 while the ring stays up. The state itself is the signal: Clerk loaded,
+  // no active session, and a client that holds at least one. It performs the same single bounded
+  // recovery, and only while this document still reports no session at all -- which is exactly the
+  // waiting surface the shared landing paints. If it ever fires for a genuinely signed-out visitor
+  // with a leftover client session, the worst outcome is one bounded reload that lands on the
+  // sign-in surface: the marker spent above keeps it to one, and nothing here claims a session.
+  useEffect(() => {
+    if (!(isLoaded && !isSignedIn)) return
+    if (resetting || entryResetDone.current) return
+    let firstLook = true
+    function check() {
+      if (entryResetDone.current || signingOutRef.current) return
+      const instance = clerkRef.current
+      // No active session, and a session the client created but never activated.
+      if (!instance?.loaded || instance.session) return
+      if (!instance.client?.sessions.length) return
+      // clerk-js emits the new session a moment after control comes back (measured well inside
+      // 100ms), so a session that is merely activating looks identical for one interval. The
+      // first look only opens the observation; a state still there on a later look is the stall.
+      if (firstLook) { firstLook = false; return }
+      // Without the per-tab claim there is no bound a replacement could honour, so the stall keeps
+      // the ring rather than risk a reload loop, and this tab's flow is already spent: nothing more
+      // can come of watching it.
+      if (!claimStallRecovery()) { clearInterval(timer); return }
+      requestReset()
+    }
+    const timer = setInterval(check, StallRecoveryInterval)
+    check()
+    return () => clearInterval(timer)
+  }, [clerkRef, isLoaded, isSignedIn, resetting, signingOutRef])
+  // An authenticated session is what ends a stalled flow for the rest of the tab, so it is also
+  // what restores the recovery for a later reset.
+  useEffect(() => {
+    if (isLoaded && isSignedIn) clearStallRecovery()
+  }, [isLoaded, isSignedIn])
   // Nothing is rendered while the binding is stale: the document is being replaced, and
   // rendering the access landing first would flash its loading state. A binding that does
   // report the closed session keeps rendering the public surface as before.

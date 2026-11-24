@@ -4,9 +4,15 @@ import { createContext, Fragment, useContext, useMemo, useSyncExternalStore, typ
 import type { ClerkProvider } from '@clerk/react'
 type ProviderProps = ComponentProps<typeof ClerkProvider>
 let providerProps: ProviderProps
-const clerk = { loaded: true, session: {} as object | null, signOut: (...args: unknown[]) => state.signOut(...args) }
+const clerk = {
+  loaded: true, session: {} as object | null,
+  // The client is where a completed reset parks the session it creates: measured in Chromium
+  // after the reset card, `clientSessions: 1` while `session` stayed null.
+  client: { sessions: [] as object[] },
+  signOut: (...args: unknown[]) => state.signOut(...args),
+}
 import { createMemoryHistory, Outlet, RouterProvider } from '@tanstack/react-router'
-const state = vi.hoisted(() => ({ signedIn: true, confirmed: true, navigated: false, refreshed: false, staleBinding: false, signOut: vi.fn() }))
+const state = vi.hoisted(() => ({ signedIn: true, confirmed: true, navigated: false, refreshed: false, staleBinding: false, waiting: false, signOut: vi.fn() }))
 type TestBinding = { isLoaded: boolean; isSignedIn: boolean; isAuthenticated: boolean; isLoading: boolean; isRefreshing: boolean }
 let providerBinding: TestBinding = { isLoaded: true, isSignedIn: true, isAuthenticated: true, isLoading: false, isRefreshing: false }
 // The installed binding is re-initialized only when the document is replaced. The
@@ -50,7 +56,9 @@ import { AuthBoundary } from './auth'
 import { LogoutButton, SessionContent, SessionInfrastructure } from '../../lib/session'
 import { createAppRouter } from '../../routes'
 import { createBrowserNavigation, browserCompletionUrl } from './auth-ui'
-const authState = () => ({ isLoaded: true, isSignedIn: state.signedIn, isLoading: false, isRefreshing: false, isAuthenticated: state.confirmed })
+// `waiting` keeps Convex unconfirmed, which is the state the measured stall was in: the shared
+// landing holds its waiting ring instead of settling on the sign-in surface.
+const authState = () => ({ isLoaded: true, isSignedIn: state.signedIn, isLoading: state.waiting, isRefreshing: false, isAuthenticated: state.confirmed })
 // Stands in for the auth stores: consumers re-render when the tree re-renders and
 // read the live store values, like a working subscription.
 const AuthState = createContext(authState())
@@ -63,8 +71,9 @@ afterEach(() => {
   cleanup()
   vi.restoreAllMocks()
   vi.clearAllMocks()
-  Object.assign(state, { signedIn: true, confirmed: true, navigated: false, refreshed: false, staleBinding: false })
-  Object.assign(clerk, { loaded: true, session: {} })
+  Object.assign(state, { signedIn: true, confirmed: true, navigated: false, refreshed: false, staleBinding: false, waiting: false })
+  Object.assign(clerk, { loaded: true, session: {}, client: { sessions: [] } })
+  window.sessionStorage.clear()
   documentModel.generation = 0
   documentModel.listeners.clear()
   window.history.replaceState(null, '', '/')
@@ -425,6 +434,124 @@ it('performs the single bounded document reset when the window expires with no s
   await act(async () => { await providerProps.routerReplace!(completionUrl, { windowNavigate }) })
   expect(documentReset).toHaveBeenCalledTimes(1)
   expect(screen.queryByRole('alert')).toBeNull()
+})
+// Measured in Chromium after a completed password reset: Clerk's success card at +828ms, the
+// waiting ring at +3098ms, and 12s later the ring still there with `{loaded: true, isSignedIn:
+// false, session: null, clientSessions: 1}` and no completion navigation in the whole run. A
+// manual reload then came up authenticated in 1399ms, so the reset does activate the session --
+// only never through clerk-js' completion navigation, which is why `entryAttempt` stayed 0 and
+// the navigation-triggered recovery never armed. The stall itself has to arm the same recovery.
+function stalledEntry({ converge, reload = true }: { converge: boolean; reload?: boolean }) {
+  state.staleBinding = true
+  state.signedIn = false
+  state.confirmed = false
+  state.waiting = true
+  clerk.session = null
+  clerk.client = { sessions: [{ id: 'sess_reset' }] }
+  const { completionUrl, documentReset, replaceState } = entryHarness('/#/')
+  // The URL write is the observable part of a document reset. A converged replacement comes
+  // back authenticated (what the operator measured); a stalled one boots in the same state.
+  documentReset.mockImplementation((data, title, url) => {
+    replaceState(data, title, url)
+    if (url !== completionUrl || !reload) return
+    if (converge) Object.assign(state, { staleBinding: false, signedIn: true, confirmed: true, waiting: false })
+    reloadDocument()
+  })
+  const router = createAppRouter(createMemoryHistory({ initialEntries: ['/'] }))
+  router.routeTree.update({ component: () => <SessionContent><Outlet /></SessionContent> })
+  const windowNavigate = vi.fn()
+  const tree = () => <AuthState.Provider value={authState()}>
+    <SessionInfrastructure>
+      <AuthBoundary {...props}
+        modalNavigation={createBrowserNavigation(completionUrl, replace => router.navigate({ to: '/', replace }))}>
+        <RouterProvider router={router} />
+      </AuthBoundary>
+    </SessionInfrastructure>
+  </AuthState.Provider>
+  return { completionUrl, documentReset, windowNavigate, tree }
+}
+it('recovers a stalled reset the client holds but the instance never activates, with no completion navigation', async () => {
+  const { completionUrl, documentReset, windowNavigate, tree } = stalledEntry({ converge: true })
+  render(tree())
+  // The waiting ring owns the document; the sign-in form is not painted.
+  await screen.findByText('Loading')
+  expect(screen.queryByText('Public sign-in')).toBeNull()
+  // Nothing ever hands control back through the completion navigation.
+  expect(windowNavigate).not.toHaveBeenCalled()
+  // The stall alone performs the same single bounded document reset, and the replaced
+  // document comes up authenticated with no manual refresh.
+  await waitFor(() => expect(documentReset).toHaveBeenCalledTimes(1), { timeout: 2000 })
+  expect(documentReset).toHaveBeenCalledWith(null, '', completionUrl)
+  expect(windowNavigate).not.toHaveBeenCalled()
+  await screen.findByRole('button', { name: 'Open app' })
+  expect(screen.getByText('Backend access confirmed')).toBeTruthy()
+  expect(screen.queryByText('Loading')).toBeNull()
+})
+it('performs no second document reset when the same stalled flow is still stalled in the new document', async () => {
+  const { documentReset, tree } = stalledEntry({ converge: false })
+  render(tree())
+  await screen.findByText('Loading')
+  await waitFor(() => expect(documentReset).toHaveBeenCalledTimes(1), { timeout: 2000 })
+  // The replaced document boots into the same stalled state. Component state is fresh there,
+  // so the per-tab marker is what keeps this a state to report instead of another reload:
+  // several observation intervals pass with no further reset.
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 1500)) })
+  expect(documentReset).toHaveBeenCalledTimes(1)
+  expect(screen.queryByText('Public sign-in')).toBeNull()
+})
+it('leaves a signed-out visitor with no client session alone and reaches the sign-in surface', async () => {
+  state.staleBinding = true
+  state.signedIn = false
+  state.confirmed = false
+  clerk.session = null
+  // Genuinely signed out: the client holds no session at all, so no stall exists.
+  clerk.client = { sessions: [] }
+  const { completionUrl, documentReset } = entryHarness('/#/')
+  const router = createAppRouter(createMemoryHistory({ initialEntries: ['/'] }))
+  router.routeTree.update({ component: () => <SessionContent><Outlet /></SessionContent> })
+  render(<AuthState.Provider value={authState()}>
+    <SessionInfrastructure>
+      <AuthBoundary {...props}
+        modalNavigation={createBrowserNavigation(completionUrl, replace => router.navigate({ to: '/', replace }))}>
+        <RouterProvider router={router} />
+      </AuthBoundary>
+    </SessionInfrastructure>
+  </AuthState.Provider>)
+  // The sign-in surface renders and stays: no ring, no document reset, no session invented.
+  await screen.findByText('Public sign-in')
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 1200)) })
+  expect(documentReset).not.toHaveBeenCalled()
+  expect(screen.queryByText('Loading')).toBeNull()
+})
+it('performs one document reset when the stalled state and a completion navigation are both present', async () => {
+  // Both triggers armed on one document: the old one cannot add a reset of its own.
+  const { completionUrl, documentReset, windowNavigate, tree } = stalledEntry({ converge: false, reload: false })
+  render(tree())
+  await screen.findByText('Loading')
+  await act(async () => { await providerProps.routerReplace!(completionUrl, { windowNavigate }) })
+  await waitFor(() => expect(documentReset).toHaveBeenCalledTimes(1), { timeout: 2000 })
+  // The document is still here and both windows are spent: the reset is single-shot.
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 900)) })
+  expect(documentReset).toHaveBeenCalledTimes(1)
+  expect(documentReset).toHaveBeenCalledWith(null, '', completionUrl)
+})
+it('clears the per-tab stall bound once a session is confirmed, so a later reset can recover again', async () => {
+  const { documentReset, tree } = stalledEntry({ converge: true })
+  const view = render(tree())
+  await screen.findByText('Loading')
+  await waitFor(() => expect(documentReset).toHaveBeenCalledTimes(1), { timeout: 2000 })
+  // The replaced document confirms an authenticated session, which is the only event that
+  // has to restore the recovery for the rest of this tab's life.
+  await screen.findByRole('button', { name: 'Open app' })
+  expect(screen.getByText('Backend access confirmed')).toBeTruthy()
+  // A later reset in the same tab stalls in exactly the same way and recovers again.
+  Object.assign(state, { staleBinding: true, signedIn: false, confirmed: false, waiting: true })
+  clerk.session = null
+  clerk.client = { sessions: [{ id: 'sess_reset_again' }] }
+  view.rerender(tree())
+  await screen.findByText('Loading')
+  await waitFor(() => expect(documentReset).toHaveBeenCalledTimes(2), { timeout: 2000 })
+  await screen.findByRole('button', { name: 'Open app' })
 })
 it('keeps private content hidden and renders no placeholder while Clerk still reports a session', async () => {
   state.staleBinding = true
