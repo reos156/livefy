@@ -206,6 +206,25 @@ Per task, held by the writer that owns it, narrow and disjoint:
   minutes because I used the readonly shell variable `UID` as the delete target;
   it was found by `external_id`, deleted, and the count returned to 2 before any
   further run.
+- **L13** The CSP gate's last runtime residual is CLOSED. Earlier rounds proved the
+  header was set on the Response object but explicitly could not prove Chromium
+  applied it to a packaged renderer, recorded then as "unverified: Electron header
+  transmission to the renderer". Verified on Windows against the unpacked artifact
+  built by `bun run dist:win` at `C:\Livefy\mvp` with no dev server running:
+  `location.protocol` returned `livefy:`, and both `fetch('livefy://renderer/')` and
+  `fetch('/')` returned the `content-security-policy` header byte-identical to the
+  single-source production policy — no `unsafe-eval`, no `unsafe-inline` in
+  `script-src` (only `style-src` keeps it), and no `ws://127.0.0.1:5173`. So the
+  packaged renderer really receives the header from `protocol.cjs`, not merely the
+  `index.html` meta fallback. Still not claimed: a signed or installed build, and
+  any production deployment.
+- **L14** Delivery risk observed in the same run, not a defect of this gate:
+  electron-builder packs the workspace `node_modules` into the app
+  (`resources\app\node_modules\@esbuild\...`), so the portable artifact is far
+  larger than the code it ships, while the renderer is already bundled and the main
+  process needs only `electron` plus built-ins. `asar` stays deliberately disabled
+  because `protocol.cjs` requires real-filesystem containment that an asar cannot
+  satisfy. Both belong to a distribution task, not here.
 
 ## Delivery
 
