@@ -141,4 +141,14 @@ describe('encrypted Clerk token storage', () => {
     await storage.removeItem('token')
     expect(await storage.getItem('token')).toBeNull()
   })
+  it.each([[true, 'dpapi', 'encrypted', true], [false, 'dpapi', 'memory-only', false], [true, 'basic_text', 'memory-only', false]])(
+    'reports %s/%s as %s and matches the restart durability it implies', async (available, backend, persistence, survives) => {
+      const { storage, store, safeStorage } = fixture(available, backend)
+      expect(storage.persistence).toBe(persistence)
+      await storage.setItem(key, 'credential')
+      // A fresh adapter is the restart: same disk, new process memory.
+      const restarted = await createTokenStorage({ store, safeStorage }).getItem(key)
+      expect(restarted).toBe(survives ? 'credential' : null)
+      if (!survives) expect(store.get(key)).toBeUndefined()
+    })
 })

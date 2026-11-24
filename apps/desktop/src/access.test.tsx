@@ -141,3 +141,51 @@ it('explains unavailable access without mounting authentication', () => {
   expect((screen.getByRole('button', { name: 'Sign in — coming soon' }) as HTMLButtonElement).disabled).toBe(true)
   expect(screen.queryByTestId('embedded-auth')).toBeNull()
 })
+it.each([true, false])('never grants private access to a provider-revoked session (native=%s)', async native => {
+  Object.assign(state, { native, configured: true, isLoaded: true, isSignedIn: true, isAuthenticated: false, isRefreshing: false })
+  const persistence = vi.fn().mockResolvedValue('memory-only')
+  window.livefySession = { persistence, logout: vi.fn() }
+  const enter = vi.fn()
+  const view = render(<SessionBoundary logout={async () => {}}><AccessLanding onEnterApp={enter} /></SessionBoundary>)
+  await act(async () => {})
+  // Fail closed: the revoked session keeps the announced wait and grants nothing.
+  expect(screen.getByRole('status').textContent).toBe('Loading')
+  expect(screen.getByRole('status').classList.contains('sr-only')).toBe(true)
+  expect(screen.queryByText('Backend access confirmed')).toBeNull()
+  expect(screen.queryByRole('button', { name: 'Open app' })).toBeNull()
+  expect(screen.queryByRole('button', { name: 'Sign out' })).toBeNull()
+  expect(screen.queryByTestId('embedded-auth')).toBeNull()
+  // A resolved persistence mode is never disclosed without confirmed access.
+  expect(screen.queryByText(/persistence|encryption|restart|memory-only/i)).toBeNull()
+  expect(enter).not.toHaveBeenCalled()
+  // Differential: the same gate grants only after the provider authenticates the session.
+  state.isAuthenticated = true
+  view.rerender(<SessionBoundary logout={async () => {}}><AccessLanding onEnterApp={enter} /></SessionBoundary>)
+  fireEvent.click(screen.getByRole('button', { name: 'Open app' }))
+  expect(enter).toHaveBeenCalledOnce()
+})
+it('claims restart survival only for encrypted persistence and discloses memory-only truthfully', async () => {
+  Object.assign(state, { native: true, configured: true, isLoaded: true, isSignedIn: true, isAuthenticated: true, isRefreshing: false })
+  const claim = {
+    encrypted: 'Encrypted session persistence',
+    'memory-only': 'Memory-only session: encryption unavailable; session will not survive restart',
+  } as const
+  for (const mode of ['encrypted', 'memory-only'] as const) {
+    window.livefySession = { persistence: vi.fn().mockResolvedValue(mode), logout: vi.fn() }
+    const view = render(<SessionBoundary logout={async () => {}}><AccessLanding /></SessionBoundary>)
+    await act(async () => {})
+    expect(screen.getByText(claim[mode])).toBeTruthy()
+    const text = screen.getByRole('main').textContent ?? ''
+    if (mode === 'memory-only') {
+      // The only survival claim is the negation; no persistence claim is made.
+      expect(text).toContain('session will not survive restart')
+      expect(text).not.toContain(claim.encrypted)
+      expect(text).not.toMatch(/will survive|survives restart|session persists/i)
+    } else {
+      // Only the encrypted case may claim survival across restart.
+      expect(text).not.toContain('will not survive restart')
+      expect(text).not.toMatch(/memory-only/i)
+    }
+    view.unmount()
+  }
+})

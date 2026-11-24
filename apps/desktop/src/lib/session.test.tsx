@@ -116,3 +116,13 @@ it('keeps access excluded on failure and supports a safe deletion retry', async 
   await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Retry local sign-out' })))
   expect(screen.getByText('Signed out on this device.')).toBeTruthy()
 })
+
+it.each(['ended', 'failed'] as const)('discloses unconfirmed remote revocation exactly when the %s sign-out cannot confirm it', async outcome => {
+  // Offline: the remote removal is never confirmed, whether local deletion settles or fails.
+  const logout = outcome === 'failed' ? vi.fn().mockRejectedValue(new Error('offline')) : vi.fn().mockResolvedValue(undefined)
+  render(<SessionBoundary logout={logout}><p>Private content</p><LogoutButton /></SessionBoundary>)
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Sign out' })))
+  expect(screen.queryByText('Private content')).toBeNull()
+  expect(screen.getByText('Remote session revocation is unconfirmed, including when offline.')).toBeTruthy()
+  expect(screen.queryByText(/session survives restart|revocation confirmed/i)).toBeNull()
+})

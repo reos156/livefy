@@ -1,26 +1,66 @@
 import { cleanup, render, screen, fireEvent, act } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useEffect } from 'react'
-const mocks = vi.hoisted(() => ({ client: vi.fn(), clerk: vi.fn(), convex: vi.fn(), resource: vi.fn(), unmount: vi.fn() }))
+import { createRequire } from 'node:module'
+const nodeRequire = createRequire(import.meta.url)
+const mocks = vi.hoisted(() => ({ client: vi.fn(), clerk: vi.fn(), convex: vi.fn(), resource: vi.fn(), unmount: vi.fn(), auth: vi.fn(), convexAuth: vi.fn() }))
 vi.mock('@clerk/electron/react', () => ({
   ClerkProvider: (props: { children: React.ReactNode }) => {
     useEffect(() => () => mocks.unmount(), [])
     mocks.clerk(props); return props.children
   },
+  SignIn: () => null,
   useClerk: () => mocks.resource(),
-  useAuth: () => ({}),
+  useAuth: () => mocks.auth(),
 }))
 vi.mock('convex/react', () => ({
   ConvexReactClient: class { constructor(url: string) { mocks.client(url) } },
-  useConvexAuth: () => ({ isLoading: false, isAuthenticated: false }),
+  useConvexAuth: () => mocks.convexAuth(),
 }))
 vi.mock('convex/react-clerk', () => ({ ConvexProviderWithClerk: (props: { children: React.ReactNode }) => { mocks.convex(props); return props.children } }))
 import { AuthBoundary, validEndpoint } from './auth'
 import { publicCompletionUrl } from './auth-ui'
 import { useAuthConfigured } from '../../lib/auth'
 import { LogoutButton } from '../../lib/session'
+import { AccessLanding } from '../../access'
 afterEach(() => { cleanup(); delete window.livefySession })
-beforeEach(() => { mocks.resource.mockReturnValue({ client: null }); mocks.unmount.mockClear() })
+beforeEach(() => {
+  mocks.resource.mockReturnValue({ client: null })
+  mocks.unmount.mockClear()
+  mocks.auth.mockReturnValue({})
+  mocks.convexAuth.mockReturnValue({ isLoading: false, isAuthenticated: false, isRefreshing: false })
+})
+
+// The real token storage stands in for the preload/IPC/main chain: only the IPC hop is simulated.
+type NativeStorage = {
+  persistence: 'encrypted' | 'memory-only'
+  setItem(key: string, value: string): Promise<void>
+  getItem(key: string): Promise<string | null>
+  logout(): Promise<void>
+}
+function nativeTokenStorage() {
+  type Record = { owner: string; version: 1; ciphertext: string }
+  const records = new Map<string, Record>()
+  const store = {
+    get: (key: string) => records.get(key),
+    set: (key: string, value: Record) => { records.set(key, value) },
+    delete: (key: string) => { records.delete(key) },
+  }
+  const safeStorage = {
+    isEncryptionAvailable: () => true,
+    getSelectedStorageBackend: () => 'dpapi',
+    encryptString: (value: string) => Buffer.from(`encrypted:${value}`),
+    decryptString: (value: { toString(): string }) => {
+      const text = value.toString()
+      if (!text.startsWith('encrypted:')) throw new Error('corrupt')
+      return text.slice('encrypted:'.length)
+    },
+  }
+  const createTokenStorage = nodeRequire('../../../electron/clerk-storage.cjs').createTokenStorage as (options: {
+    store: typeof store; safeStorage: typeof safeStorage
+  }) => NativeStorage
+  return { records, store, safeStorage, createTokenStorage, storage: createTokenStorage({ store, safeStorage }) }
+}
 const endpoint = 'https://polite-parrot-887.convex.cloud'
 const publishableKey = `pk_test_${btoa('organic-snake-7233.clerk.accounts.dev$')}`
 function Configuration() { return <p>{String(useAuthConfigured())}</p> }
@@ -151,5 +191,72 @@ describe('safe native auth configuration', () => {
     expect(screen.queryByText('true')).toBeNull()
     expect(screen.queryByText('Signed out on this device.')).toBeNull()
     expect(screen.getByRole('alert')).toBeTruthy()
+  })
+  it('deletes the local credential offline, removes private access and stays signed out after restart', async () => {
+    const { records, store, safeStorage, createTokenStorage, storage } = nativeTokenStorage()
+    await storage.setItem('__clerk_client_jwt', 'signed-in-credential')
+    // Offline: provider removal rejects, so nothing can confirm remote revocation.
+    const client = { id: 'client', sessions: [{ status: 'active' }], signedInSessions: [{ status: 'active' }],
+      removeSessions: vi.fn(async () => { throw new Error('offline') }), reload: vi.fn(async () => client) }
+    mocks.resource.mockReturnValue({ client, session: {} as object | null })
+    mocks.auth.mockReturnValue({ isLoaded: true, isSignedIn: true })
+    mocks.convexAuth.mockReturnValue({ isLoading: false, isAuthenticated: true, isRefreshing: false })
+    const logout = vi.fn(() => storage.logout()), preserveAndQuit = vi.fn()
+    window.livefySession = { logout, preserveAndQuit, persistence: async () => storage.persistence }
+    const enter = vi.fn()
+    const view = render(<AuthBoundary endpoint={endpoint} publishableKey={publishableKey}><AccessLanding onEnterApp={enter} /></AuthBoundary>)
+    await act(async () => {})
+    expect(screen.getByText('Backend access confirmed')).toBeTruthy()
+    expect(records.size).toBe(1)
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Sign out' })))
+    expect(client.removeSessions).toHaveBeenCalledExactlyOnceWith()
+    expect(client.reload).not.toHaveBeenCalled()
+    expect(preserveAndQuit).not.toHaveBeenCalled()
+    // The local credential is gone from disk, not merely fenced in memory.
+    expect(logout).toHaveBeenCalledExactlyOnceWith()
+    expect(records.size).toBe(0)
+    expect(await storage.getItem('__clerk_client_jwt')).toBeNull()
+    expect(screen.queryByText('Backend access confirmed')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Open app' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Sign out' })).toBeNull()
+    expect(screen.getByText('Signed out on this device.')).toBeTruthy()
+    expect(screen.getByText('Remote session revocation is unconfirmed, including when offline.')).toBeTruthy()
+    // Restart: a fresh process over the same disk restores no credential and grants nothing.
+    expect(await createTokenStorage({ store, safeStorage }).getItem('__clerk_client_jwt')).toBeNull()
+    view.unmount()
+    mocks.resource.mockReturnValue({ client: { ...client, sessions: [], signedInSessions: [] }, session: null })
+    mocks.auth.mockReturnValue({ isLoaded: true, isSignedIn: false })
+    mocks.convexAuth.mockReturnValue({ isLoading: false, isAuthenticated: false, isRefreshing: false })
+    render(<AuthBoundary endpoint={endpoint} publishableKey={publishableKey}><AccessLanding onEnterApp={enter} /></AuthBoundary>)
+    await act(async () => {})
+    expect(screen.queryByText('Backend access confirmed')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Open app' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Sign out' })).toBeNull()
+    expect(enter).not.toHaveBeenCalled()
+  })
+  it('denies private access to a provider-revoked session and grants it only once the provider authenticates', async () => {
+    mocks.resource.mockReturnValue({ client: { id: 'client', sessions: [], signedInSessions: [] }, session: {} })
+    mocks.auth.mockReturnValue({ isLoaded: true, isSignedIn: true })
+    mocks.convexAuth.mockReturnValue({ isLoading: false, isAuthenticated: false, isRefreshing: false })
+    const persistence = vi.fn(async () => 'memory-only' as const)
+    window.livefySession = { logout: vi.fn(), persistence }
+    const enter = vi.fn()
+    const view = render(<AuthBoundary endpoint={endpoint} publishableKey={publishableKey}><AccessLanding onEnterApp={enter} /></AuthBoundary>)
+    await act(async () => {})
+    // A Clerk session alone is never private access: it stays on the announced wait.
+    expect(screen.getByRole('status').textContent).toBe('Loading')
+    expect(screen.queryByText('Backend access confirmed')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Open app' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Sign out' })).toBeNull()
+    // A resolved persistence mode is never disclosed without confirmed access.
+    expect(screen.queryByText(/persistence|encryption|restart|memory-only/i)).toBeNull()
+    expect(enter).not.toHaveBeenCalled()
+    // Differential: the identical composition grants access once the provider authenticates.
+    mocks.convexAuth.mockReturnValue({ isLoading: false, isAuthenticated: true, isRefreshing: false })
+    view.rerender(<AuthBoundary endpoint={endpoint} publishableKey={publishableKey}><AccessLanding onEnterApp={enter} /></AuthBoundary>)
+    await act(async () => {})
+    expect(screen.getByText('Backend access confirmed')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Open app' }))
+    expect(enter).toHaveBeenCalledOnce()
   })
 })
