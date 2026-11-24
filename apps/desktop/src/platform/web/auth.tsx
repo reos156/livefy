@@ -8,6 +8,19 @@ import { browserCompletionUrl, createBrowserNavigation } from './auth-ui'
 export { BrowserAuthUi } from './auth-ui'
 
 type BrowserClerk = ReturnType<typeof useClerk>
+// Read-only seam for the shared access landing: whether this document's Clerk instance holds a
+// session of its own, including one that has not finished activating. In the installed SDK the gap
+// is exactly the activating session: `clerk.isSignedIn` is `session?.status !== 'pending' &&
+// !!session`, and `useAuth()` (via `resolveAuthState`, `treatPendingAsSignedOut` defaults to true)
+// reports `isSignedIn: false, isLoaded: true` while the session's status is `pending`. So `!!session`
+// is false only when there is no session at all, which is what makes it the right read here: a
+// document that boots with an activating session would otherwise paint the sign-in surface
+// (measured: ring, sign-in flash, app) until the session becomes active. Nothing here waits or
+// polls: it is the session the instance already holds, and the landing is the only consumer.
+export function useInstanceSession() {
+  const clerk = useClerk()
+  return !!clerk.session
+}
 // The binding value the provider captured at mount, as the session boundary observes it.
 type BindingSnapshot = { isLoaded: boolean; isSignedIn: boolean | undefined }
 // A completed entry can hand control back well before the session it activated is

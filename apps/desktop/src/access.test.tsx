@@ -1,16 +1,19 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, act } from '@testing-library/react'
-const state = vi.hoisted(() => ({ configured: false, isLoading: false, isAuthenticated: false, isRefreshing: false, isLoaded: true, isSignedIn: false, native: true }))
+const state = vi.hoisted(() => ({ configured: false, isLoading: false, isAuthenticated: false, isRefreshing: false, isLoaded: true, isSignedIn: false, native: true, instanceSession: false }))
+// Counts reads of the browser-only instance view, so a native render can prove it never asks.
+const seam = vi.hoisted(() => ({ reads: 0 }))
 vi.mock('convex/react', () => ({ useConvexAuth: () => state }))
 vi.mock('./lib/auth', () => ({ useAuthConfigured: () => state.configured }))
 vi.mock('./platform/auth', () => ({ useAuth: () => state, isNativePlatform: () => state.native,
   AuthUi: () => <div data-testid="embedded-auth">Official authentication</div> }))
+vi.mock('./platform/web/auth', () => ({ useInstanceSession: () => { seam.reads += 1; return state.instanceSession } }))
 // Eligibility seam only; platform component contracts are tested separately.
 import { AccessLanding } from './access'
 import { SessionBoundary } from './lib/session'
 afterEach(() => {
-  cleanup(); delete window.livefySession; vi.clearAllMocks()
-  Object.assign(state, { configured: false, isLoading: false, isAuthenticated: false, isRefreshing: false, isLoaded: true, isSignedIn: false, native: true })
+  cleanup(); delete window.livefySession; vi.clearAllMocks(); seam.reads = 0
+  Object.assign(state, { configured: false, isLoading: false, isAuthenticated: false, isRefreshing: false, isLoaded: true, isSignedIn: false, native: true, instanceSession: false })
 })
 it.each([true, false])('uses a neutral backend transition without granting controls (native=%s)', native => {
   Object.assign(state, { native, configured: true, isSignedIn: true, isAuthenticated: true, isRefreshing: true })
@@ -71,6 +74,54 @@ it.each([
   expect(screen.getAllByRole('status')).toHaveLength(1)
   expect(screen.queryByTestId('embedded-auth')).toBeNull()
   expect(screen.queryByRole('button', { name: 'Open app' })).toBeNull()
+})
+it('keeps the waiting surface while an instance session exists but Convex has not confirmed it', () => {
+  // Measured after the reset's document reload: ring, then a flash of the sign-in surface,
+  // then the app. Convex settles unauthenticated before it authenticates the session the
+  // booted document already holds, and Clerk reports that same session as signed out while
+  // it is still activating, so unconfirmed must not be read as signed out.
+  Object.assign(state, { native: false, configured: true, isLoaded: true, isSignedIn: false, isAuthenticated: false,
+    isLoading: false, isRefreshing: false, instanceSession: true })
+  const enter = vi.fn()
+  const view = render(<AccessLanding onEnterApp={enter} />)
+  expect(screen.getByRole('status').textContent).toBe('Loading')
+  expect(screen.getByRole('status').classList.contains('sr-only')).toBe(true)
+  expect(screen.getByTitle('Loading...').closest('svg')).not.toBeNull()
+  expect(screen.queryByTestId('embedded-auth')).toBeNull()
+  expect(screen.queryByRole('heading')).toBeNull()
+  expect(screen.queryByRole('button', { name: 'Open app' })).toBeNull()
+  // The browser landing does ask the instance; that is what holds the ring here.
+  expect(seam.reads).toBeGreaterThan(0)
+  // Fail closed is untouched: the ring grants nothing while Convex stays silent.
+  expect(enter).not.toHaveBeenCalled()
+  // Convex confirming the very same session is the only thing that moves the landing on.
+  state.isAuthenticated = true
+  view.rerender(<AccessLanding onEnterApp={enter} />)
+  expect(screen.queryByTestId('embedded-auth')).toBeNull()
+  expect(screen.getByText('Backend access confirmed')).toBeTruthy()
+})
+it('renders the sign-in surface promptly when the instance holds no session and Convex settles unauthenticated', () => {
+  // No new delay: with no session on the instance there is nothing to hold the ring for.
+  Object.assign(state, { native: false, configured: true, isLoaded: true, isSignedIn: false, instanceSession: false,
+    isAuthenticated: false, isLoading: false, isRefreshing: false })
+  render(<AccessLanding />)
+  expect(screen.getByTestId('embedded-auth')).toBeTruthy()
+  expect(screen.queryByTitle('Loading...')).toBeNull()
+  expect(screen.queryByRole('status')).toBeNull()
+  expect(screen.getByRole('heading', { level: 1, name: 'Livefy' })).toBeTruthy()
+})
+it('leaves the native gate exactly as it was when a session is observed without confirmation', () => {
+  // The native shell builds its own Clerk in process, so its session is already present when
+  // the resource boots and this shape does not arise there. The browser-only observation must
+  // therefore never reach the native decision: same surface as before the change.
+  Object.assign(state, { native: true, configured: true, isLoaded: true, isSignedIn: false, instanceSession: true,
+    isAuthenticated: false, isLoading: false, isRefreshing: false })
+  render(<AccessLanding />)
+  expect(screen.getByTestId('embedded-auth')).toBeTruthy()
+  expect(screen.queryByTitle('Loading...')).toBeNull()
+  // Provably unreachable on native: the browser-only instance read is never consulted, so the
+  // accepted native gate cannot depend on it even when a session is observed without confirmation.
+  expect(seam.reads).toBe(0)
 })
 it('waits for backend confirmation after Clerk sign-in and keeps refresh authoritative', () => {
   state.configured = true

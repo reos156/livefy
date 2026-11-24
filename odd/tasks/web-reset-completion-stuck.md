@@ -21,6 +21,12 @@
   action its own recovery button performed successfully — is the correct outcome,
   not a terminal card. A failure surface that asserts no session was created is
   forbidden: the operator demonstrated that claim was false.
+- **S6** On boot, while a Clerk session exists but Convex has not yet confirmed it,
+  the shared access landing MUST keep the waiting surface and MUST NOT render the
+  sign-in form. Measured sequence after the document reset: ring, then a flash of
+  the sign-in surface, then the authenticated app. Once Convex settles
+  unauthenticated **and** no instance session exists, the sign-in surface renders
+  normally.
 
 ## Tasks
 
@@ -94,3 +100,19 @@
   document reset itself. The desktop shell differs structurally — it builds its own
   `Clerk` in process, with no CDN clerk-js and no hash-router completion interception —
   so its session is already present when the native resource boots.
+- **L7** Operator re-test of the expired-window reset (screenshot: Clerk's own card
+  `Your password was successfully changed. Signing you in, please wait a moment.`):
+  the reset now completes and lands authenticated, so the earlier glimpsed message
+  was Clerk's success state, not ours. The remaining defect is a flash of the
+  sign-in surface between the ring and the app, which is the third and last mixing
+  point: the new document boots before Convex confirms, so the landing treats an
+  unsettled state as signed-out. Authorized: close it with the same instance-derived
+  rule (S6) rather than another timer.
+- **L8** Structural explanation recorded for the operator, who asked why the same
+  flow is calm on desktop and volatile on web: the desktop composes one session view
+  (an in-process Clerk instance plus the native token bridge), while the browser
+  composes three that change independently inside one document — clerk-js hydrating
+  from the CDN, the Convex client authenticating itself through `setAuth`, and
+  Clerk driving our hash router through an adapter that intercepts its completion
+  navigation. Every defect in this document is a different one of those three seams,
+  which is why patching per screen kept failing and the rule belongs in one place.
