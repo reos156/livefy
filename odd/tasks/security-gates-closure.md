@@ -171,6 +171,8 @@ Five work units, in this order on `feat/mvp`:
 - `86d47e4` test(auth): cover offline logout, revoked session and memory-only disclosure
 - `b45c8ff` fix(verify): keep the JWT negatives pending unless provenance is attested
 - `f45864d` docs(odd): track the security gates closure feature
+- `bd2354c` feat(verify): attest the wrong-audience negative from a script-minted template token
+- `fb67fbd` docs(odd): record the S9 attested path and its live-run command
 
 Each unit carries its own tests; each was verified independently before commit.
 The branch is already 13,445 authored lines across 58 commits since `main`, far
