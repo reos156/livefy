@@ -108,6 +108,34 @@ export function validateClaims(jwt, userId) {
   return claims
 }
 
+// The two error texts that mean "the deployment refused this token's
+// authentication". Convex answers a token it will not accept with a 401 whose body
+// this client surfaces verbatim as the error message: either the bare
+// `Unauthorized` refusal or the structured `{"code":"NoAuthProvider",...}` body
+// measured on DEV for a genuinely Clerk-signed token whose `aud` is not `convex`.
+// Nothing else is a refusal: an unknown code, a prose message that merely mentions
+// one, a transport failure, a 500-class body and any non-Error thrown value all stay
+// inconclusive, so they abort the run instead of producing a security verdict.
+export const authenticationRefusals = Object.freeze(['Unauthorized', 'NoAuthProvider'])
+
+// The compared text: a structured body is judged by its `code` value only, never by
+// the prose of its `message` field; a bare refusal is compared whole.
+function refusalCode(message) {
+  const text = message.trim()
+  try {
+    const parsed = JSON.parse(text)
+    if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return typeof parsed.code === 'string' ? parsed.code : undefined
+    }
+  } catch { /* Not a structured body: compared as plain text below. */ }
+  return text
+}
+
+export function isAuthenticationRefusal(error) {
+  return error instanceof Error && typeof error.message === 'string' &&
+    authenticationRefusals.includes(refusalCode(error.message))
+}
+
 // S3: a negative that was not actually exercised stays explicitly pending. These
 // exact strings must not be replaced by a pass. The only exception is the attested
 // S9 mint below, which reports its own distinct verdict and never reuses these.
@@ -170,7 +198,7 @@ export async function attestedWrongAudience(query, api, sessionId, template) {
   try {
     await query(minted.jwt)
   } catch (error) {
-    if (!String(error?.message).includes('Unauthorized')) {
+    if (!isAuthenticationRefusal(error)) {
       throw new Error('Attested wrong-audience token rejection was inconclusive')
     }
     return attestedVerdicts.wrongAudience
@@ -215,7 +243,7 @@ async function exerciseNegative(query, jwt, kind) {
   try {
     await query(jwt)
   } catch (error) {
-    if (!String(error?.message).includes('Unauthorized')) {
+    if (!isAuthenticationRefusal(error)) {
       throw new Error(`Untrusted ${kind} token rejection was inconclusive`)
     }
     return unauditedNegative(kind)
@@ -233,6 +261,17 @@ export async function untrustedNegatives(query, sources = {}) {
 export function ownsFixture(user, marker, userId) {
   return typeof userId === 'string' && user?.id === userId &&
     user.external_id === marker && user.private_metadata?.h1_2c_fixture === marker
+}
+
+// S10: the inventory is a baseline, not a requirement of emptiness. Only a
+// non-negative integer count is usable; anything else fails closed, because a run
+// that cannot read the baseline cannot prove the cleanup delta.
+export function usableUserCount(response) {
+  const count = response?.total_count
+  if (typeof count !== 'number' || !Number.isInteger(count) || count < 0) {
+    throw new Error('User count read did not yield a usable number')
+  }
+  return count
 }
 
 // Conservative base-address syntax only: no aliases, trimming, or normalization.
@@ -259,14 +298,19 @@ export async function smoke(api, query, marker = `livefy-h1-2c-${randomUUID()}`,
   if (used.has(api)) throw new Error('Fixture transport already used')
   used.add(api)
   if (!/^livefy-h1-2c-[a-zA-Z0-9-]+$/.test(marker)) throw new Error('Invalid fixture marker')
+  // S10: the preflight records the initial inventory instead of requiring an empty
+  // instance. A failed or unusable read still fails closed here, before any fixture
+  // is created, so a preflight failure never has anything to clean up.
+  let usersBefore
   try {
-    if ((await api('GET', '/users/count')).total_count !== 0) throw new Error('DEV users appeared; stopping')
+    usersBefore = usableUserCount(await api('GET', '/users/count'))
   } catch (error) {
     console.error(JSON.stringify({ failure: failureSummary('initial-inventory', error), cleanupComplete: true, fixtureAttempted: false }))
     throw new Error('DEV preflight failed; details suppressed')
   }
   let userId, sessionId, createAttempted = false, sessionAttempted = false
   let failure, cleanupFailure
+  let usersAfter, fixtureAbsent
   let stage = 'user-create'
   let cleanupStage = 'user-reconcile'
   let validAccepted = false, anonymousRejected = false
@@ -354,19 +398,40 @@ export async function smoke(api, query, marker = `livefy-h1-2c-${randomUUID()}`,
         const deleted = await api('DELETE', `/users/${userId}`)
         if (deleted.id !== userId || deleted.deleted !== true) throw new Error('User deletion not confirmed')
       }
+      // S10: one verdict with two halves, both read before either is judged. The
+      // count delta alone is not proof and the absent-fixture read alone is not
+      // proof, so a run fails unless the inventory is back to its baseline AND the
+      // owned fixture is absent by external_id.
       cleanupStage = 'cleanup-inventory'
-      if ((await api('GET', '/users/count')).total_count !== 0) throw new Error('Cleanup aggregate not empty')
+      usersAfter = usableUserCount(await api('GET', '/users/count'))
+      const countRestored = usersAfter === usersBefore
+      // Read the absent-fixture half even when the count half already failed: the
+      // operator needs both halves of the verdict, not only the first failure.
+      cleanupStage = 'cleanup-fixture-absence'
+      const response = await api('GET', `/users?external_id=${encodeURIComponent(marker)}&limit=2`)
+      const users = Array.isArray(response) ? response : response.data
+      if (!Array.isArray(users) || users.length > 1) throw new Error('Ambiguous fixture absence reconciliation')
+      fixtureAbsent = users.length === 0
+      if (!countRestored) {
+        cleanupStage = 'cleanup-inventory'
+        throw new Error('Cleanup inventory delta is not zero')
+      }
+      if (!fixtureAbsent) throw new Error('Owned fixture user survived cleanup')
     } catch (error) { cleanupFailure = failureSummary(cleanupStage, error) }
   }
   if (cleanupFailure) {
-    console.error(JSON.stringify({ cleanupComplete: false, failure, cleanupFailure }))
+    // Say plainly which half of the S10 verdict failed: a restored count, an absent
+    // fixture, neither, or a half that could not be read at all (`null`).
+    console.error(JSON.stringify({ cleanupComplete: false, failure, cleanupFailure,
+      cleanupChecks: { countRestored: usersAfter === undefined ? null : usersAfter === usersBefore,
+        fixtureAbsent: fixtureAbsent === undefined ? null : fixtureAbsent } }))
     throw new Error('Fixture cleanup incomplete; stop and inspect exact owned fixture')
   }
   if (failure) {
-    console.error(JSON.stringify({ cleanupComplete: true, failure, userReconciled: !!userId, sessionRevoked: !!sessionId, usersAfter: 0 }))
+    console.error(JSON.stringify({ cleanupComplete: true, failure, userReconciled: !!userId, sessionRevoked: !!sessionId, usersBefore, usersAfter }))
     throw new Error('DEV verification failed; details suppressed')
   }
-  return { validAccepted, anonymousRejected, sessionRevoked: true, usersAfter: 0, ...reported }
+  return { validAccepted, anonymousRejected, sessionRevoked: true, usersBefore, usersAfter, ...reported }
 }
 
 // Production query seam: the only place a token is handed to the backend.

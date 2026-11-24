@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest'
-import { attestedSource, attestedTemplateVariable, attestedVerdicts, attestedWrongAudience, claimVerdict, classifyError, decodeClaims, errorParameter, expectations, main, pendingNegatives, runMain, smoke, target, transportFailure, untrustedNegatives, untrustedSources, validateClaims, validateFixtureEmail } from './verify-clerk-dev.mjs'
+import { attestedSource, attestedTemplateVariable, attestedVerdicts, attestedWrongAudience, authenticationRefusals, claimVerdict, classifyError, decodeClaims, errorParameter, expectations, isAuthenticationRefusal, main, pendingNegatives, runMain, smoke, target, transportFailure, untrustedNegatives, untrustedSources, usableUserCount, validateClaims, validateFixtureEmail } from './verify-clerk-dev.mjs'
 
 const email = 'fixture@example.test'
 const marker = 'livefy-h1-2c-test'
@@ -9,13 +9,15 @@ const marker = 'livefy-h1-2c-test'
 function encoded(claims: unknown, signature = 'unverified-signature') {
   return `header.${Buffer.from(JSON.stringify(claims)).toString('base64url')}.${signature}`
 }
+// `base` is the pre-existing inventory of the instance: 0 for the historical empty
+// instance, 2 for the DEV instance that holds real users (S10).
 function fixture(lost: 'user' | 'session' | 'none' = 'none', foreign = false,
-  mint: { aud?: unknown; jwt?: string; fail?: boolean } = {}) {
+  mint: { aud?: unknown; jwt?: string; fail?: boolean } = {}, base = 0) {
   let user: any, session: any
   const calls: string[] = []
   const api = async (method: string, path: string, body?: any): Promise<any> => {
     calls.push(`${method} ${path}`)
-    if (path === '/users/count') return { total_count: user ? 1 : 0 }
+    if (path === '/users/count') return { total_count: base + (user ? 1 : 0) }
     if (method === 'POST' && path === '/users') {
       user = { id: 'user_test', external_id: body.external_id, private_metadata: body.private_metadata }
       if (foreign) user.private_metadata = {}
@@ -75,6 +77,23 @@ const untrustedAudienceToken = encoded({ iss: target.issuer, aud: 'other', sub: 
 const attestedTemplate = 'livefy-h1-2c-wrong-aud'
 const attestedMintedToken = encoded({ iss: target.issuer, aud: attestedTemplate, sub: 'user_test' })
 const attestedVerdict = 'rejected: attested wrong-audience token refused by the query'
+// The two refusal bodies a Convex deployment produces for a token it will not
+// accept. `NoAuthProvider` is the body measured on DEV for a genuinely Clerk-signed
+// token whose `aud` is not `convex`; `Unauthorized` is the bare refusal.
+const noAuthProviderRefusal = JSON.stringify({ code: 'NoAuthProvider',
+  message: `No auth provider found matching the given token. Check that your JWT's issuer and audience match one of your configured providers: [OIDC(domain=${target.issuer}, app_id=convex)]` })
+const documentedRefusals = [
+  ['the measured NoAuthProvider body', noAuthProviderRefusal],
+  ['a bare Unauthorized refusal', 'Unauthorized'],
+] as const
+// Everything that is NOT an authentication refusal: a network failure, a
+// 500-class body, an unrecognised refusal body, and an empty error.
+const nonRefusals = [
+  ['a network error', 'socket hang up'],
+  ['a 500-class failure', JSON.stringify({ status: 'error', errorMessage: 'InternalServerError' })],
+  ['an unrecognised refusal body', JSON.stringify({ code: 'InternalServerError', message: 'boom' })],
+  ['an empty refusal', ''],
+] as const
 
 describe('runtime fixture email preflight', () => {
   it('forwards the supplied address unchanged and preserves ownership and cleanup', async () => {
@@ -352,6 +371,25 @@ describe('externally supplied untrusted tokens (S1, S2 seam, S3 pending)', () =>
       expect(output).not.toMatch(/rejected:|pending:/)
     } finally { log.mockRestore() }
   })
+  it('keeps a supplied token pending when the query refuses it with NoAuthProvider', async () => {
+    const f = fixture()
+    const result = await smoke(f.api, guarded({ refusal: noAuthProviderRefusal }).query, marker, email,
+      { wrongAudience: untrustedAudienceToken })
+    expect(result.wrongAudience).toBe(`${pendingNegatives.audience} (refused by the query, provenance unverified)`)
+    expect(result.wrongAudience.startsWith('rejected:')).toBe(false)
+    expect(result.wrongAudience).not.toBe(attestedVerdict)
+  })
+  it.each(nonRefusals)('still aborts when the supplied token is refused with %s, which is not a refusal', async (_label, refusal) => {
+    const f = fixture()
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      await expect(smoke(f.api, guarded({ refusal }).query, marker, email, { wrongAudience: untrustedAudienceToken }))
+        .rejects.toThrow('DEV verification failed; details suppressed')
+      const output = log.mock.calls.flat().join('\n')
+      expect(JSON.parse(output)).toMatchObject({ cleanupComplete: true, failure: { stage: 'untrusted-negatives' } })
+      expect(output).not.toMatch(/rejected:|pending:/)
+    } finally { log.mockRestore() }
+  })
   it('refuses a supplied token that does not carry the intended mismatch', async () => {
     const matching = encoded({ iss: target.issuer, aud: 'convex', sub: 'user_test' })
     await expect(untrustedNegatives(guarded().query, { wrongIssuer: matching }))
@@ -365,8 +403,8 @@ describe('externally supplied untrusted tokens (S1, S2 seam, S3 pending)', () =>
 
 // The injected seam `main()` uses: a Clerk dispatcher, an OIDC discovery fetch and
 // a Convex query. Nothing here reaches Clerk or Convex.
-function mainIo(overrides: { argv?: string[]; env?: Record<string, string | undefined> } = {}) {
-  const f = fixture()
+function mainIo(overrides: { argv?: string[]; env?: Record<string, string | undefined>; base?: number } = {}) {
+  const f = fixture('none', false, {}, overrides.base ?? 0)
   const g = guarded()
   const dispatch = vi.fn((method: string, path: string, body?: any, platform?: boolean) => {
     if (platform) {
@@ -396,6 +434,33 @@ async function failedSmoke(f: ReturnType<typeof fixture>, query: (token?: string
     return log.mock.calls.flat().join('\n')
   } finally { log.mockRestore() }
 }
+
+describe('authentication refusal predicate (S9 and S3 boundary)', () => {
+  it('names exactly the two documented refusal codes', () => {
+    expect(authenticationRefusals).toEqual(['Unauthorized', 'NoAuthProvider'])
+    expect(Object.isFrozen(authenticationRefusals)).toBe(true)
+  })
+  it('accepts the two documented refusal codes and nothing else', () => {
+    expect(isAuthenticationRefusal(new Error('Unauthorized'))).toBe(true)
+    expect(isAuthenticationRefusal(new Error(JSON.stringify({ code: 'Unauthorized', message: 'Unauthenticated' })))).toBe(true)
+    // The body measured on DEV for a genuinely signed wrong-audience token.
+    expect(isAuthenticationRefusal(new Error(noAuthProviderRefusal))).toBe(true)
+  })
+  it('rejects an unknown error and never a generic thrown value', () => {
+    const nonErrors: unknown[] = [undefined, null, 'Unauthorized', noAuthProviderRefusal, 401, true,
+      { message: 'Unauthorized' }, { message: noAuthProviderRefusal }, { code: 'NoAuthProvider' },
+      ['Unauthorized'], () => 'Unauthorized']
+    for (const thrown of nonErrors) expect(isAuthenticationRefusal(thrown)).toBe(false)
+    const unknown: unknown[] = ['', ' ', 'socket hang up', 'InternalServerError', '500 Internal Server Error',
+      JSON.stringify({ code: 'InternalServerError', message: 'boom' }),
+      JSON.stringify({ status: 'error', errorMessage: 'InternalServerError' }),
+      JSON.stringify({ message: 'Unauthorized' }),
+      JSON.stringify({ error: { code: 'NoAuthProvider' } }),
+      JSON.stringify({ code: 'NoAuthProviderX' }), JSON.stringify({ code: 1 }),
+      'NotUnauthorized', 'NoAuthProvider Unauthorized', 'Unauthorized\nNoAuthProvider', '{"code":', '[]', 'null']
+    for (const message of unknown) expect(isAuthenticationRefusal(new Error(message))).toBe(false)
+  })
+})
 
 describe('S9 attested wrong-audience negative (mock transport, not JWT evidence)', () => {
   it('reports the explicit attested verdict only for the token it minted through the named template', async () => {
@@ -499,6 +564,25 @@ describe('S9 attested wrong-audience negative (mock transport, not JWT evidence)
     expect(JSON.parse(output)).toMatchObject({ cleanupComplete: true, failure: { stage: 'attested-negative' } })
     expect(output).not.toMatch(/rejected:|pending:/)
   })
+  it.each(documentedRefusals)('reports the attested verdict when the minted token is refused with %s', async (_label, refusal) => {
+    const f = fixture()
+    const g = guarded({ refusal })
+    const result = await smoke(f.api, g.query, marker, email, {}, { template: attestedTemplate })
+    expect(g.seen).toContain(attestedMintedToken)
+    expect(result.wrongAudience).toBe(attestedVerdict)
+    expect(result.wrongIssuer).toBe(pendingNegatives.issuer)
+    expect(result).toMatchObject({ validAccepted: true, anonymousRejected: true, sessionRevoked: true })
+    expect(f.user()).toBeUndefined()
+  })
+  it.each(nonRefusals)('still aborts the attested run when the refusal is %s, which is not a refusal', async (_label, refusal) => {
+    const f = fixture()
+    const inconclusive = guarded({ refusal }).query
+    await expect(attestedWrongAudience(inconclusive, f.api, 'sess_test', attestedTemplate))
+      .rejects.toThrow('Attested wrong-audience token rejection was inconclusive')
+    const output = await failedSmoke(fixture(), inconclusive, { attested: { template: attestedTemplate } })
+    expect(JSON.parse(output)).toMatchObject({ cleanupComplete: true, failure: { stage: 'attested-negative' } })
+    expect(output).not.toMatch(/rejected:|pending:/)
+  })
   it('refuses contradictory wrong-audience sources instead of choosing one silently', async () => {
     const f = fixture()
     const g = guarded()
@@ -574,7 +658,7 @@ describe('main() invocation contract', () => {
       expect(errorLog).not.toHaveBeenCalled()
       const line = String(log.mock.calls[0][0])
       expect(JSON.parse(line)).toEqual({ validAccepted: true, anonymousRejected: true, sessionRevoked: true,
-        usersAfter: 0, wrongIssuer: pendingNegatives.issuer, wrongAudience: pendingNegatives.audience })
+        usersBefore: 0, usersAfter: 0, wrongIssuer: pendingNegatives.issuer, wrongAudience: pendingNegatives.audience })
       expect(line).not.toContain(email)
       expect(line.split('\n')).toHaveLength(1)
       expect(process.exitCode).toBeUndefined()
@@ -629,5 +713,152 @@ describe('exact fixture cleanup (mock transport, not JWT evidence)', () => {
     await expect(smoke(api, query, marker, email)).rejects.toThrow('details suppressed')
     expect(f.user()).toBeUndefined()
     expect(f.session()?.status).toBe('revoked')
+  })
+})
+
+// S10: the preflight records the initial inventory instead of requiring an empty
+// instance, and a run passes only when BOTH halves of one verdict hold: the final
+// count equals the initial count AND the owned fixture is absent by external_id.
+// These wrappers bend exactly one half so each half can be observed on its own.
+function counts(api: (method: string, path: string, body?: any) => Promise<any>,
+  before: number, after: number) {
+  let reads = 0
+  return async (method: string, path: string, body?: any): Promise<any> => {
+    if (path === '/users/count') { reads += 1; return { total_count: reads === 1 ? before : after } }
+    return api(method, path, body)
+  }
+}
+// Reports the deletion as confirmed while the owned user stays readable by the
+// external_id read: the delta half can pass while the absence half fails.
+function surviving(f: ReturnType<typeof fixture>) {
+  return async (method: string, path: string, body?: any): Promise<any> => {
+    if (method === 'DELETE') return { id: 'user_test', deleted: true }
+    return f.api(method, path, body)
+  }
+}
+const fixtureQuery = `GET /users?external_id=${encodeURIComponent(marker)}&limit=2`
+
+async function failedRun(api: (method: string, path: string, body?: any) => Promise<any>,
+  queryImpl: (token?: string) => Promise<any>, reason: string) {
+  const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {})
+  const log = vi.spyOn(console, 'log').mockImplementation(() => {})
+  try {
+    await expect(smoke(api, queryImpl, marker, email)).rejects.toThrow(reason)
+    return { summary: JSON.parse(String(errorLog.mock.calls.flat()[0])), log, errorLog }
+  } finally { errorLog.mockRestore(); log.mockRestore() }
+}
+
+describe('S10 inventory delta contract (mock transport, not JWT evidence)', () => {
+  it('passes on a non-empty instance when the count is restored and the fixture is absent', async () => {
+    const f = fixture('none', false, {}, 2)
+    const g = guarded()
+    const result = await smoke(f.api, g.query, marker, email)
+    // Both halves of the verdict, reported: the DEV instance starts with 2 real users.
+    expect(result).toEqual({ validAccepted: true, anonymousRejected: true, sessionRevoked: true,
+      usersBefore: 2, usersAfter: 2, wrongIssuer: pendingNegatives.issuer,
+      wrongAudience: pendingNegatives.audience })
+    expect(f.calls.filter(call => call === 'GET /users/count')).toHaveLength(2)
+    expect(f.calls[0]).toBe('GET /users/count')
+    expect(f.calls.at(-1)).toBe(fixtureQuery)
+    expect(f.user()).toBeUndefined()
+    expect(f.session()?.status).toBe('revoked')
+  })
+  it('still passes and reports 0 before and after when the instance started empty', async () => {
+    const f = fixture()
+    expect(await smoke(f.api, guarded().query, marker, email))
+      .toMatchObject({ validAccepted: true, usersBefore: 0, usersAfter: 0 })
+    expect(f.user()).toBeUndefined()
+  })
+  it('fails when the final count does not equal the initial count', async () => {
+    const f = fixture('none', false, {}, 2)
+    const { summary, log } = await failedRun(counts(f.api, 2, 3), guarded().query,
+      'Fixture cleanup incomplete; stop and inspect exact owned fixture')
+    // The fixture is absent, so the absence half holds; the count delta is not zero.
+    expect(summary).toMatchObject({ cleanupComplete: false,
+      cleanupFailure: { stage: 'cleanup-inventory', errorClass: 'unclassified', errorParameter: 'unclassified' },
+      cleanupChecks: { countRestored: false, fixtureAbsent: true } })
+    expect(summary.usersAfter).toBeUndefined()
+    expect(log).not.toHaveBeenCalled()
+  })
+  it('fails when the count is restored but the owned fixture user is still present', async () => {
+    const f = fixture('none', false, {}, 2)
+    const { summary, log } = await failedRun(counts(surviving(f), 2, 2), guarded().query,
+      'Fixture cleanup incomplete; stop and inspect exact owned fixture')
+    // The delta is zero, so the count half holds; the fixture survives.
+    expect(summary).toMatchObject({ cleanupComplete: false,
+      cleanupFailure: { stage: 'cleanup-fixture-absence', errorClass: 'unclassified', errorParameter: 'unclassified' },
+      cleanupChecks: { countRestored: true, fixtureAbsent: false } })
+    expect(summary.usersAfter).toBeUndefined()
+    expect(log).not.toHaveBeenCalled()
+  })
+  it('fails closed before the fixture when the initial count read fails', async () => {
+    const api = vi.fn(async (method: string, path: string) => {
+      if (path === '/users/count') {
+        throw transportFailure({ stderr: JSON.stringify({ error: { code: 'rate_limit_exceeded' } }) })
+      }
+      throw new Error(`Unexpected operation ${method} ${path}`)
+    })
+    const { summary } = await failedRun(api, guarded().query, 'DEV preflight failed; details suppressed')
+    expect(summary).toEqual({ failure: { stage: 'initial-inventory', errorClass: 'rate_limit_exceeded',
+      errorParameter: 'unclassified' }, cleanupComplete: true, fixtureAttempted: false })
+    expect(api.mock.calls).toEqual([['GET', '/users/count']])
+  })
+  it.each([{}, { total_count: undefined }, { total_count: null }, { total_count: '2' },
+    { total_count: -1 }, { total_count: 1.5 }, { total_count: Number.NaN },
+    { total_count: Number.POSITIVE_INFINITY }, {}, undefined, null])
+  ('fails closed before the fixture when the initial count is unusable (%#)', async payload => {
+    const api = vi.fn(async (method: string, path: string) => {
+      if (path === '/users/count') return payload
+      throw new Error(`Unexpected operation ${method} ${path}`)
+    })
+    const { summary } = await failedRun(api, guarded().query, 'DEV preflight failed; details suppressed')
+    expect(summary).toEqual({ failure: { stage: 'initial-inventory', errorClass: 'unclassified',
+      errorParameter: 'unclassified' }, cleanupComplete: true, fixtureAttempted: false })
+    expect(api.mock.calls).toEqual([['GET', '/users/count']])
+  })
+  it('accepts only a non-negative integer as a usable initial count', () => {
+    for (const count of [0, 1, 2, 137]) expect(usableUserCount({ total_count: count })).toBe(count)
+    for (const count of [-1, 0.5, Number.NaN, Number.POSITIVE_INFINITY, '0', null, undefined, {}]) {
+      expect(() => usableUserCount({ total_count: count }))
+        .toThrow('User count read did not yield a usable number')
+    }
+    expect(() => usableUserCount(undefined)).toThrow('User count read did not yield a usable number')
+  })
+  it('fails closed when the final count read is unusable instead of treating it as no change', async () => {
+    const f = fixture('none', false, {}, 2)
+    let reads = 0
+    const api = async (method: string, path: string, body?: any) => {
+      if (path === '/users/count') { reads += 1; return reads === 1 ? { total_count: 2 } : {} }
+      return f.api(method, path, body)
+    }
+    const { summary } = await failedRun(api, guarded().query,
+      'Fixture cleanup incomplete; stop and inspect exact owned fixture')
+    expect(summary).toMatchObject({ cleanupComplete: false,
+      cleanupFailure: { stage: 'cleanup-inventory', errorClass: 'unclassified' } })
+    expect(summary.cleanupChecks).toEqual({ countRestored: null, fixtureAbsent: null })
+  })
+  it('does not claim either half of the verdict when the cleanup failed before them', async () => {
+    // Ownership is refused, so the inventory and absence reads never run: both
+    // halves are reported as not evaluated instead of as failures or as clean.
+    const f = fixture('user', true)
+    const { summary } = await failedRun(f.api, guarded().query,
+      'Fixture cleanup incomplete; stop and inspect exact owned fixture')
+    expect(summary.cleanupFailure.stage).toBe('user-reconcile')
+    expect(summary.cleanupChecks).toEqual({ countRestored: null, fixtureAbsent: null })
+    // Only the preflight read ran; the cleanup inventory read never did.
+    expect(f.calls.filter(call => call === 'GET /users/count')).toHaveLength(1)
+  })
+  it('reports both counts in the success line the operator reads', async () => {
+    const { io } = mainIo({ base: 2 })
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      await main(io)
+      expect(log).toHaveBeenCalledTimes(1)
+      expect(errorLog).not.toHaveBeenCalled()
+      expect(JSON.parse(String(log.mock.calls[0][0]))).toEqual({ validAccepted: true,
+        anonymousRejected: true, sessionRevoked: true, usersBefore: 2, usersAfter: 2,
+        wrongIssuer: pendingNegatives.issuer, wrongAudience: pendingNegatives.audience })
+    } finally { log.mockRestore(); errorLog.mockRestore() }
   })
 })
