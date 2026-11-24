@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest'
-import { claimVerdict, classifyError, decodeClaims, errorParameter, expectations, main, pendingNegatives, runMain, smoke, target, transportFailure, untrustedNegatives, untrustedSources, validateClaims, validateFixtureEmail } from './verify-clerk-dev.mjs'
+import { attestedSource, attestedTemplateVariable, attestedVerdicts, attestedWrongAudience, claimVerdict, classifyError, decodeClaims, errorParameter, expectations, main, pendingNegatives, runMain, smoke, target, transportFailure, untrustedNegatives, untrustedSources, validateClaims, validateFixtureEmail } from './verify-clerk-dev.mjs'
 
 const email = 'fixture@example.test'
 const marker = 'livefy-h1-2c-test'
@@ -9,7 +9,8 @@ const marker = 'livefy-h1-2c-test'
 function encoded(claims: unknown, signature = 'unverified-signature') {
   return `header.${Buffer.from(JSON.stringify(claims)).toString('base64url')}.${signature}`
 }
-function fixture(lost: 'user' | 'session' | 'none' = 'none', foreign = false) {
+function fixture(lost: 'user' | 'session' | 'none' = 'none', foreign = false,
+  mint: { aud?: unknown; jwt?: string; fail?: boolean } = {}) {
   let user: any, session: any
   const calls: string[] = []
   const api = async (method: string, path: string, body?: any): Promise<any> => {
@@ -31,6 +32,12 @@ function fixture(lost: 'user' | 'session' | 'none' = 'none', foreign = false) {
     if (method === 'GET' && path.startsWith('/sessions?')) return session ? [session] : []
     if (method === 'GET' && path === '/sessions/sess_test') return session
     if (path === '/sessions/sess_test/tokens') return { jwt: `header.${Buffer.from(JSON.stringify({ iss: target.issuer, aud: 'convex', sub: 'user_test' })).toString('base64url')}.signature` }
+    if (path.startsWith('/sessions/sess_test/tokens/')) {
+      // The attesting mint: a JWT template token, distinct from the session token.
+      if (mint.fail) throw new Error('mint failed')
+      if (mint.jwt) return { jwt: mint.jwt }
+      return { jwt: encoded({ iss: target.issuer, aud: 'aud' in mint ? mint.aud : attestedTemplate, sub: 'user_test' }) }
+    }
     if (path === '/sessions/sess_test/revoke') { session.status = 'revoked'; return session }
     if (method === 'DELETE' && path === '/users/user_test') { user = undefined; return { id: 'user_test', deleted: true } }
     throw new Error(`Unexpected operation ${method} ${path}`)
@@ -62,6 +69,12 @@ function guarded(options: { refusal?: string; acceptAll?: boolean } = {}) {
 // Genuinely decodable tokens of untrusted provenance carrying exactly one mismatch.
 const untrustedIssuerToken = encoded({ iss: 'https://foreign-snake.clerk.accounts.dev', aud: 'convex', sub: 'user_other' })
 const untrustedAudienceToken = encoded({ iss: target.issuer, aud: 'other', sub: 'user_test' })
+
+// S9 attested path fixtures. The template name is always supplied by the test, as
+// the operator must supply it: the script has no default template.
+const attestedTemplate = 'livefy-h1-2c-wrong-aud'
+const attestedMintedToken = encoded({ iss: target.issuer, aud: attestedTemplate, sub: 'user_test' })
+const attestedVerdict = 'rejected: attested wrong-audience token refused by the query'
 
 describe('runtime fixture email preflight', () => {
   it('forwards the supplied address unchanged and preserves ownership and cleanup', async () => {
@@ -369,6 +382,161 @@ function mainIo(overrides: { argv?: string[]; env?: Record<string, string | unde
     f, g, dispatch, discovery,
   }
 }
+
+// S9: a negative may be reported as passed only from a token this script minted
+// itself through a named JWT template. Every assertion below drives the mock
+// transport and the mock query seam; none is evidence about Clerk or the
+// configured Convex deployment, which stays T5.
+async function failedSmoke(f: ReturnType<typeof fixture>, query: (token?: string) => Promise<any>,
+  extra: { untrusted?: any; attested?: any } = {}) {
+  const log = vi.spyOn(console, 'error').mockImplementation(() => {})
+  try {
+    await expect(smoke(f.api, query, marker, email, extra.untrusted ?? {}, extra.attested ?? {}))
+      .rejects.toThrow('DEV verification failed; details suppressed')
+    return log.mock.calls.flat().join('\n')
+  } finally { log.mockRestore() }
+}
+
+describe('S9 attested wrong-audience negative (mock transport, not JWT evidence)', () => {
+  it('reports the explicit attested verdict only for the token it minted through the named template', async () => {
+    const f = fixture()
+    const g = guarded()
+    const result = await smoke(f.api, g.query, marker, email, {}, { template: attestedTemplate })
+    expect(f.calls).toContain(`POST /sessions/sess_test/tokens/${attestedTemplate}`)
+    expect(g.seen).toContain(attestedMintedToken)
+    expect(result.wrongAudience).toBe(attestedVerdict)
+    expect(result.wrongIssuer).toBe(pendingNegatives.issuer)
+    expect(result).toMatchObject({ validAccepted: true, anonymousRejected: true, sessionRevoked: true, usersAfter: 0 })
+    expect(f.user()).toBeUndefined()
+    expect(f.session()?.status).toBe('revoked')
+    expect(attestedVerdicts.wrongAudience).toBe(attestedVerdict)
+    expect(attestedVerdict.startsWith('rejected:')).toBe(true)
+    expect(attestedVerdict).not.toContain('pending:')
+    expect(attestedVerdict).not.toBe(pendingNegatives.audience)
+  })
+  it('sends the minted token to the query while the issuer negative stays pending', async () => {
+    const f = fixture()
+    const g = guarded()
+    const result = await smoke(f.api, g.query, marker, email, {}, { template: attestedTemplate })
+    expect(g.seen).toEqual([
+      `header.${Buffer.from(JSON.stringify({ iss: target.issuer, aud: 'convex', sub: 'user_test' })).toString('base64url')}.signature`,
+      attestedMintedToken,
+    ])
+    expect(result.wrongIssuer).toBe(pendingNegatives.issuer)
+    expect(g.seen.every(token => token !== untrustedAudienceToken)).toBe(true)
+  })
+  it.each([undefined, '', ' ', 'livefy/wrong-aud', 'livefy h1 aud', `${attestedTemplate}\n`, 'x'.repeat(129)])
+  ('refuses to mint without an explicit valid template name (%#)', async template => {
+    const f = fixture()
+    const g = guarded()
+    await expect(attestedWrongAudience(g.query, f.api, 'sess_test', template as string))
+      .rejects.toThrow('Explicit JWT template name required for the attested negative; details suppressed')
+    expect(f.calls).toEqual([])
+    expect(g.seen).toEqual([])
+  })
+  it('takes the template name only from an explicit input and treats unset or empty as not requested', () => {
+    expect(attestedTemplateVariable).toBe('H1_2C_WRONG_AUDIENCE_TEMPLATE')
+    expect(attestedSource({})).toEqual({})
+    expect(attestedSource({ [attestedTemplateVariable]: '' })).toEqual({})
+    expect(attestedSource({ [attestedTemplateVariable]: attestedTemplate })).toEqual({ template: attestedTemplate })
+    for (const bad of [' ', 'livefy/wrong-aud', 'x'.repeat(129)]) {
+      expect(() => attestedSource({ [attestedTemplateVariable]: bad }))
+        .toThrow('Explicit JWT template name required for the attested negative; details suppressed')
+    }
+  })
+  it('fails the run when the attesting mint fails', async () => {
+    const f = fixture('none', false, { fail: true })
+    const output = await failedSmoke(f, guarded().query, { attested: { template: attestedTemplate } })
+    expect(JSON.parse(output)).toMatchObject({ cleanupComplete: true, failure: { stage: 'attested-negative' } })
+    expect(output).not.toMatch(/rejected:|pending:/)
+    expect(f.user()).toBeUndefined()
+    expect(f.session()?.status).toBe('revoked')
+  })
+  it.each([
+    ['the configured audience', 'convex'],
+    ['a missing audience', undefined],
+    ['an empty audience', ''],
+    ['a blank entry in an audience array', ['']],
+    ['an audience array that still contains the configured audience', ['other', 'convex']],
+    ['a non-string audience', { value: 'other' }],
+  ] as const)('fails closed when the minted token carries %s', async (_label, aud) => {
+    const f = fixture('none', false, { aud })
+    const output = await failedSmoke(f, guarded().query, { attested: { template: attestedTemplate } })
+    expect(JSON.parse(output)).toMatchObject({ cleanupComplete: true, failure: { stage: 'attested-negative' } })
+    expect(output).not.toMatch(/rejected:|pending:/)
+    expect(output).not.toContain(attestedTemplate)
+  })
+  it('refuses a misconfigured template before handing its token to the query', async () => {
+    const f = fixture('none', false, { aud: 'convex' })
+    const g = guarded()
+    await expect(attestedWrongAudience(g.query, f.api, 'sess_test', attestedTemplate))
+      .rejects.toThrow('Attested wrong-audience token does not carry a foreign audience')
+    expect(g.seen).toEqual([])
+  })
+  it('fails closed when the minted token is not from the configured issuer', async () => {
+    const foreign = encoded({ iss: 'https://foreign-snake.clerk.accounts.dev', aud: 'other', sub: 'user_test' })
+    const f = fixture('none', false, { jwt: foreign })
+    const g = guarded()
+    await expect(attestedWrongAudience(g.query, f.api, 'sess_test', attestedTemplate))
+      .rejects.toThrow('Attested wrong-audience token was not issued by the configured issuer')
+    expect(g.seen).toEqual([])
+  })
+  it('fails the run when the query accepts the attested token', async () => {
+    const f = fixture()
+    const accepting = guarded({ acceptAll: true }).query
+    await expect(attestedWrongAudience(accepting, f.api, 'sess_test', attestedTemplate))
+      .rejects.toThrow('Attested wrong-audience token was accepted')
+    const output = await failedSmoke(fixture(), accepting, { attested: { template: attestedTemplate } })
+    expect(JSON.parse(output)).toMatchObject({ cleanupComplete: true, failure: { stage: 'attested-negative' } })
+    expect(output).not.toMatch(/rejected:|pending:/)
+  })
+  it('fails the run when the attested refusal is inconclusive', async () => {
+    const f = fixture()
+    const inconclusive = guarded({ refusal: 'socket hang up' }).query
+    await expect(attestedWrongAudience(inconclusive, f.api, 'sess_test', attestedTemplate))
+      .rejects.toThrow('Attested wrong-audience token rejection was inconclusive')
+    const output = await failedSmoke(fixture(), inconclusive, { attested: { template: attestedTemplate } })
+    expect(JSON.parse(output)).toMatchObject({ cleanupComplete: true, failure: { stage: 'attested-negative' } })
+    expect(output).not.toMatch(/rejected:|pending:/)
+  })
+  it('refuses contradictory wrong-audience sources instead of choosing one silently', async () => {
+    const f = fixture()
+    const g = guarded()
+    await expect(smoke(f.api, g.query, marker, email, { wrongAudience: untrustedAudienceToken },
+      { template: attestedTemplate })).rejects.toThrow('Conflicting wrong-audience sources')
+    expect(f.calls).toEqual([])
+    expect(g.seen).toEqual([])
+  })
+  it('wires the attested template from the environment into the production dispatch seam', async () => {
+    const { io, dispatch, g } = mainIo({ env: { H1_2C_FIXTURE_EMAIL: email, H1_2C_WRONG_AUDIENCE_TEMPLATE: attestedTemplate } })
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const errorLog = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      await main(io)
+      expect(dispatch.mock.calls).toContainEqual(['POST', `/sessions/sess_test/tokens/${attestedTemplate}`, {}])
+      expect(g.seen).toContain(attestedMintedToken)
+      const line = String(log.mock.calls[0][0])
+      expect(JSON.parse(line).wrongAudience).toBe(attestedVerdict)
+      expect(JSON.parse(line).wrongIssuer).toBe(pendingNegatives.issuer)
+      expect(errorLog).not.toHaveBeenCalled()
+    } finally { log.mockRestore(); errorLog.mockRestore() }
+  })
+  it('fails the invocation before any Clerk call when the template name is malformed', async () => {
+    const { io, dispatch } = mainIo({ env: { H1_2C_FIXTURE_EMAIL: email, H1_2C_WRONG_AUDIENCE_TEMPLATE: 'livefy/wrong-aud' } })
+    await expect(main(io)).rejects.toThrow('Explicit JWT template name required for the attested negative; details suppressed')
+    expect(dispatch).not.toHaveBeenCalled()
+  })
+  it('keeps the environment-supplied audience token pending even when the attested path is enabled', async () => {
+    const f = fixture()
+    const g = guarded()
+    // The attested path and the environment path are separate inputs; the
+    // environment source alone can never pass, with or without a template.
+    const result = await smoke(f.api, g.query, marker, email, { wrongIssuer: untrustedIssuerToken }, { template: attestedTemplate })
+    expect(result.wrongIssuer).toBe(`${pendingNegatives.issuer} (refused by the query, provenance unverified)`)
+    expect(result.wrongIssuer.startsWith('rejected:')).toBe(false)
+    expect(result.wrongAudience).toBe(attestedVerdict)
+  })
+})
 
 describe('main() invocation contract', () => {
   it('requires the explicit single-fixture flag on the real argv before any Clerk call', async () => {

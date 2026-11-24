@@ -109,15 +109,77 @@ export function validateClaims(jwt, userId) {
 }
 
 // S3: a negative that was not actually exercised stays explicitly pending. These
-// exact strings must not be replaced by a pass until a genuinely signed untrusted
-// token has been exercised against the configured backend.
+// exact strings must not be replaced by a pass. The only exception is the attested
+// S9 mint below, which reports its own distinct verdict and never reuses these.
 export const pendingNegatives = Object.freeze({
   issuer: 'pending: no authorized genuinely signed untrusted issuer source',
   audience: 'pending: no authorized genuinely signed wrong-audience source',
 })
 
-// Externally supplied tokens of untrusted provenance. This script never mints
-// them and never verifies a signature.
+// S9: a negative may be reported as passed only from a token this script minted
+// itself from the authorized instance through a named JWT template. That mint
+// attests provenance: Clerk signs the token with the trusted key of the configured
+// issuer, so the only difference from an accepted token is `aud`. The verdict is
+// deliberately not the bare `rejected:` prefix, and it is unreachable from any
+// environment-supplied token.
+export const attestedVerdicts = Object.freeze({
+  wrongAudience: 'rejected: attested wrong-audience token refused by the query',
+})
+
+// The template name is an operator input with no default: a built-in default could
+// point a different instance's template at this run. An unset or empty variable
+// leaves the attested negative unrequested, which keeps the audience gate pending
+// exactly as S3 requires.
+export const attestedTemplateVariable = 'H1_2C_WRONG_AUDIENCE_TEMPLATE'
+
+export function validateTemplateName(template) {
+  if (typeof template !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/.test(template)) {
+    throw new Error('Explicit JWT template name required for the attested negative; details suppressed')
+  }
+  return template
+}
+
+export function attestedSource(env = process.env) {
+  const template = env[attestedTemplateVariable]
+  if (template === undefined || template === '') return {}
+  return { template: validateTemplateName(template) }
+}
+
+// A foreign audience is present, non-empty, and never the configured one. This is
+// the guard that stops a template still carrying `aud: convex` (a configuration
+// error) from masquerading as evidence.
+function carriesForeignAudience(audience) {
+  const values = Array.isArray(audience) ? audience : [audience]
+  return values.length > 0 && values.every(value => typeof value === 'string' && value !== '')
+}
+
+// Mints the wrong-audience token from the fixture session through the named
+// template and exercises it. Every precondition fails closed: a missing or invalid
+// template, a failed mint, a minted token that is not foreign in `aud`, and a query
+// that accepts it all abort the run instead of reporting a verdict.
+export async function attestedWrongAudience(query, api, sessionId, template) {
+  const name = validateTemplateName(template)
+  // Non-GET: the shared Clerk helper dry-runs this path before the real request.
+  const minted = await api('POST', `/sessions/${encodeURIComponent(sessionId)}/tokens/${encodeURIComponent(name)}`, {})
+  const claims = decodeClaims(minted?.jwt)
+  const { issuerMatches, audienceMatches } = claimVerdict(claims)
+  if (!issuerMatches) throw new Error('Attested wrong-audience token was not issued by the configured issuer')
+  if (audienceMatches || !carriesForeignAudience(claims.aud)) {
+    throw new Error('Attested wrong-audience token does not carry a foreign audience')
+  }
+  try {
+    await query(minted.jwt)
+  } catch (error) {
+    if (!String(error?.message).includes('Unauthorized')) {
+      throw new Error('Attested wrong-audience token rejection was inconclusive')
+    }
+    return attestedVerdicts.wrongAudience
+  }
+  throw new Error('Attested wrong-audience token was accepted')
+}
+
+// Externally supplied tokens of untrusted provenance. This script never mints them
+// on this path and never verifies a signature.
 export function untrustedSources(env = process.env) {
   return {
     wrongIssuer: env.H1_2C_UNTRUSTED_ISSUER_JWT || undefined,
@@ -130,8 +192,8 @@ export function untrustedSources(env = process.env) {
 // the configured domain, and that refusal is indistinguishable from a genuine
 // issuer or audience rejection. The refusal is therefore recorded as a diagnostic
 // while the gate stays explicitly pending, and no supplied token is ever reported
-// as a pass. Only a source that attests the token's provenance could change this,
-// and no such authorized source exists yet (T5 of the feature document).
+// as a pass. The attested mint in `attestedWrongAudience` is the only path that can
+// close a negative, and it never accepts an input from here.
 function unauditedNegative(kind) {
   const base = kind === 'issuer' ? pendingNegatives.issuer : pendingNegatives.audience
   return `${base} (refused by the query, provenance unverified)`
@@ -187,8 +249,13 @@ export function validateFixtureEmail(email) {
 
 // A transport may be used once only; there are no create retries or fallback users.
 const used = new WeakSet()
-export async function smoke(api, query, marker = `livefy-h1-2c-${randomUUID()}`, email, untrusted = {}) {
+export async function smoke(api, query, marker = `livefy-h1-2c-${randomUUID()}`, email, untrusted = {}, attested = {}) {
   validateFixtureEmail(email)
+  // The attested mint and an environment-supplied audience token are two different
+  // sources for one negative; choosing one silently would misreport provenance.
+  if (attested.template && untrusted.wrongAudience) {
+    throw new Error('Conflicting wrong-audience sources; use the attested template alone')
+  }
   if (used.has(api)) throw new Error('Fixture transport already used')
   used.add(api)
   if (!/^livefy-h1-2c-[a-zA-Z0-9-]+$/.test(marker)) throw new Error('Invalid fixture marker')
@@ -237,10 +304,17 @@ export async function smoke(api, query, marker = `livefy-h1-2c-${randomUUID()}`,
       else throw new Error('Anonymous request failed for an unrelated reason')
     }
     if (!anonymousRejected) throw new Error('Anonymous access accepted')
-    // Externally supplied untrusted tokens only; the fixture token is never reused
-    // as a negative and nothing is minted here.
+    // S9: the only negative this script may report as passed, because here it
+    // controls and attests the token's provenance.
+    stage = 'attested-negative'
+    const attestedAudience = attested.template
+      ? await attestedWrongAudience(query, api, sessionId, attested.template)
+      : undefined
+    // Externally supplied untrusted tokens stay pending (S3); the fixture token is
+    // never reused as a negative.
     stage = 'untrusted-negatives'
     reported = await untrustedNegatives(query, untrusted)
+    if (attestedAudience) reported = { ...reported, wrongAudience: attestedAudience }
   } catch (error) { failure = failureSummary(stage, error) }
   finally {
     // Delete only the exact marker-owned user, even when the live checks fail.
@@ -317,6 +391,7 @@ export async function main(io = {}) {
     throw new Error('Inherited deployment credentials are not allowed')
   }
   const email = validateFixtureEmail(env.H1_2C_FIXTURE_EMAIL)
+  const attested = attestedSource(env)
   mainStage = 'target-metadata'
   const metadata = dispatch('GET', `/platform/applications/${target.app}`, undefined, true)
   if (metadata.application_id !== target.app || !metadata.instances.some(
@@ -325,7 +400,7 @@ export async function main(io = {}) {
   const discovery = await (await fetchImpl(`${target.issuer}/.well-known/openid-configuration`)).json()
   if (discovery.issuer !== target.issuer) throw new Error('OIDC issuer mismatch')
   mainStage = 'smoke'
-  console.log(JSON.stringify(await smoke(dispatch, query, undefined, email, untrustedSources(env))))
+  console.log(JSON.stringify(await smoke(dispatch, query, undefined, email, untrustedSources(env), attested)))
 }
 
 // The module-level exit contract: one sanitized summary line plus the stop line on
