@@ -574,19 +574,17 @@ cada paso; no marcar aceptado un paso no observado.
 
 ### Límites de un build portable
 
-- El paquete ya es autocontenido: `portable` extrae el árbol en `%TEMP%` y, como
-  no depende de un `node_modules` ajeno al artefacto, resuelve `dist/main.cjs` y
-  sus dependencias inlineadas desde su propia ruta temporal. Comprobado aquí solo
-  por construcción (build + verificación de resolución), no por ejecución
-  Windows.
-- No hay registro `livefy://` a nivel de sistema sin instalador. `@clerk/electron`
-  registra el esquema para el ejecutable en tiempo de arranque
-  (`node_modules/@clerk/electron/dist/cjs/index.js:89`, ahora inlineado en
-  `dist/main.cjs`) y `main.cjs:33-39` solo añade el directorio de la app cuando
-  corre en modo desarrollo. El objetivo `portable` se autoextrae en `%TEMP%` en
-  cada ejecución, de modo que cualquier registro apuntaría a una ruta volátil.
-  **El retorno de OAuth por deep link sigue siendo solo de desarrollo** y no se
-  valida con este paquete; definir la distribución (instalador) es otra decisión.
+- El paquete es autocontenido y **está verificado en ejecución**: `portable`, corrido
+desde `C:\Temp` fuera del workspace, abre y recorre todo el flujo, incluido Google
+OAuth, sin depender de ningún `node_modules` ajeno al artefacto.
+- No hay registro `livefy://` permanente sin instalador. `@clerk/electron` registra
+  el esquema en tiempo de arranque (ahora inlineado en `dist/main.cjs`) y
+  `main.cjs:33-39` solo añade el directorio de la app cuando corre en modo
+  desarrollo; el objetivo `portable` se autoextrae en `%TEMP%` en cada ejecución.
+  **Medido:** mientras la app corre, el retorno de OAuth por deep link funciona
+  también en `portable`. El residuo es el registro que queda tras cerrar: apunta a
+  una ruta temporal que ya no existe. Un instalador lo resuelve; definir la
+  distribución sigue siendo otra decisión.
 - `portable` extrae el árbol en cada arranque: el primer inicio es más lento que
   `win-unpacked` y consume espacio temporal. Para validar contenido y rendimiento
   de arranque usar `win-unpacked`; `portable` solo confirma que el ejecutable
@@ -600,10 +598,13 @@ Sobre `release\win-unpacked\Livefy.exe`, sin servidor de desarrollo: la app arra
 `protocol.cjs` en las dos rutas consultadas, y el recorrido completo pasa contra
 Clerk y Convex reales — registro con verificación por email, login, reinicio con
 sesión persistida, logout y recuperación de contraseña. **También el login con
-Google**, porque `win-unpacked` tiene ruta estable y el SDK registra `livefy://` al
-arrancar: el límite de OAuth descrito arriba aplica solo al objetivo `portable`,
-no a este artefacto. Una predicción previa de esta sesión afirmó lo contrario y
-queda corregida por esta observación.
+Google**, en los dos artefactos: `win-unpacked` y el `portable` ejecutado desde
+`C:\Temp`, fuera del workspace, que es el caso que antes fallaba con
+`Cannot find module '@clerk/electron'`. Una predicción previa de esta sesión afirmó
+lo contrario para el portable y queda corregida por esta observación: el SDK
+registra el esquema en cada arranque, así que el deep link funciona mientras la app
+corre. El artefacto quedó autosuficiente: `resources\app` contiene solo `dist` y
+`package.json`, sin `node_modules`, y `win-unpacked` bajó de 607 MB a 347 MB.
 
 ### Lo que no se verificó al escribir esta configuración
 

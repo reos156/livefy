@@ -218,13 +218,21 @@ Per task, held by the writer that owns it, narrow and disjoint:
   packaged renderer really receives the header from `protocol.cjs`, not merely the
   `index.html` meta fallback. Still not claimed: a signed or installed build, and
   any production deployment.
-- **L14** Delivery risk observed in the same run, not a defect of this gate:
-  electron-builder packs the workspace `node_modules` into the app
-  (`resources\app\node_modules\@esbuild\...`), so the portable artifact is far
-  larger than the code it ships, while the renderer is already bundled and the main
-  process needs only `electron` plus built-ins. `asar` stays deliberately disabled
-  because `protocol.cjs` requires real-filesystem containment that an asar cannot
-  satisfy. Both belong to a distribution task, not here.
+- **L14** Delivery risk observed in the same run, later RESOLVED. electron-builder
+  packed the workspace `node_modules` into the app
+  (`resources\app\node_modules\@esbuild\...`): 261MB of the 607MB artifact, while the
+  renderer is already bundled and the main process needs only `electron` plus
+  builtins. That also made the artifact non-self-contained: the unpacked build only
+  resolved `@clerk/electron` because it still sat inside the workspace, and the
+  portable target, extracting to a temp directory, failed with
+  `Cannot find module '@clerk/electron'`. Fixed by bundling the main process to
+  `dist/main.cjs` with `electron` and Node builtins external and moving every
+  build-time package to devDependencies, so the packaged file set is
+  `package.json` plus `dist`. Measured after: `resources/app` holds only `dist` and
+  `package.json` with no `node_modules`, `win-unpacked` went 607MB to 347MB and the
+  portable 119MB to 94MB, and both artifacts run the whole journey including Google
+  OAuth from outside the workspace. `asar` stays disabled deliberately: enabling it
+  needs a `protocol.cjs` change first.
 
 ## Delivery
 
