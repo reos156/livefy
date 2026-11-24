@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
-import { createContext, useContext, useRef, type ComponentProps } from 'react'
+import { createContext, Fragment, useContext, useMemo, useSyncExternalStore, type ComponentProps } from 'react'
 import type { ClerkProvider } from '@clerk/react'
 type ProviderProps = ComponentProps<typeof ClerkProvider>
 let providerProps: ProviderProps
@@ -9,16 +9,32 @@ import { createMemoryHistory, Outlet, RouterProvider } from '@tanstack/react-rou
 const state = vi.hoisted(() => ({ signedIn: true, confirmed: true, navigated: false, refreshed: false, staleBinding: false, signOut: vi.fn() }))
 type TestBinding = { isLoaded: boolean; isSignedIn: boolean; isAuthenticated: boolean; isLoading: boolean; isRefreshing: boolean }
 let providerBinding: TestBinding = { isLoaded: true, isSignedIn: true, isAuthenticated: true, isLoading: false, isRefreshing: false }
+// The installed binding is re-initialized only when the document is replaced. The
+// harness models the browser's part of a reload here, so no case has to re-render
+// the app tree by hand to make a fresh snapshot appear.
+const documentModel = vi.hoisted(() => ({ generation: 0, listeners: new Set<() => void>() }))
+function subscribeDocument(listener: () => void) {
+  documentModel.listeners.add(listener)
+  return () => { documentModel.listeners.delete(listener) }
+}
+function documentGeneration() { return documentModel.generation }
+function reloadDocument() {
+  documentModel.generation += 1
+  for (const listener of [...documentModel.listeners]) listener()
+}
 vi.mock('@clerk/react', () => ({
   // Measured in Chromium: the stale value lives in the provider context, so the
   // snapshot is taken when the PROVIDER mounts. Remounting a consumer re-reads
-  // that same snapshot, no matter how often it is remounted.
+  // that same snapshot, no matter how often it is remounted; only a browser reload
+  // mounts the provider again with fresh values.
   ClerkProvider: (props: ProviderProps) => {
     providerProps = props
-    const bound = useRef<TestBinding | null>(null)
-    if (!bound.current) bound.current = { ...authState(), isSignedIn: !!clerk.session, isAuthenticated: !!clerk.session }
-    providerBinding = bound.current
-    return props.children
+    const generation = useSyncExternalStore(subscribeDocument, documentGeneration)
+    providerBinding = useMemo(
+      () => ({ ...authState(), isSignedIn: !!clerk.session, isAuthenticated: !!clerk.session }),
+      [generation],
+    )
+    return <Fragment key={generation}>{props.children}</Fragment>
   },
   useAuth: () => state.staleBinding ? providerBinding : useLiveAuth(),
   useClerk: () => clerk,
@@ -49,6 +65,8 @@ afterEach(() => {
   vi.clearAllMocks()
   Object.assign(state, { signedIn: true, confirmed: true, navigated: false, refreshed: false, staleBinding: false })
   Object.assign(clerk, { loaded: true, session: {} })
+  documentModel.generation = 0
+  documentModel.listeners.clear()
   window.history.replaceState(null, '', '/')
 })
 it.each([
@@ -186,6 +204,163 @@ it('resets the document instead of rendering a transient surface when the bindin
   expect(screen.queryByRole('heading', { level: 1, name: 'Signed out' })).toBeNull()
   expect(screen.queryByText('Confirming signed-out session.')).toBeNull()
   expect(router.state.location.pathname).toBe('/')
+})
+// A password reset creates and activates a session, so this is an entry transition.
+// Measured in Chromium (same mechanism as the sign-out case above, opposite
+// direction): clerk.session becomes a session while the binding keeps serving the
+// signed-out value its provider captured at mount. The transition is therefore read
+// from the instance, and the document reset it needs is bounded to one per entry.
+function entryHarness(path: string) {
+  window.history.replaceState(null, '', path)
+  const completionUrl = browserCompletionUrl(window.location.href)
+  vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
+  const replaceState = window.history.replaceState.bind(window.history)
+  // The URL write is the observable part of a document reset: an inert or blocked reload
+  // has no other effect, and the app has to perform the reset itself.
+  return { completionUrl, documentReset: vi.spyOn(window.history, 'replaceState'), replaceState }
+}
+it('reaches the authenticated surface from the instance after a completed reset, with no external re-render', async () => {
+  state.staleBinding = true
+  state.signedIn = false
+  state.confirmed = false
+  clerk.session = null
+  const { completionUrl, documentReset, replaceState } = entryHarness('/#/')
+  // The browser's part of the reset: the document is replaced, which is the only way
+  // the binding and the Convex client are re-initialized. Nothing here re-renders the
+  // app tree, and the app itself has to ask for the reset.
+  documentReset.mockImplementation((data, title, url) => {
+    replaceState(data, title, url)
+    if (url !== completionUrl) return
+    state.staleBinding = false
+    state.signedIn = true
+    state.confirmed = true
+    reloadDocument()
+  })
+  const router = createAppRouter(createMemoryHistory({ initialEntries: ['/'] }))
+  router.routeTree.update({ component: () => <SessionContent><Outlet /></SessionContent> })
+  const windowNavigate = vi.fn()
+  render(<AuthState.Provider value={authState()}>
+    <SessionInfrastructure>
+      <AuthBoundary {...props}
+        modalNavigation={createBrowserNavigation(completionUrl, replace => router.navigate({ to: '/', replace }))}>
+        <RouterProvider router={router} />
+      </AuthBoundary>
+    </SessionInfrastructure>
+  </AuthState.Provider>)
+  // Signed out at mount: the public sign-in surface owns the document.
+  await screen.findByText('Public sign-in')
+  // The reset completes: the instance gains a session, the bound snapshot does not.
+  expect(providerBinding.isSignedIn).toBe(false)
+  clerk.session = { id: 'sess_reset' }
+  await act(async () => { await providerProps.routerReplace!(completionUrl, { windowNavigate }) })
+  // The reset is deferred by one tick so the binding can be re-read before it fires.
+  await waitFor(() => expect(documentReset).toHaveBeenCalledTimes(1))
+  expect(documentReset).toHaveBeenCalledWith(null, '', completionUrl)
+  await screen.findByRole('button', { name: 'Open app' })
+  expect(screen.getByText('Backend access confirmed')).toBeTruthy()
+  expect(screen.queryByText('Loading')).toBeNull()
+  expect(windowNavigate).not.toHaveBeenCalled()
+})
+// A sign-in or OAuth return hands control back through the same callback as a reset, and
+// clerk-js awaits that callback before it emits the new session, so the binding necessarily
+// still reports signed-out at that moment. Unlike the reset case it converges on its own a
+// tick later, so neither a document reset nor a failure surface belongs there.
+it('lets a binding that converges on the next tick finish the transition without a document reset', async () => {
+  state.staleBinding = true
+  state.signedIn = false
+  state.confirmed = false
+  clerk.session = null
+  const { completionUrl, documentReset } = entryHarness('/#/')
+  const router = createAppRouter(createMemoryHistory({ initialEntries: ['/'] }))
+  router.routeTree.update({ component: () => <SessionContent><Outlet /></SessionContent> })
+  const windowNavigate = vi.fn()
+  const tree = () => <AuthState.Provider value={authState()}>
+    <SessionInfrastructure>
+      <AuthBoundary {...props}
+        modalNavigation={createBrowserNavigation(completionUrl, replace => router.navigate({ to: '/', replace }))}>
+        <RouterProvider router={router} />
+      </AuthBoundary>
+    </SessionInfrastructure>
+  </AuthState.Provider>
+  const view = render(tree())
+  await screen.findByText('Public sign-in')
+  // The instance already holds the new session while the bound snapshot still says signed-out.
+  clerk.session = { id: 'sess_signin' }
+  await act(async () => { await providerProps.routerReplace!(completionUrl, { windowNavigate }) })
+  // One tick later the provider publishes that session to its consumers: the normal
+  // transition, which needs no repair from this component.
+  state.staleBinding = false
+  state.signedIn = true
+  state.confirmed = true
+  view.rerender(tree())
+  // The whole settle window passes with no document reset and no failure surface.
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 300)) })
+  expect(documentReset).not.toHaveBeenCalled()
+  expect(screen.queryByText(/Password reset incomplete/)).toBeNull()
+  expect(screen.queryByText('Public sign-in')).toBeNull()
+  await screen.findByRole('button', { name: 'Open app' })
+  expect(screen.getByText('Backend access confirmed')).toBeTruthy()
+  expect(windowNavigate).not.toHaveBeenCalled()
+})
+it('resets the document once per entry transition while the instance keeps reporting the session', async () => {
+  state.staleBinding = true
+  state.signedIn = false
+  state.confirmed = false
+  clerk.session = null
+  const { completionUrl, documentReset } = entryHarness('/#/')
+  const navigate = vi.fn(), windowNavigate = vi.fn()
+  render(<AuthState.Provider value={authState()}>
+    <SessionInfrastructure>
+      <AuthBoundary {...props} modalNavigation={createBrowserNavigation(completionUrl, navigate)}>
+        <p>Access landing</p>
+      </AuthBoundary>
+    </SessionInfrastructure>
+  </AuthState.Provider>)
+  await screen.findByText('Access landing')
+  clerk.session = { id: 'sess_reset' }
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await act(async () => { await providerProps.routerReplace!(completionUrl, { windowNavigate }) })
+  }
+  // The instance kept reporting the same session and the bound snapshot stayed stale:
+  // the transition still owns exactly one document reset, so it cannot become a loop.
+  expect(providerBinding.isSignedIn).toBe(false)
+  await waitFor(() => expect(documentReset).toHaveBeenCalledTimes(1))
+  expect(documentReset).toHaveBeenCalledWith(null, '', completionUrl)
+  expect(navigate).toHaveBeenCalledTimes(3)
+  expect(windowNavigate).not.toHaveBeenCalled()
+})
+it('shows a failure surface instead of the waiting ring when the instance reports no session after the attempt', async () => {
+  state.staleBinding = true
+  state.signedIn = false
+  state.confirmed = false
+  clerk.session = null
+  const { completionUrl, documentReset } = entryHarness('/#/')
+  const router = createAppRouter(createMemoryHistory({ initialEntries: ['/'] }))
+  router.routeTree.update({ component: () => <SessionContent><Outlet /></SessionContent> })
+  const windowNavigate = vi.fn()
+  render(<AuthState.Provider value={authState()}>
+    <SessionInfrastructure>
+      <AuthBoundary {...props}
+        modalNavigation={createBrowserNavigation(completionUrl, replace => router.navigate({ to: '/', replace }))}>
+        <RouterProvider router={router} />
+      </AuthBoundary>
+    </SessionInfrastructure>
+  </AuthState.Provider>)
+  await screen.findByText('Public sign-in')
+  // The completed attempt hands control back with no session on the instance.
+  await act(async () => { await providerProps.routerReplace!(completionUrl, { windowNavigate }) })
+  expect(windowNavigate).toHaveBeenCalledExactlyOnceWith(completionUrl)
+  const failure = await screen.findByRole('alert', {}, { timeout: 3000 })
+  expect(failure.textContent).toContain('Password reset incomplete')
+  // A real failure stays visible: no endless ring and no stale private surface.
+  expect(screen.queryByText('Loading')).toBeNull()
+  expect(screen.queryByText('Public sign-in')).toBeNull()
+  expect(screen.queryByText('Backend access confirmed')).toBeNull()
+  expect(documentReset).not.toHaveBeenCalled()
+  // The failure surface is bounded too: one operator-driven document reset.
+  fireEvent.click(screen.getByRole('button', { name: 'Return to sign in' }))
+  expect(documentReset).toHaveBeenCalledTimes(1)
+  expect(documentReset).toHaveBeenCalledWith(null, '', completionUrl)
 })
 it('keeps private content hidden and renders no placeholder while Clerk still reports a session', async () => {
   state.staleBinding = true
