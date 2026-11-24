@@ -7,7 +7,11 @@ const path = require('node:path')
 const { DEV_URL, webPreferences, secureContents } = require('./security.cjs')
 
 const development = !app.isPackaged && process.argv.includes('--livefy-dev')
-const indexPath = path.join(__dirname, '../dist/index.html')
+// This file is bundled to dist/main.cjs (electron/build-main.mjs); the unbundled
+// source at electron/main.cjs stays the entry the tests execute. Both live
+// exactly one directory below the build output, so `../dist` is the renderer and
+// preload directory in either location, and its parent is the app directory.
+const distDir = path.resolve(__dirname, '../dist')
 const entry = development ? DEV_URL : 'livefy://renderer/'
 // Clerk owns scheme registration and OAuth IPC before Electron becomes ready.
 // safeStorage must only be inspected after readiness, before opening any window.
@@ -24,6 +28,8 @@ const bridge = createClerkBridge({
 })
 // The SDK registers only the executable. Default Electron also needs our app
 // directory; override after the bridge so its registration cannot replace this.
+// `__dirname` is this file's directory (electron/ in source, dist/ bundled), so
+// its parent is the application directory in both layouts.
 if (bridge.isPrimaryInstance && process.defaultApp) {
   const args = [path.resolve(__dirname, '..')]
   if (development) args.push('--livefy-dev')
@@ -40,7 +46,7 @@ function createWindow() {
     width: 1000,
     height: 720,
     title: 'Livefy',
-    webPreferences: { ...webPreferences, preload: path.join(__dirname, '../dist/preload.cjs') },
+    webPreferences: { ...webPreferences, preload: path.join(distDir, 'preload.cjs') },
   })
   trustedContents.add(window.webContents)
   window.webContents.on('destroyed', () => trustedContents.delete(window.webContents))
@@ -53,7 +59,7 @@ function createWindow() {
 }
 
 if (bridge.isPrimaryInstance) app.whenReady().then(() => {
-  protocol.handle('livefy', rendererHandler(path.dirname(indexPath), net))
+  protocol.handle('livefy', rendererHandler(distDir, net))
   storage = createTokenStorage({ store: new Store({ name: 'clerk-tokens', accessPropertiesByDotNotation: false }), safeStorage })
   ipcMain.handle('livefy:session-persistence', event => {
     if (event.senderFrame !== event.sender.mainFrame) throw new Error('Denied')

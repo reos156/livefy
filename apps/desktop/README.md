@@ -74,9 +74,14 @@ No se incluye ni se fabrica una clave. Se valida localmente el host codificado
 faltante/incorrecta no crea proveedores ni cliente. Producción necesitará otra
 configuración revisada; no basta con reemplazar estas variables.
 
-Compilar desde `apps/desktop` con `bun run build` genera también `dist/preload.cjs`:
-CJS empaquetado por Vite/Rollup, solo Electron externo, compatible con sandbox.
-Compilar antes de `desktop:dev` también es necesario para disponer de la precarga.
+Compilar desde `apps/desktop` con `bun run build` genera, además del
+renderizador, los dos procesos empaquetados por Vite/Rollup: `dist/preload.cjs`
+(precarga, solo Electron externo, compatible con sandbox) y `dist/main.cjs`
+(proceso principal, ver «Proceso principal empaquetado» más abajo). `package.json`
+apunta su entrada `main` a ese `dist/main.cjs`, y `desktop:dev`/`start` reconstruyen
+precarga y proceso principal antes de lanzar Electron, así que nunca se ejecuta
+código viejo salvo que se edite `electron/*.cjs` con la aplicación ya abierta:
+reiniciar `desktop:dev` es lo que recompila.
 El origen empaquetado es `livefy://renderer`; el esquema se registra antes de
 readiness y sirve solo archivos contenidos en dist, incluyendo comprobación de
 rutas reales. Desarrollo usa `http://127.0.0.1:5173`.
@@ -342,6 +347,9 @@ cd apps/desktop
 bun run start
 ```
 
+`bun run start` reconstruye `dist/preload.cjs` y `dist/main.cjs` antes de abrir
+Electron.
+
 En desarrollo, utiliza dos terminales en `apps/desktop`:
 
 ```sh
@@ -354,7 +362,9 @@ bun run dev
 bun run desktop:dev
 ```
 
-`dev` inicia solamente Vite; Electron se inicia con `desktop:dev`. Desde la raíz, `bun run dev` coordina la tarea Vite mediante Turborepo, sin iniciar Electron.
+`dev` inicia solamente Vite; Electron se inicia con `desktop:dev`, que
+reconstruye la precarga y el proceso principal antes de lanzar Electron contra el
+servidor de desarrollo. Desde la raíz, `bun run dev` coordina la tarea Vite mediante Turborepo, sin iniciar Electron.
 
 El renderizador utiliza la transformación JSX de Vite sin el preámbulo de Fast Refresh para restringir los scripts de la CSP a archivos locales. TanStack Router usa historial en memoria iniciado en `/`; el fragmento queda
 reservado a Clerk. Navegar a `/app` no modifica el hash. El cambio aceptado por el
@@ -371,6 +381,12 @@ Instalador, firma de código, MSIX/Store y actualización automática quedan
 deliberadamente fuera: son una decisión de distribución separada y no están
 configurados aquí. Nada de esta sección se ejecutó en el host Linux de autoría;
 ver «Lo que no se verificó» al final.
+
+El paquete es **autocontenido**: no lleva `node_modules`. El renderizador lo
+empaqueta Vite y los procesos principal y de precarga se empaquetan en
+`dist/main.cjs` y `dist/preload.cjs` (ver «Proceso principal empaquetado»), así
+que en tiempo de ejecución solo se resuelven `electron` (lo aporta el propio
+runtime) y módulos nativos de Node.
 
 ### Herramienta y versiones
 
@@ -389,7 +405,8 @@ cd apps\desktop
 bun run dist:win
 ```
 
-`dist:win` ejecuta `vite build` (incluye `dist/preload.cjs`) y después
+`dist:win` ejecuta `vite build` (renderizador en `dist/index.html` + `assets/`),
+los dos empaquetados de proceso (`dist/preload.cjs` y `dist/main.cjs`) y después
 `electron-builder --win`, que aplica los dos objetivos del archivo de
 configuración y produce:
 
@@ -416,28 +433,89 @@ el `.exe` portable. No existe ningún paso de publicación ni de actualización.
 
 ### Qué contiene el paquete
 
-`electron-builder.yml` declara solo archivos de ejecución; electron-builder añade
-por su cuenta el árbol `node_modules` de **dependencias de producción** (nunca
-`devDependencies`):
+`electron-builder.yml` declara solo archivos de ejecución y el paquete no lleva
+árbol de `node_modules`. electron-builder recolecta `node_modules` únicamente a
+partir del campo `dependencies` de `package.json` (nunca de `devDependencies`), y
+este `package.json` ya no declara dependencias de producción: todo lo que necesita
+el build está en `devDependencies` porque se inlinea al compilar.
 
 | Entra | Por qué |
 | --- | --- |
-| `package.json` | metadatos y `main: electron/main.cjs` |
-| `electron/*.cjs` | proceso principal: `main`, `protocol`, `csp-policy`, `security`, `clerk-storage` y `preload` fuente |
-| `dist/**/*` | renderizador compilado servido por `livefy://renderer/` y `dist/preload.cjs` que carga `main.cjs` |
-| `node_modules` de producción | dependencias de ejecución (`@clerk/electron`, `electron-store`, …) |
+| `package.json` | metadatos y entrada `main: dist/main.cjs` |
+| `dist/index.html` + `dist/assets/**` | renderizador compilado servido por `livefy://renderer/` |
+| `dist/main.cjs` | proceso principal empaquetado (incluye `@clerk/electron`, `electron-store`, `protocol`, `csp-policy`, `security`, `clerk-storage`) |
+| `dist/preload.cjs` | precarga empaquetada que carga `main.cjs` |
+| `node_modules` | **no entra** |
 
 No entran `src/`, `index.html`, `vite.config.ts`, `csp.test.ts`, el backend
-remoto `convex/`, `scripts/`, `electron/build-preload.mjs` ni ningún `*.test.*`.
-La regla práctica: un módulo nuevo del proceso principal se empaqueta solo si es
-`electron/*.cjs`; un script de compilación (`.mjs`) o una prueba (`.test.js`) no
-se empaqueta aunque viva en `electron/`.
+remoto `convex/`, `scripts/`, los scripts de compilación (`electron/build-*.mjs`),
+las fuentes sin empaquetar `electron/*.cjs` ni ningún `*.test.*`.
+
+La reducción esperada frente al paquete anterior es de unos **260 MB** en
+`win-unpacked` (de ~607 MB medidos a ~345 MB, antes de comprimir), porque
+desaparece `resources/app/node_modules` — los ~300 paquetes de producción — y en
+su lugar quedan los ~418 kB de `dist/main.cjs`. La cifra exacta depende de
+comprobaciones de Windows y de la compresión del objetivo `portable`, así que se
+confirma midiendo el artefacto, no aquí.
+
+Para verificar el autocontenido del artefacto sin abrirlo, basta inspeccionar
+`resources/app/node_modules` (no debe existir) y comprobar que `resources/app`
+solo contiene `package.json` y `dist/`. En el árbol de fuentes, el equivalente es:
+
+```sh
+# solo debe listar electron y builtins de Node (path, fs, crypto, …)
+grep -oE 'require\("[^"]+"\)' dist/main.cjs | sort -u
+```
+
+Las apariciones de `require("ajv/…")` que ese `grep` muestra son parte de
+cadenas de código generado de ajv (`x.code = 'require("ajv/dist/runtime/equal")'`),
+no llamadas que se resuelvan aquí: los módulos de runtime de ajv sí están
+inlineados. La comprobación real de resolución es cargar `dist/main.cjs` con un
+`require` que lance ante cualquier especificador que no sea `electron` ni un
+builtin de Node; el arranque crea la ventana sobre `livefy://renderer/` y registra
+los canales de Clerk y `livefy:session-*` sin tocar otro paquete.
+
+### Proceso principal empaquetado (`electron/build-main.mjs`)
+
+`electron/build-main.mjs` compila `electron/main.cjs` a **`dist/main.cjs`**, igual
+que `build-preload.mjs` compila la precarga. Rollup inlinea los módulos hermanos
+(`protocol.cjs`, `csp-policy.cjs`, `security.cjs`, `clerk-storage.cjs`),
+`@clerk/electron` y `electron-store` con su árbol de dependencias. Quedan externos
+solo `electron` y los builtins de Node, así que el paquete no necesita
+`node_modules` en ninguna ruta de ejecución.
+
+- `package.json` declara `main: dist/main.cjs`; el paquete y el arranque local
+  (`bun run start`) usan el mismo archivo.
+- `desktop:dev` y `start` ejecutan primero `node electron/build-preload.mjs` y
+  después `node electron/build-main.mjs`, antes de `electron .`, de modo que
+  nunca se lanza el bundle de una compilación anterior. Editar `electron/*.cjs`
+  con la aplicación abierta no recarga nada: hay que reiniciar `desktop:dev`,
+  que recompila.
+- Los caminos derivados de `__dirname` siguen siendo válidos y quedan explícitos
+  en `main.cjs:14`: `distDir = path.resolve(__dirname, '../dist')`. La fuente vive
+  en `electron/main.cjs` y el bundle en `dist/main.cjs`, ambos exactamente un
+  nivel por debajo de `dist`, así que el renderizador y la precarga se resuelven
+  en el mismo directorio en las dos disposiciones; el directorio de la
+  aplicación sigue siendo el padre de `__dirname` (`main.cjs:33-39`). Ningún camino
+  depende ya de `electron/` dentro del paquete.
+- `@clerk/electron` importa dinámicamente su peer nativo opcional
+  `@clerk/electron-passkeys` solo en la ruta `createClerkBridge({ passkeys: true })`.
+  Esta aplicación nunca habilita passkeys y el paquete no está instalado, así que
+  el build lo sustituye por un módulo inerte que informa «no disponible» en lugar
+  de dejar un especificador suelto en el bundle. Habilitar passkeys nativas más
+  adelante requiere instalar el paquete y quitar ese stub; no hay binarios
+  nativos, rutas de asset ni `require` dinámicos de otra dependencia en el
+  bundle (verificado con el arranque descrito arriba).
+- `electron-store`/`conf` arrastran ajv. ajv genera validadores con `new Function`
+  solo si se le pasa un `schema`; este código crea el store sin `schema`, así que
+  esa ruta no se ejecuta. En el proceso principal `new Function` no está sujeto a
+  CSP (la CSP es del renderizador y no cambia).
 
 ### Decisión sobre asar: archivo deshabilitado (`asar: false`)
 
-`electron/main.cjs:10` calcula el documento de entrada como
-`path.join(__dirname, '../dist/index.html')` y entrega a `protocol.cjs` el
-directorio `dist` (`main.cjs:56`). `electron/protocol.cjs:39-41` exige que
+La entrada empaquetada calcula la raíz del renderizador en `main.cjs:14` como
+`path.resolve(__dirname, '../dist')` y entrega ese directorio a `protocol.cjs`
+(`main.cjs:62`). `electron/protocol.cjs:39-41` exige que
 `fs.realpath(root)` y `fs.realpath(target)` compartan ancestro (`path.relative`
 no puede empezar por `..` ni ser absoluto) y solo después pasa la ruta real a
 `net.fetch(pathToFileURL(file).href)` (`protocol.cjs:42`). Esa comprobación es la
@@ -450,7 +528,7 @@ repositorio, y `asarUnpack` no elimina el problema sino que lo agrava — el
 archivo conserva la ruta virtual `app.asar/dist/...` mientras los bytes viven en
 `app.asar.unpacked/dist/...`, justo el caso que el cálculo de ancestro común
 rechaza. Si esa comprobación falla, cada respuesta del renderizador es 403/404 y
-`main.cjs:49-52` cierra la aplicación: el empaquetado no arrancaría.
+`main.cjs:54-58` cierra la aplicación: el empaquetado no arrancaría.
 
 Por eso este objetivo de validación usa `asar: false` y el paquete queda como un
 árbol de archivos idéntico al que el código ya sirve hoy desde disco. Habilitar
@@ -464,6 +542,14 @@ los ajustes de seguridad.
 Registrar modo y artefacto (`win-unpacked` o `portable`), versión y resultado de
 cada paso; no marcar aceptado un paso no observado.
 
+0. **Contenido del paquete**: `dir apps\desktop\release\win-unpacked\resources\app`
+   debe listar solo `dist` y `package.json`; `dir ...\resources\app\node_modules`
+   debe fallar con «no se encuentra». Si `node_modules` existe, el `package.json`
+   empaquetado volvió a declarar `dependencies` de producción. Para el objetivo
+   `portable`, copiar el `.exe` fuera del workspace (por ejemplo `C:\Temp`) y
+   ejecutarlo desde ahí: antes fallaba con `Cannot find module
+   '@clerk/electron'` justamente por depender del `node_modules` izado del
+   workspace, así que este paso es el que prueba el autocontenido.
 1. **Arranque**: la ventana abre el renderizador y no aparece
    «Unable to load the local Livefy renderer». Si aparece, el paquete no cargó
    `livefy://renderer/` desde `dist` y la validación se detiene aquí.
@@ -488,14 +574,19 @@ cada paso; no marcar aceptado un paso no observado.
 
 ### Límites de un build portable
 
+- El paquete ya es autocontenido: `portable` extrae el árbol en `%TEMP%` y, como
+  no depende de un `node_modules` ajeno al artefacto, resuelve `dist/main.cjs` y
+  sus dependencias inlineadas desde su propia ruta temporal. Comprobado aquí solo
+  por construcción (build + verificación de resolución), no por ejecución
+  Windows.
 - No hay registro `livefy://` a nivel de sistema sin instalador. `@clerk/electron`
   registra el esquema para el ejecutable en tiempo de arranque
-  (`node_modules/@clerk/electron/dist/cjs/index.js:89`) y `main.cjs:27-33` solo
-  añade el directorio de la app cuando corre en modo desarrollo. El objetivo
-  `portable` se autoextrae en `%TEMP%` en cada ejecución, de modo que cualquier
-  registro apuntaría a una ruta volátil. **El retorno de OAuth por deep link
-  sigue siendo solo de desarrollo** y no se valida con este paquete; definir la
-  distribución (instalador) es otra decisión.
+  (`node_modules/@clerk/electron/dist/cjs/index.js:89`, ahora inlineado en
+  `dist/main.cjs`) y `main.cjs:33-39` solo añade el directorio de la app cuando
+  corre en modo desarrollo. El objetivo `portable` se autoextrae en `%TEMP%` en
+  cada ejecución, de modo que cualquier registro apuntaría a una ruta volátil.
+  **El retorno de OAuth por deep link sigue siendo solo de desarrollo** y no se
+  valida con este paquete; definir la distribución (instalador) es otra decisión.
 - `portable` extrae el árbol en cada arranque: el primer inicio es más lento que
   `win-unpacked` y consume espacio temporal. Para validar contenido y rendimiento
   de arranque usar `win-unpacked`; `portable` solo confirma que el ejecutable
@@ -518,15 +609,19 @@ queda corregida por esta observación.
 
 El host de autoría es Linux/WSL sin wine ni Windows, y la tarea prohíbe explícitamente
 producir el artefacto. Verificado aquí: el archivo de configuración carga con el
-cargador real de electron-builder y pasa su validación de esquema, los objetivos
-resueltos son `dir` y `portable` para x64, la versión de Electron resuelta es
-41.10.7, y `test`/`typecheck`/`build` siguen verdes en este host. **No** verificado
-aquí: que el `.exe` resultante arranque, el contenido final del paquete (incluida
-la recolección de `node_modules` de producción en un workspace con dependencias
-izadas: esta versión de electron-builder trae un colector específico de bun por
-recorrido de archivos, `out/node-module-collector/bunNodeModulesCollector.js`, y
-un respaldo por recorrido en `out/util/appFileCopier.js:305-320`, pero ninguno se
-ejecutó aquí), la cabecera CSP en la ventana empaquetada ni ningún paso del
+cargador real de electron-builder y pasa su validación de esquema (`files` resuelto
+a `package.json` + `dist/**/*`, sin `node_modules`), los objetivos resueltos son
+`dir` y `portable` para x64, la versión de Electron resuelta es 41.10.7, y
+`test`/`typecheck`/`build` siguen verdes en este host, con `dist/main.cjs`
+cargable por `node --check` y arrancando sobre `livefy://renderer/` con un
+`require` que rechaza cualquier especificador que no sea `electron` o un builtin.
+**No** verificado aquí: que el `.exe` resultante arranque, el tamaño final y el
+contenido real de `resources/app` (en un workspace con dependencias izadas esta
+versión de electron-builder trae un colector específico de bun por recorrido de
+archivos, `out/node-module-collector/bunNodeModulesCollector.js`, y un respaldo
+por recorrido en `out/util/appFileCopier.js:305-320`; el paquete ya no declara
+dependencias de producción, así que el colector no tiene nada que recolectar, pero
+no se ejecutó), la cabecera CSP en la ventana empaquetada ni ningún paso del
 checklist anterior. Todo eso pertenece a la ejecución Windows de H1.12.
 
 ## Seguridad y límites de verificación

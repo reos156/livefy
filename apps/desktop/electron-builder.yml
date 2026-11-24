@@ -4,15 +4,15 @@
 # Installer targets, code signing, MSIX/Store and auto-update are deliberately
 # absent; they belong to a separate distribution decision.
 #
-# asar is disabled on purpose. electron/main.cjs resolves the renderer root as
-# `path.join(__dirname, '../dist')` (main.cjs:10,56) and electron/protocol.cjs
-# requires `fs.realpath(root)` and `fs.realpath(target)` to share a common
-# ancestor (protocol.cjs:39-41) before handing the real path to
+# asar is disabled on purpose. The packaged entry dist/main.cjs resolves the
+# renderer root as `path.resolve(__dirname, '../dist')` (main.cjs:14,62) and
+# electron/protocol.cjs requires `fs.realpath(root)` and `fs.realpath(target)` to
+# share a common ancestor (protocol.cjs:39-41) before handing the real path to
 # `net.fetch(file://…)` (protocol.cjs:42). Inside an asar archive both of those
 # are archive-virtual paths, and the containment check is what keeps the
 # renderer from serving a file outside dist. Neither `asar: true` nor
 # `asarUnpack` can be proven from the sources in this repository, and a wrong
-# guess makes every renderer response 403/404 and quits the app (main.cjs:49-52).
+# guess makes every renderer response 403/404 and quits the app (main.cjs:54-58).
 # Keeping the archive off makes the packaged tree identical to the on-disk tree
 # the current code already serves. Re-enabling it is a code change in
 # protocol.cjs plus a packaged Windows run, not a configuration toggle.
@@ -25,14 +25,25 @@ asar: false
 directories:
   output: release
 
-# Only runtime files plus the production node_modules tree electron-builder
-# collects on its own. Renderer sources (src/, index.html, vite.config.ts,
-# csp.test.ts), the remote backend (convex/), verification scripts (scripts/),
-# the preload build script and every *.test.js stay out of the package.
+# Runtime payload only, and deliberately no node_modules: both the renderer
+# (Vite) and the main process (electron/build-main.mjs) are bundled into dist,
+# so nothing is resolved from a package tree at runtime. `package.json` stays
+# for the entry point (`main: dist/main.cjs`) and the app metadata.
+#
+# `app/desktop/package.json` accordingly declares no production `dependencies`:
+# electron-builder collects `node_modules` from that field only (never from
+# devDependencies), so an empty production set is what keeps the tree out.
+# Every package the build needs — React/Convex for the renderer, @clerk/electron
+# and electron-store for the main and preload bundles — is a devDependency
+# because it is inlined at build time.
+#
+# Renderer sources (src/, index.html, vite.config.ts, csp.test.ts), the remote
+# backend (convex/), verification scripts (scripts/), both build scripts
+# (electron/build-*.mjs), the unbundled main sources (electron/*.cjs) and every
+# *.test.* file stay out of the package.
 files:
   - package.json
   - dist/**/*
-  - electron/*.cjs
 
 win:
   target:
