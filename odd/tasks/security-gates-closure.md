@@ -50,15 +50,26 @@ signed JWT negatives (`mvp-h1-access-windows.md:257`), production CSP delivery
   Commit: pending.
 - T4 — route gentle-ai-verify. Independent verification of T1–T3 (Risk item 2 and
   item 3 apply). Not optional.
-- T5 (S1, S2) — BLOCKED on an interactive CLI login. The audience case is
-  authorized: a JWT template with a different `aud` in the DEV instance, no second
-  instance. It needs two things in order: (a) S9, the attested mint path, without
-  which even a genuinely signed token still reports pending; (b) `clerk auth
-  login`, because the CLI is unauthenticated and `.env.local` is blocked by the
-  safety policy, so no secret key is reachable. S2 stays open by explicit
-  decision: without a second instance there is no genuinely signed foreign issuer
-  to test, and the record must say so rather than implying the issuer pin is
-  verified.
+- T5 (S1, S2) — IN PROGRESS. Clerk CLI authenticated (DEV, the only app/instance).
+  The authorized audience case exists: template `livefy-h1-2c-wrong-aud`
+  (`jtmp_3MXHKSGkp6QoTj6qc22lenb5Pqa`, claims `{"aud":"livefy-h1-2c-wrong-aud"}`,
+  RS256, Clerk's own signing key) and S9, the attested mint path, is implemented
+  and verified. What remains is the live execution, which needs a controlled
+  fixture mailbox: it creates and revokes a real user. Operator command, after
+  exporting nothing that holds `CONVEX_DEPLOY_KEY`, `CONVEX_SELF_HOSTED_ADMIN_KEY`
+  or `CONVEX_SELF_HOSTED_URL`:
+
+  ```sh
+  H1_2C_FIXTURE_EMAIL='<controlled-mailbox>' \
+  H1_2C_WRONG_AUDIENCE_TEMPLATE='livefy-h1-2c-wrong-aud' \
+  node apps/desktop/scripts/verify-clerk-dev.mjs --one-authorized-fixture
+  ```
+
+  Expected success line reports `wrongIssuer` pending and
+  `wrongAudience: rejected: attested wrong-audience token refused by the query`.
+  S2 stays open by explicit decision: without a second instance there is no
+  genuinely signed foreign issuer to test, and the record must say so rather than
+  implying the issuer pin is verified.
 
 ## Allowed edit surfaces
 
@@ -131,6 +142,25 @@ Per task, held by the writer that owns it, narrow and disjoint:
   so the candidate is a commit range. Follow-ups recorded, not fixed here: only
   `script-src` is pinned exactly (an origin added to `connect-src` would not fail
   that assertion), and S1/S2 stay open until T5.
+- **L9** S9 implemented after the human authenticated the Clerk CLI. Template
+  `livefy-h1-2c-wrong-aud` created in the single DEV instance (no production
+  instance exists, so the target was unambiguous). The script now mints its own
+  wrong-audience token through that named template on the fixture session
+  (`POST /sessions/{session_id}/tokens/{template_name}`), and only that path may
+  report `rejected: attested wrong-audience token refused by the query`; the
+  environment-supplied path still returns pending plus the unverified-provenance
+  suffix. Independent verification (`mwu4h5hh-2-0ggz`) found no blocker: it could
+  not reach the attested verdict from any supplied token, the conflict guard runs
+  before the transport is marked used, the configured-issuer and foreign-audience
+  checks cannot be satisfied by a caller-controlled value, and a foreign-issuer or
+  `convex`-auditing template fails closed at stage `attested-negative` instead of
+  reporting. 377 tests, `tsc --noEmit` exit 0. Advisories recorded, not fixed:
+  the verdict attests that the query refused a wrong-audience token, not that the
+  audience was the reason for the refusal (mitigated, not eliminated, by the
+  same-session accepted-versus-refused differential); the read-only platform
+  preflight runs before the conflict guard; and three verifier probes worth adding
+  are listed in its report (conflict must not consume the single-use transport,
+  foreign-issuer fail-closed, conflict exits 1).
 
 ## Delivery
 
