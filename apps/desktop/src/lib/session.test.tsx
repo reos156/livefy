@@ -1,0 +1,128 @@
+import { fireEvent, render, screen, act, cleanup } from '@testing-library/react'
+import { expect, it, vi, afterEach } from 'vitest'
+import { SessionBoundary, LogoutButton, SessionInfrastructure, SessionContent } from './session'
+import { useEffect } from 'react'
+afterEach(cleanup)
+
+it('unmounts gated consumers but retains browser navigation infrastructure during failure and retry', async () => {
+  const consumerUnmount = vi.fn(), infrastructureUnmount = vi.fn()
+  let finish!: () => void
+  const logout = vi.fn().mockRejectedValueOnce(new Error('failure')).mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve }))
+  function Consumer() {
+    useEffect(() => consumerUnmount, [])
+    return <><p>Private consumer</p><LogoutButton /></>
+  }
+  function Infrastructure() {
+    useEffect(() => infrastructureUnmount, [])
+    return <SessionContent><Consumer /></SessionContent>
+  }
+  render(<SessionInfrastructure><SessionBoundary browser logout={logout} completedContent={<p>Waiting</p>}><Infrastructure /></SessionBoundary></SessionInfrastructure>)
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Sign out' })))
+  expect(consumerUnmount).toHaveBeenCalledOnce()
+  expect(infrastructureUnmount).not.toHaveBeenCalled()
+  expect(screen.queryByText('Private consumer')).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'Retry sign-out' }))
+  await act(async () => finish())
+  expect(screen.getByText('Waiting')).toBeTruthy()
+  expect(infrastructureUnmount).not.toHaveBeenCalled()
+  expect(screen.queryByText('Private consumer')).toBeNull()
+})
+
+function expectLogoutShell(title: string) {
+  const main = screen.getByRole('main')
+  expect(main.classList.contains('visual-shell')).toBe(true)
+  expect(screen.getByRole('heading', { level: 1, name: title }).closest('main')).toBe(main)
+  expect(main.querySelector('.visual-content')?.contains(screen.getByText(/Remote session revocation is unconfirmed/))).toBe(true)
+}
+
+it.each(['pending', 'ended', 'failed'] as const)('gives %s logout the shared shell and heading', async state => {
+  const logout = () => state === 'pending' ? new Promise<void>(() => {})
+    : state === 'failed' ? Promise.reject(new Error('failure')) : Promise.resolve()
+  render(<SessionBoundary logout={logout}><LogoutButton /></SessionBoundary>)
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Sign out' })))
+  expectLogoutShell({ pending: 'Signing out', ended: 'Signed out', failed: 'Sign-out incomplete' }[state])
+})
+
+it('shows no intermediate surface while the browser signs out', async () => {
+  const logout = vi.fn(() => new Promise<void>(() => {}))
+  render(<SessionBoundary browser logout={logout}><p>Private content</p><LogoutButton /></SessionBoundary>)
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Sign out' })))
+  expect(logout).toHaveBeenCalledOnce()
+  expect(screen.queryByText('Private content')).toBeNull()
+  expect(screen.queryByText('Signing out locally…')).toBeNull()
+  expect(screen.queryByRole('heading', { level: 1, name: 'Signing out' })).toBeNull()
+  expect(screen.queryByRole('main')).toBeNull()
+  // Announced, never flashed: the wait stays in the accessibility tree.
+  const status = screen.getByRole('status')
+  expect(status.textContent).toBe('Signing out')
+  expect(status.classList.contains('sr-only')).toBe(true)
+})
+it('shows no ended surface in the browser once the session is gone', async () => {
+  render(<SessionBoundary browser completedContent={<p>Waiting</p>} logout={() => Promise.resolve()}>
+    <p>Private content</p><LogoutButton />
+  </SessionBoundary>)
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Sign out' })))
+  expect(screen.getByText('Waiting')).toBeTruthy()
+  expect(screen.queryByText('Signed out on this device.')).toBeNull()
+  expect(screen.queryByRole('heading', { level: 1, name: 'Signed out' })).toBeNull()
+  expect(screen.queryByText('Private content')).toBeNull()
+})
+it('keeps the browser sign-out failure destructive with its retry action', async () => {
+  const logout = vi.fn().mockRejectedValue(new Error('failure'))
+  render(<SessionBoundary browser logout={logout}><p>Private content</p><LogoutButton /></SessionBoundary>)
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Sign out' })))
+  const alert = screen.getByRole('alert')
+  expect(alert.classList.contains('text-destructive')).toBe(true)
+  expect(alert.textContent).toBe('Sign-out incomplete. Private access remains blocked.')
+  expect(screen.queryByText('Private content')).toBeNull()
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Retry sign-out' })))
+  expect(logout).toHaveBeenCalledTimes(2)
+})
+it('excludes access immediately, excludes duplicates and confirms only native completion', async () => {
+  let finish!: () => void
+  const logout = vi.fn(() => new Promise<void>(resolve => { finish = resolve }))
+  render(<SessionBoundary logout={logout}><p>Private content</p><LogoutButton /></SessionBoundary>)
+  const button = screen.getByRole('button', { name: 'Sign out' })
+  fireEvent.click(button)
+  fireEvent.click(button)
+  expect(logout).toHaveBeenCalledTimes(1)
+  expect(screen.queryByText('Private content')).toBeNull()
+  expect(screen.queryByText('Signed out on this device.')).toBeNull()
+  await act(async () => finish())
+  expect(screen.getByText('Signed out on this device.')).toBeTruthy()
+  expect(screen.getByText(/Remote session revocation is unconfirmed/)).toBeTruthy()
+  expect(screen.getByText(/Livefy closes automatically/)).toBeTruthy()
+  expect(screen.queryByText(/close Livefy completely/)).toBeNull()
+})
+it('presents failed logout with the official destructive Alert and exact description', async () => {
+  render(<SessionBoundary logout={() => Promise.reject(new Error('failure'))}><LogoutButton /></SessionBoundary>)
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Sign out' })))
+  const alert = screen.getByRole('alert')
+  expect(alert.getAttribute('data-slot')).toBe('alert')
+  expect(alert.classList.contains('text-destructive')).toBe(true)
+  expect(alert.querySelector('[data-slot="alert-description"]')?.textContent).toBe(
+    'Local sign-out incomplete; restart exclusion is not confirmed. Private access remains blocked.',
+  )
+  expect(screen.getAllByRole('alert')).toHaveLength(1)
+})
+
+it('keeps access excluded on failure and supports a safe deletion retry', async () => {
+  const logout = vi.fn().mockRejectedValueOnce(new Error('secret detail')).mockResolvedValue(undefined)
+  render(<SessionBoundary logout={logout}><p>Private content</p><LogoutButton /></SessionBoundary>)
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Sign out' })))
+  expect(screen.queryByText('Private content')).toBeNull()
+  expect(screen.queryByText(/secret detail/)).toBeNull()
+  expect(screen.getByRole('alert').textContent).toContain('restart exclusion is not confirmed')
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Retry local sign-out' })))
+  expect(screen.getByText('Signed out on this device.')).toBeTruthy()
+})
+
+it.each(['ended', 'failed'] as const)('discloses unconfirmed remote revocation exactly when the %s sign-out cannot confirm it', async outcome => {
+  // Offline: the remote removal is never confirmed, whether local deletion settles or fails.
+  const logout = outcome === 'failed' ? vi.fn().mockRejectedValue(new Error('offline')) : vi.fn().mockResolvedValue(undefined)
+  render(<SessionBoundary logout={logout}><p>Private content</p><LogoutButton /></SessionBoundary>)
+  await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Sign out' })))
+  expect(screen.queryByText('Private content')).toBeNull()
+  expect(screen.getByText('Remote session revocation is unconfirmed, including when offline.')).toBeTruthy()
+  expect(screen.queryByText(/session survives restart|revocation confirmed/i)).toBeNull()
+})

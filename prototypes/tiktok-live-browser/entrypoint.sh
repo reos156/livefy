@@ -14,22 +14,35 @@ done
 pactl set-default-sink tiktok_sink 2>/dev/null || echo "Aviso: no se pudo establecer sink"
 
 echo "Iniciando Xvfb..."
-Xvfb $DISPLAY -screen 0 ${SCREEN_RESOLUTION}x24 &
+Xvfb "$DISPLAY" -screen 0 "${SCREEN_RESOLUTION}x24" &
 for i in $(seq 1 10); do
-    if xdpyinfo -display $DISPLAY >/dev/null 2>&1; then echo "Xvfb listo."; break; fi
+    if xdpyinfo -display "$DISPLAY" >/dev/null 2>&1; then echo "Xvfb listo."; break; fi
     sleep 1
 done
 
-fluxbox -display $DISPLAY &
+fluxbox -display "$DISPLAY" &
+
+# Keep the X server available only to its root-owned clients and Chromium.
+xhost +SI:localuser:root +SI:localuser:chromium
 
 echo "Iniciando Chrome..."
 export PULSE_SINK=tiktok_sink
-chromium --no-sandbox --disable-gpu \
+runuser --user chromium -- env \
+    HOME=/home/chromium \
+    XDG_CONFIG_HOME=/home/chromium/.config \
+    XDG_CACHE_HOME=/home/chromium/.cache \
+    DISPLAY="$DISPLAY" \
+    SCREEN_RESOLUTION="$SCREEN_RESOLUTION" \
+    PULSE_SERVER="$PULSE_SERVER" \
+    PULSE_SINK="$PULSE_SINK" \
+    chromium --disable-gpu \
+         --disable-setuid-sandbox \
          --disable-dbus --disable-notifications \
          --alsa-output-device=default \
-         --window-size=${SCREEN_RESOLUTION} \
+         --user-data-dir=/home/chromium/profile \
+         --window-size="$SCREEN_RESOLUTION" \
          --app=https://www.tiktok.com/@jdenglish20/live \
-         --display=$DISPLAY &
+         --display="$DISPLAY" &
 
 sleep 5
 

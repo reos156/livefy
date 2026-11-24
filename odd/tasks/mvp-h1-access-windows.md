@@ -1,0 +1,419 @@
+# MVP H1 — Windows access and account recovery
+
+## Objective
+Deliver free email/password registration, sign-in, protected navigation, session persistence, sign-out, and email password recovery in the Windows Electron application.
+
+## Latest authorized override — H1.7 MVP acceptance and official recovery
+
+This documentation-only amendment supersedes conflicting pending/scope statements
+below, without rewriting their historical evidence or delivery status.
+
+- **H1.7 accepted for MVP by explicit human acceptance**, using existing narrow
+  IPC, sandbox/isolation, guarded navigation/origin, Convex token-trust and
+  backend-authoritative access evidence, together with the current official Clerk
+  UI and existing Google DEV evidence. These are accepted existing observations,
+  not fresh verification in this amendment; Google DEV evidence does not certify
+  production OAuth or waive provider/packaged prerequisites.
+- Actual Electron boundary attestation is **deferred by the user**, not passed.
+  No blanket guarantee of credential safety, absence of passwords/tokens from all
+  logs/IPC, or production security certification is claimed. Genuine signed
+  wrong-issuer/wrong-audience negatives (with positive controls, attribution and
+  scoped cleanup) and production CSP verification remain mandatory preproduction
+  gates, **not waived for publishing**. Any execution or mutation needs separate
+  bounded authorization.
+- **H1.8 remains pending**: validate visibility/accessibility of the recovery entry
+  in the current official Clerk screens and access to the provider-managed flow.
+  A missing recovery option is a hypothesis, not an observed defect. Clerk owns
+  recovery; no custom request/reset UI or separate Resend implementation is
+  authorized by this amendment.
+- Historical H1.9–H1.10 implementation obligations consolidate into H1.8 as
+  **superseded, not passed**. Their IDs and historical criteria remain below for
+  traceability; this is no claim of delivered reset email, successful reset or
+  negative-challenge coverage. H1.11/H1.12 remain open with their real Windows,
+  failure-case, packaged and production prerequisites; theme tasks are unchanged.
+
+No new tests, runtime checks, services, issues, commits or publishing were performed
+or authorized here. This passive amendment has no meaningful behavioral RED;
+validation is limited to document structure and scoped diff checks.
+
+## Mandatory architecture — Electron first, future web
+
+This authorized amendment governs **all future implementation**, starting with H1.4; it does not reopen or rerun H1.1–H1.3. Their accepted access/registration evidence remains desktop-only, with its recorded gaps. The checklist and Windows acceptance below are unchanged.
+
+The initial MVP delivers video, products and events in Electron. A later responsive browser client delivers products/events **without a video viewer**. No noVNC restoration, browser deployment or cloud runner deployment is authorized now. The [current scope](../../docs/livefy-scope-mvp_20260928.md#arquitectura-obligatoria--electron-primero-web-futura) defines the mandatory boundaries and phased acceptance; the [20260925 scope](../../docs/livefy-scope-mvp_20260925.md) is historical context only. The [architecture task](electron-first-web-ready.md) authorizes documentation, not runtime changes.
+
+### Implementation boundaries for H1.4 onward
+
+- MUST share frontend screens, route definitions, UI, state and product behavior; do not create separate desktop/web screens or duplicate business logic. Convex remains business authority.
+- MUST keep Electron/Node imports out of shared frontend. Isolate native capabilities, secure storage, process supervision and video in platform adapters/shell code.
+- MUST isolate preload and auth bootstrap/providers/persistence behind platform adapters. Use a narrow typed, validated and authorized bridge, not generic IPC or secret-bearing shared state. The accepted native SDK is a desktop adapter, not a required browser dependency.
+- MUST select routing history in platform entry/bootstrap, separate from shared routes, guards, UI and state. Existing hash routing/custom-protocol evidence does not certify future browser deep links or refresh behavior.
+- MUST keep remote video isolated from the product renderer and privileged bridge. Reuse must not weaken sandbox, contextIsolation, CSP, navigation or permissions; preserve recorded desktop exceptions and pending H1.7 verification, not broaden them.
+- MUST keep ingestion an independently runnable executable, initially supervised locally by Electron. Version and validate normalized events, commands, results and health contracts, including scope, correlation, compatibility, errors and sequence/idempotency semantics; do not invent provider API fields.
+- Convex MUST own business rules, persistence, authorization, idempotency and leases/epochs. Client auth UI success and producer claims are not authorization authority.
+
+### Lifecycles and future release gates
+
+Commercial live state, producer session and viewer presence MUST be separate. Closing Electron stops the **LOCAL** runner and finalizes/revokes its producer session; crashes/timeouts expose potential gaps. Closing a viewer/client does not implicitly end commercial business. “End live” is an explicit authorized business action. A future cloud producer must run independently of desktop/browser presence and require explicit start/stop/revoke controls; this is deferred, not current operational evidence.
+
+The later dual-platform release MUST target **≥90% shared owned frontend source**: source lines used by both clients divided by total owned frontend source lines across both clients, counting each file once. Include platform-specific frontend/auth adapters in the denominator; exclude dependencies, generated code and native shell. Record the inventory, classification and reproducible measurement method at that release. **No current measurement or proof exists.**
+
+| Phase | Required acceptance, not new milestone numbering |
+| --- | --- |
+| H1.4+ / Electron MVP | Execute Electron first under these boundaries and preserve each existing H1 acceptance, including Windows persistence/security/packaged gates. Scope changes still require authorization. |
+| Shared extraction and adapters | Verify shared routes/UI/state without native imports, platform auth/history isolation, standalone ingestion and versioned contract compatibility/negative cases. Do not repeat accepted H1.1–H1.3 journeys merely for this amendment. |
+| Future responsive web | Separately authorize and verify browser auth, exact origins, session persistence/logout/revocation, routing/deep links/refresh, mobile products/events without viewer and browser builds; measure ≥90% shared source. Desktop evidence does not accept these gates. |
+| Future cloud operation | Separately authorize and verify deployment, credentials, health/supervision, leases, reconnect/gaps, explicit lifecycle control, observability and recovery independently of client closure. No provider capability or cost promise is made. |
+
+These are mandatory design constraints now and deferred execution gates later, **not silent acceptance** of web authentication or cloud readiness. No service configuration, production origin expansion or new implementation authorization is implied.
+
+### Aceptación visual obligatoria para futuras pantallas
+
+Toda tarea futura de pantalla debe aplicar el [contrato visual compartido y la
+checklist Windows/DevTools](../../apps/desktop/README.md#contrato-visual-compartido-y-aceptación-de-pantallas)
+y especificar su matriz de estados, claro/oscuro y viewports: ancho **y altura**
+CSS reales del renderizador, zoom/tamaño raíz y entorno/método. Registrar cada
+caso como **aceptado, pendiente o diferido**, con evidencia y límites; todo
+diferido requiere motivo y gate/tarea de seguimiento. Las muestras 320/375/1000
+son propuestas de aceptación, no breakpoints certificados. Separar tests
+estructurales jsdom, layout de navegador y bridge/sesión Windows; incluir errores
+largos, teclado y CAPTCHA solo si se presenta realmente. No inferir aceptación
+web de resultados de escritorio.
+
+Este requisito rige tareas futuras: conserva sin cambios la aceptación histórica
+H1 y los límites de [issue #14](mvp-theme-issue-14.md); no marca nuevos casos
+aceptados ni reabre recorridos ya aceptados.
+
+## Problem and rationale
+The repository currently contains prototypes rather than an integrated product. Deliver one complete access milestone before shop setup or commerce features.
+
+## Entrega actual H1.2a–d — commits locales verificados
+
+H1.2a–d están aceptados para DEV y registrados en seis commits locales de
+`feat/mvp`: `9839db8` (pins), `456516f` (diseño de identidad), `f8fd5e5`
+(confianza del backend), `3a022e6` (verificador DEV), `d0954ff` (bridge nativo)
+y `8823782` (proveedores). El árbol final coincide exactamente con el snapshot
+verificado independientemente `c33a1840e7b9c5988ea0f2d6063f727dc4b40859`.
+**No se autorizó ni realizó push.** No se autoriza PR, cambios en main, producción
+ni cuentas nuevas. Esta corrección es solo documental: no ejecuta staging,
+commits ni cambios de worktree.
+
+### Contenido y verificación observada
+
+- Los cambios legacy H1.3 y archivos ajenos se preservaron fuera de la entrega.
+  El diff local de `apps/desktop/convex/_generated/api.d.ts` con
+  `registrationValidation` no se incorporó a los commits H1.2a–d.
+- En la raíz aislada pasó la instalación congelada (528 paquetes). Pasaron
+  78/78 tests de escritorio en 12 archivos, typecheck de escritorio, tsc del
+  backend, build sin variables de entorno, sintaxis Node y diff-check.
+  Los 22 tests legacy H1.3 (6 de registro UI y 16 de validación) quedaron excluidos;
+  los 100 tests previos del checkout sucio no son el resultado de esta entrega.
+- La ejecución funcional corresponde únicamente al snapshot final combinado,
+  no a cada commit intermedio. Advertencias no bloqueantes: `use client` y chunk
+  mayor de 500 kB. Sin deriva generada ni secretos detectados.
+- El parent completó la higiene: los 30 paths temporales sucios no ignorados
+  coincidieron byte a byte con el snapshot inmutable `8823782` antes de retirar
+  el worktree propio `verify-h12`, incluidos outputs ignorados de instalación/build.
+  La lista de worktrees contiene solo primary y mvp. La aserción inicial falló
+  antes de mutar por trim de porcelain; se corrigió con parser delimitado por NUL,
+  sin pérdida de estado.
+
+### Seis unidades locales de revisión (evidencia histórica y límites)
+
+| Unidad | Evidencia previa y límite de rollback |
+| --- | --- |
+| Pins de dependencias | Pins/peers, instalación congelada y 43 tests verificados en su momento; revertir solo manifiesto/lock de esta unidad, atendiendo a las dependencias de las unidades posteriores. |
+| Diseño de identidad aceptado | Diseño e inventarios DEV vacíos registrados; retirar/revisar la decisión documental no restaura configuración remota ni convierte sesiones Clerk en legacy. |
+| Confianza Clerk del backend | Token real válido, rechazo anónimo y limpieza propios registrados; snapshots recuperables documentados, sin afirmar un ensayo de restauración. Revertir código no revierte DEV automáticamente. |
+| Harness DEV acotado | Diagnóstico redactado, tests offline y único smoke exitoso autorizado registrados; retirar helper/tests propios, sin repetir fixtures ni tocar cuentas ajenas. |
+| Bridge nativo | Tests deterministas de almacenamiento, protocolo y precarga, con smoke visual Windows aceptado; revertir solo bridge y pruebas asociadas en coordinación con proveedores, no afirmar persistencia real. |
+| Proveedores/CSP | Tests, typechecks y build configurado previamente verificados; revertir proveedores/CSP y documentación asociada, sin modificar orígenes remotos automáticamente. |
+
+La tabla conserva evidencia previa y límites de rollback, no resultados ejecutados
+por commit intermedio. La verificación aislada observada arriba certifica solo el
+snapshot final combinado de las seis unidades.
+
+### Estado DEV y límites de aceptación
+
+El worker registró inicialización autorizada de orígenes Clerk desde `null` a
+`[http://127.0.0.1:5173, livefy://renderer]`. La verificación independiente confirmó
+el array actual exacto y Native API habilitada, no la transición histórica ni el
+número de PATCH. El valor anterior `null` está registrado para rollback, no como
+autorización de restauración automática.
+
+La captura Windows aceptada en H1.2d demuestra UI y capacidad de cifrado, no login
+ni guardado/reinicio de tokens. Permanecen pendientes H1.6 (reinicio de sesión),
+H1.7 (negativas con tokens firmados de issuer/audience incorrectos, obligatorias
+antes de producción) y H1.12 (recorrido empaquetado Windows y entitlement FREE en
+producción). No se ejecutan nuevas comprobaciones de autenticación en esta edición.
+
+**Lectura del archivo histórico:** las notas cronológicas siguientes, incluidas
+las secciones tituladas «Current plan» y «Active», conservan el estado de su momento.
+Sus pendientes y frases de falta de autorización no describen la autorización
+actual de commits locales. Ninguna autorización histórica de push prevalece sobre
+la instrucción actual de no publicar. La checklist conserva aceptación DEV y sus notas de entrega históricas;
+esta sección registra el cierre local verificado, sin publicación ni certificación
+de los recorridos Windows pendientes.
+
+## Seguimiento issue-first — registro retrospectivo publicado
+
+Jerarquía corregida por autorización explícita del usuario: [#3 — H1.2](https://github.com/reos156/livefy/issues/3)
+es el padre del contrato de sesión y transición Clerk/Convex; #4, #5, #6 y #7 son
+sub-issues nativas H1.2a–d, verificadas desde ambos extremos de la relación.
+Se amplió el título/objetivo/alcance del padre preservando su evidencia histórica.
+Todas permanecen abiertas, sin cambios de labels ni aprobación. Para tareas
+futuras, conservar la jerarquía del plan en GitHub, no aplanar sus subtareas.
+
+El usuario adoptó el flujo **issue/tarea → rama → commits coherentes de
+código, tests y documentación → push y PR autorizados → merge explícitamente
+autorizado y cierre**. Para trabajo futuro, registrar la tarea antes de implementar;
+para estas seis tareas históricas, documentar retrospectivamente la evidencia y
+las referencias existentes, sin reescribir historia ni simular una issue previa.
+
+Destino: `github.com/reos156/livefy`, cuya rama predeterminada es `main`.
+El formulario `.github/ISSUE_TEMPLATE/mvp-task.yml` fue integrado por el
+[PR #1](https://github.com/reos156/livefy/pull/1), con excepción inicial explícita
+para abrir ese PR sin issue previa y autorización separada de merge.
+Merge confirmado: `40b6ca0f75684251756c8dc548a070a6f0244a31`.
+Se crearon seis issues retrospectivas con el formulario publicado, búsqueda de
+duplicados abiertos/cerrados y readback de título, cuerpo, estado y labels.
+Todas permanecen abiertas y sin labels: no se concede aprobación ni se simula
+integración de las tareas en main. Solo se publicó la rama del formulario;
+**feat/mvp no fue publicada**. No se reescribió historia ni se modificaron credenciales.
+
+| Tarea de dominio retrospectiva | Commits existentes de referencia | Estado del registro |
+| --- | --- | --- |
+| H1.1 — Bootstrap de escritorio | `b0df6f5` | [#2](https://github.com/reos156/livefy/issues/2) abierta; commit disponible en GitHub; smoke no prueba recorrido completo. |
+| H1.2 — Contrato histórico Convex Auth | `c5d6584` | [#3](https://github.com/reos156/livefy/issues/3) abierta; commit disponible en GitHub; implementación histórica. |
+| H1.2a — Prerrequisitos nativos Clerk DEV | `9839db8` | [#4](https://github.com/reos156/livefy/issues/4) abierta; commit local; entitlement FREE producción pendiente H1.12. |
+| H1.2b — Diseño de transición de identidad | `456516f` | [#5](https://github.com/reos156/livefy/issues/5) abierta; commit local; diseño aceptado, sin ensayo de restauración. |
+| H1.2c — Confianza Clerk y verificador DEV | `f8fd5e5`, `3a022e6` | [#6](https://github.com/reos156/livefy/issues/6) abierta; commits locales; negativos firmados pendientes H1.7. |
+| H1.2d — Bridge nativo y proveedores | `d0954ff`, `8823782` | [#7](https://github.com/reos156/livefy/issues/7) abierta; commits locales; login/reinicio no certificados. |
+
+Son seis tareas de dominio, no una issue por cada commit técnico. Las referencias
+no afirman publicación ni merge: H1.2a–d tienen entrega local verificada según
+la sección anterior; las notas de publicación de H1.1/H1.2 son históricas y no
+sustituyen una verificación remota actual. Al redactar las retrospectivas, separar
+aceptación funcional, evidencia observada, fallos/diferidos y estado de entrega.
+Las secciones históricas siguientes se conservan sin modificación.
+
+## Authorized scope and constraints
+- User authorized starting H1 after approving vertical milestones.
+- Preserve Electron, React, TanStack Router, Vite, Shadcn, Convex, Turborepo and Bun Workspaces.
+- Target architecture: official Convex + Clerk integration with Clerk FREE and its native Electron SDK. Clerk owns authentication/recovery; Convex owns application data and authorization. This replaces the earlier Convex Auth/Resend plan. User authorized this planning update only; implementation and service configuration require further authorization.
+- Windows is the supported target for this phase; Linux host checks are not Windows runtime evidence.
+- The scope document is a plan, not implementation evidence. The authorized architecture-only amendment above updates it; bootstrap implementation does not authorize further scope edits.
+- Preserve pre-existing untracked files and prototypes; do not stage them implicitly.
+- No service account creation, production deployment, publishing, push or merge without explicit authorization. Commits require explicit user instruction.
+- Ask about unresolved product decisions or scope changes before implementing them.
+
+## Active H1.3 — Clerk email/password registration
+
+- User authorized proceeding with local Clerk-only registration; legacy Convex Auth contracts are not requirements. Preserve unrelated legacy backend/generated changes; no general legacy cleanup.
+- Existing-account policy: controlled safe feedback only, no automatic sign-in, transfer or activation of an existing session. Login belongs to H1.4.
+- Fresh independent read-only DEV verification matched the recorded Livefy app/instance: email/password required, signup verification requires `email_code`, public enrollment, minimum password length 15, Native API enabled and exact origins `http://127.0.0.1:5173` and `livefy://renderer`. Doctor failed for unlinked project; explicit target reads succeeded. Optional profile-field query was unavailable; do not assume extra fields are supported.
+- Installed `@clerk/electron` 0.0.51 reexports `@clerk/react` 6.17.6 signal `useSignUp` (`signUp`, `errors`, `fetchStatus`). Methods return `{ error }`; do not use the outdated Core2 recipe. Flow: password, required email-code verification, finalize only when complete; private access still requires Convex authentication.
+- Bounded source surfaces: `apps/desktop/src/registration.tsx`, `apps/desktop/src/registration.test.tsx`, `apps/desktop/src/access.tsx`, `apps/desktop/src/access.test.tsx`. Test-first covers returned/thrown errors, immediate duplicate exclusion, code retries/resend, incomplete requirements, finalization failures, existing accounts and safe copy. Run focused/full desktop tests, typecheck and build. Real email/account and Windows checks remain separately authorized and pending.
+- Issue-first prerequisite resolved by explicit user authorization: [#8 — H1.3](https://github.com/reos156/livefy/issues/8) created with the published MVP YAML form after fresh open/closed duplicate search. Exact body/title readback matched; issue OPEN, no labels or approval. Local implementation is in progress; no account/config mutations. Commit/push/PR/merge require separate explicit authorization under this project's constraints.
+
+### H1.3 password-policy adjustment — current
+
+- User manually changed Clerk minimum password length to 8 and authorized matching local behavior. Fresh explicit `auth_password` read for the previously verified instance reports `min_length: 8`, required password and strength threshold 2. This latest read does not independently re-prove environment metadata or production entitlement; prior DEV binding remains historical evidence.
+- Writer aligned registration validation, HTML minimum and controlled copy to 8 with four replacements and four tests. Observed four intended RED failures, then 25 focused and 115 full GREEN tests across 14 files; typecheck/build passed with known 27 dependency-directive and one large-chunk warnings. Native ASSESS remains unassessable (untracked scope, RDD off); independent focused verification launched. Independent followup verification found no concrete defects: 25 focused tests and typecheck passed, minimum/copy/HTML consistently 8, provider-strength rejection remains authoritative, and Git status stayed stable. Initial root-cwd test invocation failed; desktop rerun passed. Full suite/build were not independently repeated for this narrow adjustment; their 115-test/build result is writer evidence. Real Windows journey remains pending.
+- Scope remains only registration validation, HTML minimum, controlled copy and boundary tests to 8. Preserve Clerk strength enforcement; minimum length alone does not guarantee acceptance. No remote mutations, accounts or publication. Test-first: 7 rejected locally, 8 forwarded unchanged to Clerk; safe provider-strength rejection preserved. Windows journey waits for updated build.
+
+### H1.3 local writer evidence — independent verification pending
+
+- Writer replaced only the four authorized registration/access source and test files. Legacy Convex Auth semantics are not preserved; unrelated backend/generated changes remain untouched.
+- Writer observed 17 registration RED failures and an access integration RED, then 21 focused GREEN tests and 111 full tests across 14 files. Desktop typecheck and build passed with known dependency-directive/large-chunk warnings. Initial invalid test-harness import was corrected before meaningful RED.
+- Local flow uses the pinned signal API, immediate duplicate exclusion, safe returned/thrown-error handling, existing-attempt email retry, verification/resend and complete-only finalization. Existing-account policy is inform-only; backend-confirmed access gating remains authoritative.
+- Native ASSESS returned unassessable due untracked scope, RDD off; independent read-only verifier launched as required. Writer reported completed implementation, not H1.3 acceptance.
+- Independent verifier found no concrete candidate-caused defects: 21/21 focused and 111/111 full tests (14 files), desktop typecheck/build, scoped diff-check and separate untracked whitespace checks passed. Scoped/unrelated Git status was unchanged before/after. Initial root-cwd focused invocation failed because Turbo treated file paths as tasks; rerun from desktop passed. Build retained 27 ignored dependency directives and one large-chunk warning; four fixture-cleanup stderr records were expected.
+- Static inspection confirmed installed API compatibility, duplicate locks/retries, complete-only finalization, unsupported-field rejection, CAPTCHA target mounting, 15-character minimum, inform-only existing-account behavior and Convex-authoritative gating. Mocked resources do not certify native signal timing or challenge execution.
+- Real CAPTCHA execution, delivered email, actual signup/session and Windows runtime remain unverified. Unsupported additional required fields fail closed. No accounts, service changes, commits or publication performed. Local verification complete; H1.3 remains unchecked pending separately authorized real DEV/Windows acceptance and delivery.
+
+### H1.3 human runtime evidence
+
+- User reports successful real registration, incorrect email code rejected and correct code accepted, plus user visible in Clerk. Supplied application screenshot shows `Backend access confirmed` and `Encrypted session persistence`; Clerk screenshot shows a user in a development instance. Personal identifiers are deliberately omitted from this record.
+- User explicitly confirmed Windows execution and delivery of the verification code to their email. No visible CAPTCHA appeared; user considers that successful no-visible-challenge journey correct. This does not prove CAPTCHA was disabled, that no background check occurred, or that an interactive native challenge works. No abuse controls were changed. Real existing-account negative behavior remains unreported; deterministic tests cover inform-only policy.
+- This is human-observed runtime evidence, not independently replayed automation. The screenshot proves displayed backend-confirmed state, not token save/restart persistence (H1.6). Windows/email/code happy and incorrect-code paths are now human-confirmed; forced CAPTCHA challenge remains untested.
+- User subsequently accepted H1.3 DEV closure and explicitly authorized its commit and feature-branch push. No PR, merge, main mutation, account deletion or remote issue-state change is implied. Preserve the recorded untested interactive CAPTCHA and real existing-account negative; restart persistence stays in H1.6. Exact delivery manifest: four registration/access UI/test files plus this document; unrelated backend validation/generated state excluded. Clean HEAD `a42e8ea6cc12eb2952e0c2d8f85e550fa283eefe` plus only the five-file manifest passed 25 focused tests, 99 full tests in 13 files, desktop typecheck and build. Legacy validation/generated changes were excluded and are not dependencies. Initial root-cwd test failed then correct temporary desktop-cwd run passed; known directive/chunk warnings retained. Four source hashes stayed stable; document spot-check only. Practical privacy scan found synthetic fixtures only, not exhaustive. Owned audit directory cleanup was blocked by the child harness and remains pending separately; no alternate deletion attempted. Rollback boundary: revert this unit's registration UI/mount/tests and accompanying task evidence without reverting bridge/backend prerequisites. Work-unit commit created: `e83c310ae242f69b02aa7d745b88fe00ca392be1` — `feat(auth): complete Clerk email registration for H1.3`, referencing #8. Exact five-path commit contains 319 additions and 3 deletions; verified source hashes matched before staging, index had no preexisting changes, staged scope/diff-check passed. Remote push/readback pending at this documentation checkpoint. Native review was not run because the user-owned RDD switch is off; independent functional verification completed.
+
+## Future work — Social Login (outside the current MVP plan)
+
+Social Login is deferred by explicit user decision to a later MVP version. It is not a task in the current 16-item checklist and is not part of H1.3 acceptance. Future mapping: select social providers; verify plan/provider costs and production Native API entitlement; configure production OAuth credentials without shipping secrets; implement system-browser OAuth and OS deep-link return; validate exact redirect URLs and single-instance forwarding; test cancellation, errors, account linking and Windows packaged behavior. No provider activation, callback expansion or implementation is authorized now.
+
+## Checklist and acceptance
+
+> **Evidence drift note (2026-11-20).** The H1.2–H1.5 rows below record the state at their commit time. The custom registration and sign-in forms and their adapters were later retired under [Reversible Clerk auth UI variants](mvp-clerk-auth-variants.md) R0–R2, so the paths those rows cite (`src/registration.tsx` and the shared sign-in adapters) no longer exist in the tree. The current equivalents are: the official provider UI at `apps/desktop/src/platform/electron/auth-ui.tsx` and `apps/desktop/src/platform/web/auth-ui.tsx`, the Convex-backed access gate at `apps/desktop/src/access.tsx:20-38` and `apps/desktop/src/private-access.tsx:13-23`, the private route at `apps/desktop/src/routes.tsx:33-44`, and the identity contract at `apps/desktop/convex/session.ts:4` plus `apps/desktop/convex/lib/requireUser.ts:7-11`. Those rows are not re-verifiable from the retired paths; re-map them before citing them as proof.
+- [x] H1.1 — Bootstrap minimal desktop workspace. Closed in `b0df6f51119d3993c0788cc306ce354c49fff70e`. Windows launch evidence provided by user; reconstructed logical snapshot separately passed frozen install, 4 tests, typecheck and build, not a fresh Windows runtime check.
+- [x] H1.2 — Configure Convex Auth and session contract. Closed in `c5d65843b5143da0efa3704f0f82fd7d85e465ab`. Real identity/anonymous rejection and fixture cleanup passed on DEV; independent anonymous/inventory checks and 20 tests/typechecks/build passed. Windows Auth UI runtime belongs to later tasks.
+- [x] H1.2a — Verify Clerk FREE and native SDK prerequisites for DEV. Accepted by user: workspace Hobby plan reported, Native API enabled confirmed on DEV, exact compatible SDK/Electron/storage pins installed, origin/domain requirements identified, independent 43 tests/typecheck/build/frozen install passed. Production FREE entitlement explicitly deferred to H1.12, not verified. Clerk login/bridge/Windows runtime belong to later tasks. No commit performed; delivery closure pending separate authorization.
+- [x] H1.2b — Design identity and existing-account transition. User accepted clean official Convex + Clerk design: server-validated tokenIdentifier (issuer + subject), no mandatory legacy user/session mapping, empty DEV inventories and rollback strategy documented below. Design acceptance complete; no implementation or commit performed.
+- [x] H1.2c — Configure Clerk DEV and Convex token trust. Accepted for DEV with explicit user-approved deferral to H1.7: official integration, correct effective issuer/audience, real valid-token acceptance, anonymous rejection and owned fixture cleanup verified. Signed wrong-issuer/wrong-audience tests were NOT executed; mandatory before production. No commit performed; delivery closure requires separate authorization.
+- [x] H1.2d — Integrate native Electron bridge and renderer providers. Accepted complete for DEV by explicit user confirmation. Independent 100 tests, typechecks, configured build and exact DEV configuration passed; user-observed Windows UI smoke shows encrypted-storage capability, not real token persistence. Commit/delivery closure remains pending separate authorization. Acceptance: supported main/preload/storage APIs, narrow IPC, guarded renderer/window origins, isolated sandbox and ConvexProviderWithClerk; access uses backend-confirmed useConvexAuth. User accepted the documented Clerk protect.clerk.com CSP wildcard/connection-port exception, no OAuth handlers, and encrypted-only persistence with explicitly disclosed memory-only sessions when encryption is unavailable. SDK IPC main-frame checks are not per-invocation exact-origin validation.
+- [x] H1.3 — Complete Clerk registration. Accepted for DEV by user: real Windows email/password signup, delivered verification email, incorrect-code rejection, correct-code acceptance and backend access confirmed. Minimum password 8; provider strength checks retained. Safe errors, duplicate-submit control and inform-only existing-account policy covered by deterministic tests. Clean delivery snapshot passed 99 tests/typecheck/build; interactive CAPTCHA and real existing-account negative remain untested and explicitly disclosed. Feature commit/push authorized; delivery identities recorded below.
+- [x] H1.4 — Complete Clerk sign-in. Closed for DEV in 9c203db2af2d55dc33c38d9a6ecb0256123fd076: user-confirmed Windows valid login/backend access, invalid-password safe rejection and pending duplicate/form-switch exclusion; independent 53 focused/136 full tests, typecheck/build PASS. Commit/push explicitly authorized; no PR/merge or production acceptance. See mvp-h1-sign-in.md. Browser challenges and restart/logout remain outside this acceptance.
+- [x] H1.5 — Protect routes and Convex data. Accepted DEV: private /app requires Convex-confirmed access; anonymous direct navigation and Clerk revocation rejection human-confirmed on Windows; pending form switching blocked. Independent 84 focused/143 full tests, frontend/backend types and build PASS. Shared registration/login isolated from Electron through adapters. User authorized commit; see mvp-h1-route-protection.md for identity isolation and evidence. Schema empty: persisted document ownership not applicable/not certified, mandatory with first owned business resources. Browser auth and H1.6/H1.7 remain excluded.
+- [x] H1.6 — Persist and end native sessions. Closed for DEV by explicit user acceptance of Windows login/logout and authorization to commit/push. Encrypted restart restoration previously reported; automatic exit and remembered-device flow accepted after retest. Independent 194 tests/21 files, frontend/backend types, build and whitespace PASS. Commits ab7ad34 (native terminal operations), bad3c8a (logout coordination/device continuity), 6a3b786 (Device Trust continuation), all Refs #13. See mvp-h1-native-sessions.md. Separate offline, revoked-session and memory-only Windows checks remain unverified; this closure is not packaged/production/security certification.
+- [x] H1.7 — Verify desktop credential boundaries. Accepted for MVP by explicit human acceptance of existing IPC/isolation/navigation, Convex trust, current official Clerk UI and Google DEV evidence; see latest authorized override. Actual Electron boundary attestation deferred, not passed; no blanket credential-safety or production certification. Genuine signed wrong-issuer/wrong-audience negatives and production CSP remain mandatory preproduction/pre-publication gates, not waived; execution/mutations require separate bounded authorization.
+- [x] H1.8 — Validate official Clerk recovery entry. CLOSED on Windows DEV web-in-Electron (`--livefy-dev`, 127.0.0.1:5173), human-observed: the password step of the official `SignIn` renders `Forgot password?`, reachable by keyboard with a visible focus ring; the click opens the provider-managed flow inside the app (no new window, no blank surface, no `Unsupported Clerk completion target`); the code step rejects a wrong code; the flow reaches `Set new password`; `Back` returns to `#/` cleanly. The operator did not change the password. Measured flow shape: recovery is code-based and stays inside the app, so the external-URL return seam and the navigation guards were not exercised, and `form-action 'none'` does not break it because clerk-js uses fetch. Not claimed here: real email delivery, the packaged `livefy://renderer` build, and the new-password-works/old-fails criteria; those remain H1.11/H1.12. Follow-up observed, not fixed: the combined `withSignUp` flow opens on `Create your account`, so a returning operator must click `Sign in` first. Consolidates superseded H1.9–H1.10 implementation obligations; no custom recovery UI or Resend integration authorized.
+- [ ] H1.9 — Request password recovery. Superseded into H1.8, not passed; retained historical implementation criterion: usable feedback avoids account enumeration; supported provider abuse protection and error handling verified.
+- [ ] H1.10 — Complete Clerk password reset. Superseded into H1.8, not passed; retained historical implementation criterion: invalid/expired/reused challenges fail; new password works and old password fails; session policy documented and tested.
+- [x] H1.11 — Verify real registration and recovery on Windows. CLOSED on explicitly authorized DEV, human-observed: real verification and reset emails delivered to a controlled mailbox, the signup verification journey passes, the reset journey completes, the new password authenticates and the old password is refused, and the failure cases were observed (wrong code rejected, short password rejected, resend). Real Windows-registration-with-delivered-email coverage was already recorded under H1.3. The one defect this journey exposed was in the web app, not here: after a completed reset the browser sat on the waiting ring until a manual refresh, tracked and fixed in [web-reset-completion-stuck](web-reset-completion-stuck.md), including a machine-measured post-fix timeline (reset click to authenticated ~2.6s, no flash of the sign-in surface, no reload loop). Not claimed: packaged `livefy://renderer`, which remains H1.12, and the automated run used a Clerk test account, so it evidences the flow and timing, never email delivery.
+- [x] H1.12 — Verify packaged Windows access journey and retire legacy auth. DEV JOURNEY CLOSED on `release\win-unpacked\Livefy.exe` built by `bun run dist:win` at `C:\Livefy\mvp`, no dev server running, human-observed: the app starts, `location.protocol` is `livefy:`, both `fetch('livefy://renderer/')` and `fetch('/')` return the production `content-security-policy` from `protocol.cjs` (no `unsafe-eval`, no `unsafe-inline` in `script-src`, no dev websocket origin, byte-identical to the single source), and registration with email verification, login, restart with persisted session, logout and password recovery all pass against real Convex and Clerk. Google OAuth also passes in BOTH artifacts, including the `portable` executed from `C:\Temp`, outside the workspace — the case that previously failed with `Cannot find module '@clerk/electron'`; the limit recorded earlier for portable OAuth was wrong and is corrected, because the SDK registers the scheme on each launch, so the deep link works while the app runs and only the registration left after exit points at a volatile temp path. The artifact is self-contained: the main process is bundled to `dist/main.cjs`, `resources/app` holds only `dist` and `package.json` with no `node_modules`, and `win-unpacked` dropped from 607MB to 347MB (portable 119MB to 94MB). Legacy Convex Auth retirement was already recorded as closed (`convex/http.ts` empty router, `schema.ts` empty). NOT waived and still required before publishing, and therefore not claimed by this closure: production-domain prerequisites and explicit confirmation of Native API entitlement on FREE in production, since only a DEV instance exists.
+
+## Verification strategy
+Test-first for deterministic behavior where applicable; Vitest/React Testing Library and convex-test. Bootstrap configuration uses structural/build checks where no meaningful behavior RED exists. Record actual commands and results. Windows smoke checks and real service checks are separate from host builds and mocks.
+
+## Progress and evidence
+- Initial git state: branch `feat/mvp`; existing untracked configuration, scope documents, ODD documents and prototypes preserved.
+- Read-only mapping completed. H1.1 edits limited to root package.json/turbo.json/bun.lock, targeted .gitignore additions, and apps/desktop/**. Backend wiring belongs to H1.2.
+- Host availability observed: Bun executable available, Node v22.23.1, Linux. RDD mode observed off.
+- H1.1 writer returned partial: minimal desktop scaffold implemented; no authentication backend, credential collection or fake successful sign-in.
+- Writer checks: bun install, bun install --frozen-lockfile, bun run typecheck, bun run test (4 tests) and bun run build passed. Build emitted nonfatal use-client warnings. Independent confirmation pending.
+- Writer observed RED (4 failures), GREEN (4 passes), then security/disabled-access checks after refactoring.
+- Prior Linux launch reported GPU process exit 139 and bounded-run timeout 124. These do not prove the window failed to open or establish root cause; user reports an Electron window did open. Renderer content and actual runtime platform remain unconfirmed. No environment workaround performed.
+- Independent verifier failed twice with generic assistant errors, producing no check evidence. Worker read-only fallback was rejected by role validation. Explorer fallback completed static inspection but has no command-execution tool: typecheck/test/build were NOT independently executed.
+- Static inspection found configured isolation, navigation/permission denial, relative built assets and hash routing; this is not fresh build or runtime evidence. No further equivalent retries queued.
+- Native assessment returned unassessable because of untracked scope; conservative independent verifier delegated. RDD remains off; no native review started.
+- Approximate review size: 335 authored lines plus 212 generated scaffold lines, excluding lockfile. No deployments or commits.
+- User-provided Windows evidence: Node v24.18.0 exists at Program Files/nodejs; adding it to the PowerShell session PATH resolved the syntax-check failure. process.platform returned win32.
+- User ran desktop bun run typecheck successfully; bun run test passed 2 files/4 tests; bun run build completed in 2.22s with nonfatal ignored use-client directives from dependencies.
+- User ran bun run start; inspected screenshot shows the Livefy access preview rendered with unavailable-auth copy and disabled sign-in button. This validates the basic Windows launch, not installer/distribution or comprehensive runtime security.
+- Independent automated verifier remains unavailable; command evidence above comes from the human Windows run, not the failed subagents. No screenshot claim of close/reopen or credential flows.
+- User also reports successful application execution without errors in Ubuntu WSL. This is human-observed development smoke evidence, not an independently captured log or installer/security certification.
+- Convex development deployment identity and Resend sender configuration remain execution prerequisites, not verified availability.
+
+## Repository delivery setup
+- User authorized H1.1/H1.2 commits and feature-branch push, then public GitHub repository creation with main protection.
+- Created `https://github.com/reos156/livefy` (PUBLIC, empty); shared origin is `git@github.com:reos156/livefy.git`.
+- Active ruleset `24511409` targets `refs/heads/main`: PR required, zero approving reviews, resolved conversations, no bypass actors, no force pushes or branch deletion. Read back effective rules before main exists.
+- Created H1.1 `b0df6f5` and H1.2 `c5d6584` with explicit manifests and alternate indexes, preserving live files, main and unrelated untracked files. Initial diff-check rejected two trailing blank lines in reconstructed bootstrap docs/ignore; trimmed only staging artifacts, then both checks passed. Captured43 hashes matched; bounded bundle scan found zero recognized secret patterns, not exhaustive.
+- No refs pushed yet. Public reachable-history audit remains in progress; authorized feature push is held for its result. Bootstrap authored size exceeds the normal small-review budget.
+- Empty remote has no default branch; do not silently bootstrap or push main. Preserve local primary/main and MVP/feat/mvp layout.
+
+## Historical H1.2 execution notes
+H1.2 authorized by user. User explicitly authorized creating Livefy's Convex development project and completed login; CLI login status confirmed access to team `reos156`. Read-only mapping recommends `apps/desktop/convex/` and pinned Convex 1.46.0 initialization with explicit cloud-dev target and `--skip-push`. Provisioning succeeded: `reos156/livefy`, dev `polite-parrot-887`, public endpoint `https://polite-parrot-887.convex.cloud`. Convex 1.46.0 dependency and scaffold installed without function push. Frozen install and ignore check passed. CLI also generated `apps/desktop/.gitignore` outside delegated surfaces; parent inspected its sole `.env.local` rule and retained it as valid protective scaffold. Native assessment was unassessable due pre-existing untracked scope, so independent read-only configuration verification is required. Independent verifier passed pinned-dependency/scaffold inspection, frozen install with no changes, ignore protection and boolean-only dev deployment/URL binding checks. Remote ownership, endpoint availability and remote function/Auth state were not independently checked. Auth mapping completed against official setup, config/passwords and setup/manual docs plus npm peers. Local implementation returned: Password wiring/authTables/http/config, getAuthUserId + existing-user guard and minimal session query, fail-safe singleton React provider and exact CSP origins. Writer observed RED then GREEN (17 tests), desktop/backend typecheck, build and frozen install passed; nonfatal dependency use-client warnings. Independent command verification delegated because native assessment remains unassessable due untracked scope. No generated artifacts fabricated; supported generic bindings used. Independent verifier confirmed 5 files/17 passing tests, desktop/backend typechecks, build and frozen install; no severe local correctness issues found. Actual-query tests cover anonymous/existing/deleted users and supplied identity args. Built CSP is exact and excludes Vite websocket; bounded secret scan found no recognized patterns, not an exhaustive audit. Verifier observed GREEN only; writer's prior RED remains writer evidence. Provider success/singleton reuse not directly asserted. Remote activation, live sessions and Windows runtime remain untested. User explicitly authorized signing configuration, Auth/session deployment and disposable-account smoke with scoped cleanup on `polite-parrot-887` only. Next: verify target afresh, preserve any existing signing keys, activate development Auth, prove real identity and anonymous rejection, and remove only fixture-owned data. Stop on target mismatch, partially existing signing config or unproven safe cleanup. No production action or commit authorized. Worker confirmed remote dev identity via explicit CLI deployments selector; JWT_PRIVATE_KEY/JWKS absent by names-only check. Implemented marker-bounded internal cleanup locally with observed RED/GREEN (19 tests), desktop/backend typechecks passed. No remote mutation yet. Parent authorized CLI-managed updates to ignored desktop `.env.local` and `.gitignore` plus regenerable `dist/**` outputs; no direct env-file reads. Activation worker completed: only JWT_PRIVATE_KEY/JWKS configured by conflict-refusing stdin; dev push succeeded with real generated bindings. Real-token signup, authenticated identity match, anonymous Unauthorized and sign-out passed. Cleanup deleted one fixture user/account with zero dependent records after sign-out; repeat cleanup zero. Temporary INTERNAL registration removed, removal push succeeded and endpoint absence checked. Final writer20 tests/typechecks/build passed. Post-activation independent verifier passed20 tests, desktop/backend typechecks, build and frozen install. Confirmed remote dev identity, signing variable names present, anonymous session Unauthorized and temporary cleanup function absent via read-only function-spec inventory. Backend tsc initially ran from root and failed for nonexistent path, then passed from desktop; no source fix needed. Authenticated success/cleanup remain writer-observed evidence, not independently replayed after fixture disposal. Verifier did not invoke smoke --verify-removed because it attempts the mutation reference; used read-only inventory instead. Cleanup helper/module namespace retained for tests is not a registered endpoint. API evidence is not Windows/Electron runtime certification. Work-unit closure/commit remains pending explicit user authorization. Pins: auth 0.0.96, auth/core 0.41.1, convex-test 0.0.60. Password-only needs no SITE_URL. No remote signing-env changes, function deployment or fixture accounts in this local slice; those require separate authorization. Registration/login UI, Resend and persistence changes remain out of scope. No production mutation, paid action, commit or publishing authorized. H1.1 implementation verified, closure/commit pending explicit instruction; installer/restart/runtime security remain separate checks.
+
+
+## Historical H1.3 — Paused Convex Auth implementation
+- User authorized resuming registration and explicitly selected original Convex Auth behavior, superseding strict existing-account rejection. Existing exact email plus matching password may reuse the account; another password fails. Never claim a newly created account merely from a resolved signup request.
+- H1.3 is in progress; H1.1/H1.2 remain closed. Prior delivery and Next step paragraphs above are historical, not current remote-state evidence. Previous session records report feature publication and main bootstrap; no fresh remote verification was performed here.
+- Route: delegated writer because UI, provider validation, and behavioral tests touch multiple non-trivial files. Read-only exploration completed; configured upstream lacks a local tracking ref, which does not prove remote deletion. No ref repair needed for local work.
+- Scope: registration UI, safe configuration fallback, backend input validation, focused tests. Preserve provider account behavior, exact email identity, default password minimum, login/reset semantics and dependency versions. No verification-email infrastructure or custom credentials provider.
+- Verification: observed RED/GREEN for deterministic tests, full desktop tests, renderer/backend typechecks and build. Real DEV account creation and Windows UI checks remain separately pending; no remote mutation, new account, commit or publication authorized by this slice.
+- Forecast: 220–340 authored changed lines, generated outputs excluded; delivery strategy ask-on-risk. Stop and report before expanding scope or exceeding approximately 400 authored lines.
+- Work-unit closure: H1.3 remains unchecked until applicable evidence and separately authorized commit are recorded; push/PR/merge require separate authorization.
+- Next step: bounded local implementation, then native read-only assessment and verification according to its returned plan. RDD is off; do not start review.
+
+### H1.3 writer evidence — independent verification pending
+- Writer reports local registration and supported Password profile validation implemented across eight files; 177 authored diff lines including new files (not independently counted yet). Exact-email identity preserved; native email input trimming discovered and avoided with text/email inputMode.
+- Writer observed 13 behavioral RED failures, then 31 focused GREEN tests. Full suite 43 passed; desktop/backend typechecks and build passed with nonfatal dependency use-client warnings. These are writer-reported checks, not independent or Windows evidence.
+- Native read-only assessment returned unassessable because untracked files require explicit scope; RDD off, independent verifier required and launched. No native review started.
+- H1.3 remains in progress; remote real-account creation, Windows UI acceptance, independent results and authorized commit remain pending. No remote mutation or delivery performed.
+
+
+## Current plan — Convex + Clerk
+- User authorized revising MVP tasks for Convex + Clerk, not implementing migration, creating accounts, modifying remote configuration, deploying or publishing.
+- H1.1 and H1.2 stay completed as historical verified work. H1.2a–d are new migration prerequisites; they do not imply the old auth setup already supports Clerk. H1.3 remains unchecked and paused; its local Convex Auth changes are preserved, not reverted or certified for Clerk. Independent verifier was cancelled at the user's request.
+- Current task count: 16 (6 accepted completed, 10 pending). H1.2a accepted for DEV; production FREE Native API entitlement belongs to H1.12. H1.2b design accepted; H1.2c is in progress (bounded DEV configuration, deployment and disposable fixture authorized; fresh preflight pending). Historical H1.3 edits remain present, but preserving their legacy contracts is not a requirement.
+- Research sources accessed 2026-10-05: https://docs.convex.dev/auth/clerk ; https://clerk.com/pricing ; https://clerk.com/docs/electron/getting-started/quickstart ; https://clerk.com/docs/guides/development/deployment/electron . Installed Convex 1.46.0 exports react-clerk; exact Clerk SDK/runtime compatibility is pending.
+- FREE currently includes 50,000 monthly retained users/app, password/email methods, branding and fixed seven-day sessions; no free MFA/passkeys/custom email templates. Native API FREE entitlement still requires confirmation. Production requires a domain; no zero-total-cost guarantee.
+- This is passive planning-only work: no meaningful RED, tests/build/deployment not applicable. Verify document and memory readback and checklist/UI consistency. Existing historical evidence above is retained, not a claim about current remote state.
+- Delivery strategy remains ask-on-risk. Migration authored-line forecast is not yet established: H1.2a/b must bound reviewable work units before any source writes; do not treat prior registration's 177 lines as migration forecast.
+- Next step: freshly verify DEV targets/inventories and execute the authorized bounded H1.2c slice; H1.2d owns Electron bridge/providers. Necessary legacy removal is authorized for the new integration, not unrelated cleanup or production changes.
+
+## Active H1.2c — DEV token trust
+- User explicitly authorized Clerk DEV integration activation, Convex DEV issuer configuration/backend deployment, and one disposable account/session with exact cleanup after being informed legacy login will stop until H1.2d. No production, second Clerk app, commits or publishing authorized. Read-only mapping and official documentation review completed; source implementation and remote mutations remain pending fresh preflight.
+- Current backend trusts the legacy Convex issuer and requires legacy users. The bounded replacement uses Clerk Frontend API issuer, applicationID `convex`, and server-validated identity through `ctx.auth.getUserIdentity()`.
+- Official sources accessed 2026-10-05: https://docs.convex.dev/auth/clerk ; https://clerk.com/docs/guides/development/integrations/databases/convex . Activate Clerk Convex integration; session audience is pre-mapped. Installed Convex 1.46.0 supports ordinary session tokens with aud `convex`; do not assume a legacy JWT template is necessary.
+- Independent fresh read-only preflight positively verified Clerk Livefy development app `app_3KIbxIkDWq0jwZSzWrleQYbbJZb`, instance `ins_3KIbxKXJ7GOHgO8hpx2JwSMG3jL`; Convex `polite-parrot-887` as DEV. Clerk OIDC issuer: `https://organic-snake-7233.clerk.accounts.dev`. Clerk users count 0; complete bounded aggregate counts 0 in all seven legacy Convex auth tables.
+- User subsequently reports official Convex integration activated in Livefy DEV. Activation still requires independent configuration/issued-token verification. The pre-activation Clerk session config had no explicit `aud`, JWT templates count 0. CLI 3.4.0 catalogs expose no integration endpoint or verified activation payload. Next prerequisite: activate official Convex integration in the explicitly selected Livefy DEV dashboard; do not invent a Platform PATCH. Effective session claims still need issued-token verification.
+- Preflight initial Convex commands failed ENOENT from wrong cwd, then succeeded from apps/desktop; no source correction or mutation. Current remote legacy auth exports remain. Local tests/build, deployment and real-token smoke remain pending.
+- Proposed execution: fresh target/inventory checks, recoverable pre-change configuration snapshot, bounded backend trust/identity replacement and necessary legacy endpoint retirement, DEV integration/env/function push, local test-first checks and real token verification with exact disposable-fixture cleanup. Stop if new data appears. No production, bridge/provider changes, commits or publication.
+- Real signed wrong-issuer token coverage needs an explicitly authorized source; rewriting JWT claims only proves invalid-signature rejection, not isolated issuer enforcement. Do not create a second Clerk application automatically.
+- Writer deployed Clerk-only backend to DEV: only `CLERK_JWT_ISSUER_DOMAIN` set, signing variables preserved; actual bindings generated; legacy auth exports/HTTP routes retired; protected session returns validated tokenIdentifier. Legacy schema/dependencies and renderer/bridge preserved. Non-secret recoverable snapshots in approved ignored `apps/desktop/.h1-2c-recovery/` (0700 directory/0600 files). Approved DEV sync uses explicit `CONVEX_DEPLOYMENT=dev:polite-parrot-887` with fresh target/credential guards because dev lacks --deployment; explicit deployment flags retained where supported.
+- Writer checks: identity RED two failures, cleanup RED two failures; focused GREEN nine backend and five cleanup tests; full 52 tests, renderer/backend typechecks, build and diff-check passed. Obsolete Password-wiring assertion retired in separately approved registrationValidation.test.ts; 16 behavioral tests preserved. Build warned nonfatal dependency directives. Two CLI compiler-discovery sync attempts failed; separate backend tsc passed and supported one-shot DEV sync succeeded.
+- Live anonymous query rejected Unauthorized; remote inventory only session:current registered. Disposable-fixture smoke failed (initial dry-run file_not_found, corrected piped invocation also failed); exact creation stage suppressed. Cleanup reported complete/usersAfter=0/sessionRevoked=false, not proof of an issued session. Final Clerk user count zero and complete seven-table Convex inventory zero. No further fixture creation attempted.
+- Independent final verifier confirmed 52/52 tests, both typechecks, build/diff-check, explicit DEV metadata/issuer, only session:current registered, live anonymous rejection and complete zero inventories. Bounded dist scan found zero configured secret patterns (not exhaustive). Doctor unlinked exit 1 did not invalidate explicit metadata calls.
+- Read-only smoke diagnosis: exact stage/error unknown. CLI stderr parsing/top-level sanitization suppress useful failure classes; cleanup summary lacks stage and cleanup-failure output includes resource identifiers. No invalid endpoint or corrected-pipe misuse demonstrated; request-body compatibility not yet independently verified. Cleanup flags do not prove a session was never created/revoked. Local diagnostic fix completed in both smoke files: fixed stages, exact error-class whitelist and redaction; ownership-bounded reconciliation/finally cleanup retained. Writer observed RED four failures, focused GREEN 10 and full 57 tests; both typechecks passed. Independent final verification passed the same 10/57 tests/typechecks, explicit untracked-file whitespace/newline checks and static redaction/cleanup review. Official Clerk OpenAPI 2025-11-10 schemas (accessed 2026-10-05) match user/session/token payloads and raw list responses; installed CLI 3.4.0 accepts piped JSON. No local blocker found; no smoke rerun or remote mutation in this repair/verification. User subsequently explicitly authorized one new DEV disposable account/session attempt and instructed proceeding. Fresh exact target/zero inventory preflight, no creation retry, ownership-bounded cleanup and stop on ambiguity remain mandatory. This does not authorize another Clerk app, production, source changes or commits.
+- The newly authorized single smoke attempt failed at `user-create` with `unclassified`; actual POST issuance unconfirmed because preview precedes mutation. No session/token path reached; no creation retries or fixes during execution. Final Clerk count 0 and complete user list empty; all seven Convex tables count 0, complete. No fixture user reconciled/deleted or session revoked; cleanup flags are not revocation evidence.
+- Offline diagnosis proved Clerk CLI 3.4.0 emits structured API errors on stdout while helper parsed stderr only. This explains lost classification, not the actual remote rejection. Diagnostic verifier performed one bound dry-run despite inspect-only-if-contact constraint; it may resolve target metadata via GET but source control flow confirms no create POST. Deviation disclosed; no further remote command.
+- Local stream-parser fix completed: independently parse both structured streams with unchanged exact seven-code whitelist, conflicting codes conservatively unclassified; stages and cleanup unchanged. Writer observed regression RED two failures, focused GREEN 12/full 59 and both typechecks pass. Independent strictly offline verification confirmed 12/59 tests, both typechecks, redaction/whitelist/conflicts and explicit untracked whitespace/newline checks. No remote retry or mutations during fix/verification. Another disposable-fixture attempt is not authorized.
+- Third single DEV attempt explicitly authorized by user and executed exactly once after fresh exact target/credential and complete zero-inventory checks. Exit 1 at `user-create` with real observed `form_param_format_invalid`; specific invalid parameter unknown. User creation not confirmed; session/token/authenticated query/anonymous probe not reached. Before and after Clerk complete empty list/count 0 and all seven Convex inventories complete at take 1001/count 0. `cleanupComplete=true`, `userReconciled=false`, `sessionRevoked=false`; no revocation proof. Two initial read-only inventory parser checks failed on stderr status output, then corrected checks passed; these were not creation retries. No payload fixes, deploys, commits, or further fixture attempts. Single-attempt authorization consumed.
+- Read-only payload diagnosis: email array uses marker-derived `@example.test`; reserved domain is a suspect, not proved cause. Error diagnostics discard `meta.param_name`; no evidence to alter external_id/password or add bypass flags. Public Backend errors documentation accessed 2026-10-06 confirms shared format code and field metadata. Clerk/clerk-cli skills and routed references loaded; CLI 3.4.0 wrapper forwarding inspected without executing it.
+- User now explicitly authorized one new DEV attempt using their confirmed controlled base Gmail address (not an alias). Existing helper has a hardcoded reserved email; bounded local runtime email input and tests must pass before the single remote attempt. Keep personal address out of source/fixtures/logs, preserve marker-based ownership and cleanup; stop on nonzero inventories or ambiguity. No creation retries, production, deployment or commits authorized.
+- User previously authorized local exact-field-allowlist diagnostics and tests only. Preserve payload/cleanup/stages and credentials redaction; use offline RED/GREEN and independent verification. User recommends an existing domain instead of `@example.test` for a future attempt; establish safe official test-address/controlled-mailbox contract before selecting it. No new remote fixture creation, payload/domain change, commit or deployment authorized in this slice.
+- Safe rejected-field diagnostic correction verified: exact four-field allowlist, metadata bound to recognized error, conservative class/field conflicts, shared sanitized stage/class/parameter summaries. Writer RED one regression then focused 14/full 61 GREEN; both typechecks and explicit untracked whitespace/newlines passed. Independent offline verifier confirmed 14/61 tests, both typechecks, redaction and ownership/no-retry checks; no defect found. Initial root focused-test/Turbo and missing workspace tsc invocation failures were corrected using desktop cwd and hoisted binary. Both helper files untracked: Git cannot independently establish historical unchanged content; current payload/cleanup behavior inspected and tested. No remote bad-field validation, network, fixture retry, deploy or commits; actual malformed field remains unknown.
+- Runtime email input prepared with writer RED12/GREEN26/full73 tests and both typechecks/syntax/explicit untracked whitespace checks. Independent offline verifier confirmed26/73/typechecks/syntax/redaction and correct desktop cwd. Personal email supplied only in subprocess environment, no hardcoded address. Conservative base-email validator rejects plus aliases. Untracked files limit historical diff claims.
+- Authorized controlled-email DEV smoke executed exactly once from apps/desktop and exited0: validAccepted=true, anonymousRejected=true, sessionRevoked=true, usersAfter=0. Reached/passed user/session ownership, real token issuer/audience claims, protected query tokenIdentifier match, anonymous rejection, confirmed session revocation and fixture user deletion. No reconciliation required; success output has no explicit cleanupComplete/userReconciled flags. Fresh preflight and final independent inventories: Clerk count/list complete0; all seven Convex tables take1001 complete0. One initial read-only preflight wrapper stopped attempted=false on empty-table stderr representation; parser corrected from installed source before helper ran, not a creation retry. No source edits/deploy/commits/prod/new app or further helper execution. Single attempt authorization consumed.
+- Real valid-token acceptance and effective issuer/audience now verified. Signed wrong-issuer/wrong-audience rejection remains pending without an authorized signed source; mocks/tampered claims are not equivalent evidence. Windows/bridge runtime belongs to later tasks. User explicitly accepted moving both signed negative tests to H1.7 and the mandatory pre-production gate. H1.2c is accepted complete for DEV under revised scope, not a claim that negatives passed. No further remote tests or source mutations authorized; no commit performed, delivery closure remains separate. Native ASSESS unassessable due untracked scope with RDD off; independent verifier required. Approximately 340 authored lines, generated outputs separate. Historical partial status superseded by user-approved DEV acceptance and deferral to H1.7 recorded above. Backend-only cutover temporarily disables legacy desktop authentication until H1.2d; no working Clerk desktop login or Windows evidence is claimed.
+
+## Active H1.2a — Native prerequisites
+- User authorized H1.2a and separately created Livefy DEV: app `app_3KIbxIkDWq0jwZSzWrleQYbbJZb`, instance `ins_3KIbxKXJ7GOHgO8hpx2JwSMG3jL`. Superseded Levify and unused My Application were deleted with explicit authorization after zero-user checks.
+- User reports workspace Hobby plan; exact read-only Native API GET returned `api_enabled: true` on Livefy DEV. This confirms current DEV availability, not an unconditional production FREE entitlement.
+- User owns `livefy.co` in Cloudflare. No DNS or production configuration authorized or performed.
+- Candidate verified from official npm metadata: `@clerk/electron` 0.0.51, Electron 41.10.7, React/DOM 19.3.0, Convex 1.46.0; independent semver checks passed. SDK uses Clerk React ^6.17.6, compatible with Convex ^6.4.3. Default secure storage requires electron-store 8; exact compatible patch must be verified before installation.
+- Authorized local slice: exact dependency pins in apps/desktop/package.json and bun.lock only; preserve current auth and paused registration. No main/preload/provider changes, secret files, service configuration, deploy or Windows-runtime claims.
+- Forecast: under 30 authored manifest lines, generated lockfile churn reported separately. Stop on incompatible peers or unrelated dependency refresh.
+- Checks: dependency installation/frozen lock consistency, safe package entrypoint metadata, desktop tests/typecheck/build. No meaningful behavioral RED exists for unused dependency pins; use structural and regression checks instead.
+- Writer installed and exactly pinned @clerk/electron 0.0.51, electron-store 8.2.0 and Electron 41.10.7. Manifest authored +3/-1; generated lock +120/-8, existing versions reportedly preserved. SDK entrypoint metadata and peer checks passed without bridge execution.
+- Writer observed frozen install, 43 tests across 8 files, typecheck, build and diff-check passing. Build emitted 28 nonfatal use-client warnings. Two install postinstall scripts were blocked; names/impact require independent verification. No meaningful behavioral RED for dependency-only pins; Windows runtime not run.
+- Native assessment returned unassessable due unrelated untracked scope, RDD off; independent verifier launched per returned plan. No native review started.
+- Independent verifier passed frozen install (no changes), exact pins/peers/export file checks, diff-check, 43 tests across 8 files, typecheck and build. Bounded diff: 2 files, 123 insertions/9 deletions. No source edits from verifier.
+- bun pm untrusted listed browser-tabs-lock 1.3.0, core-js 3.47.0 and esbuild 0.28.2 plus Convex nested 0.27.0. Notice scripts and esbuild platform-binary selection were inspected; none trusted or executed. Linux build passed, but fresh Windows install and binary availability remain unverified.
+- Official origin requirements identified: DEV http://127.0.0.1:5173 must be allowlisted exactly; packaged guidance uses a custom scheme and explicit CSP/Frontend API host. No allowlist or custom scheme implemented; H1.2d owns implementation. Production requires the user-owned domain; FREE Native API production entitlement remains unconfirmed.
+- User authorized local WSL smoke. Verifier observed linux/Node22.23.1, DISPLAY/WAYLAND presence and Electron41.10.7. Bounded timeout 20s bun run start launched Electron but logged repeated GPU-process exit139; timeout terminated it with exit124. No screenshot/UI observation available, so rendered UI remains unconfirmed. WSL itself was not independently established.
+- User subsequently confirmed seeing the window and supplied a screenshot showing Livefy's existing email/password registration form, Register button and No authenticated session confirmed. This establishes human-observed rendered UI for this run, not Clerk integration, successful registration/login or Windows runtime. GPU exit139 remains observed; root cause unresolved.
+- SDK runtime-load probe stopped after GPU incident; bridge/auth/secure storage not exercised. No sandbox/GPU workaround or source changes applied. Diagnose runtime incident separately before repeating; ask user whether window actually appeared.
+- User approved the scope correction: H1.2a accepted complete for DEV; production FREE Native API entitlement is an explicit H1.12 pre-publication gate. Login, bridge and Windows checks are not H1.2a acceptance criteria. Additional Linux smoke remains incomplete and historical GPU evidence is retained, not a blocker to DEV prerequisite acceptance.
+- Acceptance/checklist closure is recorded; work-unit commit/delivery closure remains pending separate authorization. No integration, remote auth configuration, commit, push or PR performed in H1.2a.
+
+## Accepted H1.2b — Clean identity transition
+- User accepted this design after confirming it follows the official documentation. The target architecture is independent of the previous Convex Auth implementation; historical constraints above do not require preserving legacy IDs, auth tables, endpoints or session response shapes.
+- Clerk owns accounts, credentials, sessions and recovery. Convex owns application data and server-side authorization. Use `ctx.auth.getUserIdentity()` and its server-validated `tokenIdentifier`, which combines issuer and subject; do not manually construct or parse provider identity strings, accept caller-supplied identity, or use email as an ownership key.
+- No legacy-account migration, compatibility mapping table, password import or dual-authentication flow is needed for the verified empty DEV snapshots. A local application-user table is optional and must be justified by product data needs, not legacy compatibility.
+- Session contract: renderer uses backend-confirmed `useConvexAuth()` with loading/unauthenticated states; backend functions reject missing identities and enforce resource ownership/permissions. Clerk UI success alone is not private-access authority. No mandatory legacy `session:current` query or `{userId}` shape. Token revocation/session persistence behavior requires later functional verification.
+- Convex read-only inventory: fresh MCP status bound the desktop project to `https://polite-parrot-887.convex.cloud`; a sandboxed query returned `complete: true`, zero rows in all seven tables: users, authAccounts, authSessions, authRefreshTokens, authVerificationCodes, authVerifiers, authRateLimits. Scan bound: 1000 per table, with one extra row to detect incompleteness. No records or secrets returned. Production was not queried.
+- Clerk read-only inventory: verifier used installed CLI 3.4.0; Platform metadata positively confirmed app `app_3KIbxIkDWq0jwZSzWrleQYbbJZb` and instance `ins_3KIbxKXJ7GOHgO8hpx2JwSMG3jL` as development. Explicitly targeted GET `/users/count` returned 0. Doctor exit 1 reflected unlinked-project failure and warnings; authenticated checks passed, and explicit metadata/IDs bound the successful count independently of project linking. No user list or credentials output.
+- User authorized necessary legacy removal for the new desktop/DEV integration. Before destructive remote retirement, freshly bind the target and repeat inventory; stop if new data exists. No production, Clerk-account deletion or unrelated prototype/file cleanup is authorized. Actual removals belong to bounded integration work; H1.12 verifies retirement rather than requiring legacy code to remain until then.
+- Rollback strategy: retain recoverable, explicitly identified pre-change code/configuration snapshots before replacement, without a dual-provider requirement. If data appears before cutover, stop and establish an authorized protected backup and preservation plan. Newly created Clerk sessions/data do not automatically become legacy sessions/data on rollback. No backup, restore drill, deletion or deployment was performed in this design task.
+- Official sources fetched by parent, accessed 2026-10-05: https://docs.convex.dev/auth/functions-auth ; https://docs.convex.dev/auth/clerk ; https://clerk.com/docs/guides/development/migrating/overview . Installed versions mapped: Convex 1.46.0 and Clerk Electron 0.0.51.
+- Checks: read-only code exploration and both aggregate inventories completed; document/memory/checklist readback required for closure. Behavioral RED, tests, builds and Windows checks are not applicable to this design/documentation-only task. H1.2c/d integration checks remain pending in their own tasks. No source implementation, service mutation, commit, push or PR performed; commit/delivery closure requires separate explicit authorization.
+
+
+## Active H1.2d — Native bridge and providers
+- User accepted supported no-OAuth design, guarded window/navigation origins (not SDK per-call exact-origin validation), documented protect.clerk.com CSP wildcard/connection-port exception, encrypted-only persistence and explicitly disclosed memory-only sessions when secure encryption is unavailable.
+- Local writer implemented native storage adapter, controlled livefy://renderer asset protocol, bundled sandbox preload, ClerkProvider and ConvexProviderWithClerk, backend-authoritative useConvexAuth states, configuration fallback and local documentation. Legacy registration preserved but unmounted; backend untouched. No remote configuration, accounts, runtime launch, deployment or commits.
+- Writer observed RED/GREEN for provider/access/CSP/storage/protocol behavior; preload/build boundary tests were GREEN-only. Reported 13 files/95 tests, renderer/backend typechecks, build, main/source/generated preload syntax and tracked/new-source whitespace checks passed. Nonfatal dependency directives and large-chunk warnings remain.
+- Writer-attributed authored change size +390/-56 (446 diff lines), generated dist separate. This exceeds advisory forecast; no artificial compression or size-only split applied.
+- Native ASSESS returned unassessable because existing untracked scope, RDD off; separate independent verifier launched. Parent spot check generated preload syntax passed. Independent verification remains pending: no acceptance/closure claim.
+- Real DEV publishable key and exact remote allowed-origin verification remain prerequisites; Windows runtime, packaging and authenticated flow not verified. Commit/delivery requires separate explicit instruction.
+
+- Independent verifier confirmed 95 tests, both typechecks, build, main/source/generated preload syntax and whitespace checks. No source-level blocker found. Initial root-cwd Turbo checks passed; backend tsc failed exit127 from wrong cwd, then all targeted commands passed from desktop without edits.
+- Remaining local coverage gaps: main bootstrap/cleanup is static-only; rendererHandler symlink containment and file response/MIME serving are not executed by existing tests. Completing these bounded deterministic integration checks before DEV configuration; meta CSP is documented as permitted, header delivery and real runtime enforcement remain distinct.
+- Independent current scoped count is +395/-46 (441 lines), not directly comparable with writer incremental +390/-56 report; no exact reconciled incremental size claimed.
+
+- Test-only coverage followup executes current main.cjs through a VM with mocked external boundaries, and actual rendererHandler against owned temporary files with fake net.fetch. Writer reports 15 focused tests and 100 full tests across 14 files, both typechecks, syntax and whitespace passed. Production source unchanged. Coverage is GREEN-only; two initial harness-loading failures were fixed and are not behavior RED evidence. TDD is an applicability-based default, not an activation toggle.
+- Followup ASSESS remains unassessable with RDD off; bounded independent test verification launched. Parent syntax spot check clerk-main.test.js passed. Real MIME/CSP/SDK runtime proof and DEV key/origin configuration remain pending.
+
+- Final independent coverage verification passed 15 focused/100 full tests (14 files), renderer/backend typechecks, main syntax and both test-file whitespace/newline checks. VM executes current main bytes and real local security/protocol modules; handler tests verify real-path symlink refusal, exact file URL and refusal without fetch. Fake response does not prove Electron MIME/CSP/SDK runtime. Initial focused command failed from root via Turbo, then correct desktop-cwd command passed.
+- Baseline traceability limitation: production unchanged in the test-only followup is writer-reported, not independently proven without captured prior bytes; main differs from HEAD and protocol/tests are untracked. Verifier observed stable Git state during checks. No new build needed for reported test-only change. Local deterministic verification complete; H1.2d stays open for real DEV configuration/origin and runtime checks, with no remote mutation or commit.
+
+- User explicitly authorized bounded DEV configuration: fresh binding to existing Livefy Clerk development app/instance, local publishable-key setup and add only http://127.0.0.1:5173 plus livefy://renderer if absent while preserving existing origins. No account creation, production, deployment or commits. Readback/conflict checks required; runtime launch waits for prior GPU incident diagnosis and safe bounded verification.
+
+- DEV configuration preflight positively verified exact existing app/development instance, Native API enabled and genuine pk_test metadata decoding to expected FAPI. Backend GET /instance returned allowed_origins=null, not an array; worker stopped before remote/local changes and asks approve/decline explicit initialization to [http://127.0.0.1:5173, livefy://renderer]. Key remains unconfigured and build not run. Existing origins remain null; no mutation attempted.
+
+- User approved explicit null-to-array origin initialization. Worker reverified target and exact PATCH dry-run but stopped before writes because .env.local mode0644 contradicted parent preserve-permissions/require0600 instructions. User then explicitly approved tightening only .env.local to0600 during atomic public-key merge, preserving unrelated content. Worker resumed with fresh drift checks and one permitted PATCH/readback/build. No mutation was attempted before this resumed run.
+
+- Authorized DEV configuration completed per worker: fresh exact app/development instance and Native API verification; original origins null, exact narrow PATCH preview, immediate drift GET null, exactly one PATCH exit0 and GET confirmed [http://127.0.0.1:5173, livefy://renderer]. Rollback-history original value null retained; no automatic rollback authorized.
+- Worker atomically added real verified pk_test public key to ignored .env.local, mode0600 and unrelated bytes preserved per writer. Reports configured build and preload syntax PASS, known nonfatal warnings. No source/accounts/sessions/production/deploy/commit/launch; Convex untouched.
+- ASSESS remains unassessable/RDDoff; independent final read-only DEV origin/key/build verification launched. Parent generated preload syntax spot check PASS. Runtime still pending; historical GPU incident requires separate safe diagnosis/Windows verification before another launch.
+
+- Final independent DEV verification confirmed exact app/development instance, Native API enabled, ordered two-origin array, one local pk_test assignment decoding to expected FAPI, ignored0600 env and configured public key in built JS. Desktop build/preload syntax passed; production CSP has no dev websocket or unsafe-eval. Bounded dist scan9files/4text returned0recognized secret-pattern hits (not exhaustive).
+- Verifier first ran root build successfully, then required desktop-cwd build successfully; both only regenerate permitted dist. Known nonfatal dependency directive/large-chunk warnings retained. Current final configuration is independent evidence; historical null transition/single PATCH/unrelated-byte preservation remain writer-only absent prior baseline/audit. Git status stable through verification.
+- Local and configuration independent verification is complete; no extra review loop required solely for unassessable native assessment with RDDoff. H1.2d remains open for real Electron runtime smoke. Current host is Linux with WSL marker and display variables; do not infer GPUexit139 cause or Windows evidence. Recommended next step: human Windows build/check/start through local livefy://renderer path, without workaround, no signup/login/accounts.
+
+- User explicitly confirmed H1.2d acceptance/DEV closure after human Windows screenshot showing rendered UI, no authenticated session and encrypted persistence capability. WSL screenshot separately showed memory-only disclosure. These are human-observed smoke checks, not actual token save/restart proof or comprehensive runtime security/CSP certification. Prior Windows dependency-resolution failure was followed by displayed Windows UI; exact remediation is not independently proven.
+- H1.2d checklist accepted complete; local tests100, both typechecks, configured build and current DEV metadata/origins/public-key checks independently passed. Known nonfatal build warnings remain. Signup/login H1.3/H1.4, actual Windows session persistence H1.6, security checks H1.7 and packaged journey H1.12 remain pending. No commit/push/PR/deploy authorized by this acceptance. Next task H1.3 remains pending, not automatically launched.
