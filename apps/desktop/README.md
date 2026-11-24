@@ -502,6 +502,18 @@ cada paso; no marcar aceptado un paso no observado.
   único funciona.
 - Sin firma: SmartScreen puede avisar; no es un defecto del paquete.
 
+### Verificado por el operador en Windows (H1.12)
+
+Sobre `release\win-unpacked\Livefy.exe`, sin servidor de desarrollo: la app arranca,
+`location.protocol` es `livefy:`, la cabecera `content-security-policy` llega desde
+`protocol.cjs` en las dos rutas consultadas, y el recorrido completo pasa contra
+Clerk y Convex reales — registro con verificación por email, login, reinicio con
+sesión persistida, logout y recuperación de contraseña. **También el login con
+Google**, porque `win-unpacked` tiene ruta estable y el SDK registra `livefy://` al
+arrancar: el límite de OAuth descrito arriba aplica solo al objetivo `portable`,
+no a este artefacto. Una predicción previa de esta sesión afirmó lo contrario y
+queda corregida por esta observación.
+
 ### Lo que no se verificó al escribir esta configuración
 
 El host de autoría es Linux/WSL sin wine ni Windows, y la tarea prohíbe explícitamente
