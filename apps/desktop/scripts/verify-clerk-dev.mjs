@@ -71,14 +71,101 @@ function clerk(method, path, body, platform = false) {
   }
 }
 
-export function validateClaims(jwt, userId) {
+// The only audience and issuer this script accepts. `applicationID: 'convex'`
+// in convex/auth.config.ts is what enforces the audience server-side.
+export const expectations = Object.freeze({ issuer: target.issuer, audience: 'convex' })
+
+// Decodes a JWT payload into claims. This is deliberately not a signature check:
+// this script cannot and must not impersonate the JWKS verifier that Convex is.
+export function decodeClaims(jwt) {
   if (typeof jwt !== 'string' || jwt.split('.').length !== 3) throw new Error('Missing issued JWT')
-  const claims = JSON.parse(Buffer.from(jwt.split('.')[1], 'base64url').toString())
-  if (claims.iss !== target.issuer || claims.sub !== userId ||
-      !(claims.aud === 'convex' || Array.isArray(claims.aud) && claims.aud.includes('convex'))) {
+  let claims
+  try { claims = JSON.parse(Buffer.from(jwt.split('.')[1], 'base64url').toString()) } catch {
+    throw new Error('Unreadable token claims')
+  }
+  if (claims === null || typeof claims !== 'object' || Array.isArray(claims)) {
+    throw new Error('Unreadable token claims')
+  }
+  return claims
+}
+
+// Answers whether decoded claims match the configured issuer and audience.
+export function claimVerdict(claims, expected = expectations) {
+  const audience = claims && typeof claims === 'object' ? claims.aud : undefined
+  return {
+    issuerMatches: claims?.iss === expected.issuer,
+    audienceMatches: audience === expected.audience ||
+      (Array.isArray(audience) && audience.includes(expected.audience)),
+  }
+}
+
+export function validateClaims(jwt, userId) {
+  const claims = decodeClaims(jwt)
+  const { issuerMatches, audienceMatches } = claimVerdict(claims)
+  if (!issuerMatches || !audienceMatches || typeof userId !== 'string' || claims.sub !== userId) {
     throw new Error('Issued token issuer, audience, or subject mismatch')
   }
   return claims
+}
+
+// S3: a negative that was not actually exercised stays explicitly pending. These
+// exact strings must not be replaced by a pass until a genuinely signed untrusted
+// token has been exercised against the configured backend.
+export const pendingNegatives = Object.freeze({
+  issuer: 'pending: no authorized genuinely signed untrusted issuer source',
+  audience: 'pending: no authorized genuinely signed wrong-audience source',
+})
+
+// Externally supplied tokens of untrusted provenance. This script never mints
+// them and never verifies a signature.
+export function untrustedSources(env = process.env) {
+  return {
+    wrongIssuer: env.H1_2C_UNTRUSTED_ISSUER_JWT || undefined,
+    wrongAudience: env.H1_2C_UNTRUSTED_AUDIENCE_JWT || undefined,
+  }
+}
+
+// A supplied token of unverified provenance cannot close S1/S2. Convex refuses a
+// forged or locally minted token because its signature does not match the JWKS of
+// the configured domain, and that refusal is indistinguishable from a genuine
+// issuer or audience rejection. The refusal is therefore recorded as a diagnostic
+// while the gate stays explicitly pending, and no supplied token is ever reported
+// as a pass. Only a source that attests the token's provenance could change this,
+// and no such authorized source exists yet (T5 of the feature document).
+function unauditedNegative(kind) {
+  const base = kind === 'issuer' ? pendingNegatives.issuer : pendingNegatives.audience
+  return `${base} (refused by the query, provenance unverified)`
+}
+
+// A supplied token is exercised against the query whenever it carries exactly the
+// intended mismatch. Anything else is a failure, never a pass, and a refusal never
+// clears the pending state above.
+async function exerciseNegative(query, jwt, kind) {
+  if (typeof jwt !== 'string' || jwt === '') {
+    return kind === 'issuer' ? pendingNegatives.issuer : pendingNegatives.audience
+  }
+  const { issuerMatches, audienceMatches } = claimVerdict(decodeClaims(jwt))
+  const attributable = kind === 'issuer' ? !issuerMatches && audienceMatches : issuerMatches && !audienceMatches
+  if (!attributable) {
+    const expected = kind === 'issuer' ? 'audience' : 'issuer'
+    throw new Error(`Supplied untrusted ${kind} token does not carry a foreign ${kind} with the expected ${expected}`)
+  }
+  try {
+    await query(jwt)
+  } catch (error) {
+    if (!String(error?.message).includes('Unauthorized')) {
+      throw new Error(`Untrusted ${kind} token rejection was inconclusive`)
+    }
+    return unauditedNegative(kind)
+  }
+  throw new Error(`Untrusted ${kind} token was accepted`)
+}
+
+export async function untrustedNegatives(query, sources = {}) {
+  return {
+    wrongIssuer: await exerciseNegative(query, sources.wrongIssuer, 'issuer'),
+    wrongAudience: await exerciseNegative(query, sources.wrongAudience, 'audience'),
+  }
 }
 
 export function ownsFixture(user, marker, userId) {
@@ -100,7 +187,7 @@ export function validateFixtureEmail(email) {
 
 // A transport may be used once only; there are no create retries or fallback users.
 const used = new WeakSet()
-export async function smoke(api, query, marker = `livefy-h1-2c-${randomUUID()}`, email) {
+export async function smoke(api, query, marker = `livefy-h1-2c-${randomUUID()}`, email, untrusted = {}) {
   validateFixtureEmail(email)
   if (used.has(api)) throw new Error('Fixture transport already used')
   used.add(api)
@@ -116,6 +203,7 @@ export async function smoke(api, query, marker = `livefy-h1-2c-${randomUUID()}`,
   let stage = 'user-create'
   let cleanupStage = 'user-reconcile'
   let validAccepted = false, anonymousRejected = false
+  let reported = { wrongIssuer: pendingNegatives.issuer, wrongAudience: pendingNegatives.audience }
   try {
     createAttempted = true
     const user = await api('POST', '/users', {
@@ -149,6 +237,10 @@ export async function smoke(api, query, marker = `livefy-h1-2c-${randomUUID()}`,
       else throw new Error('Anonymous request failed for an unrelated reason')
     }
     if (!anonymousRejected) throw new Error('Anonymous access accepted')
+    // Externally supplied untrusted tokens only; the fixture token is never reused
+    // as a negative and nothing is minted here.
+    stage = 'untrusted-negatives'
+    reported = await untrustedNegatives(query, untrusted)
   } catch (error) { failure = failureSummary(stage, error) }
   finally {
     // Delete only the exact marker-owned user, even when the live checks fail.
@@ -200,38 +292,52 @@ export async function smoke(api, query, marker = `livefy-h1-2c-${randomUUID()}`,
     console.error(JSON.stringify({ cleanupComplete: true, failure, userReconciled: !!userId, sessionRevoked: !!sessionId, usersAfter: 0 }))
     throw new Error('DEV verification failed; details suppressed')
   }
-  return { validAccepted, anonymousRejected, sessionRevoked: true, usersAfter: 0,
-    wrongIssuer: 'pending: no authorized genuinely signed untrusted issuer source',
-    wrongAudience: 'pending: no authorized genuinely signed wrong-audience source' }
+  return { validAccepted, anonymousRejected, sessionRevoked: true, usersAfter: 0, ...reported }
+}
+
+// Production query seam: the only place a token is handed to the backend.
+function convexQuery(token) {
+  const client = new ConvexHttpClient(target.endpoint)
+  if (token) client.setAuth(token)
+  return client.query(makeFunctionReference('session:current'), {})
 }
 
 let mainStage = 'invocation'
-async function main() {
-  if (process.argv.length !== 3 || process.argv[2] !== '--one-authorized-fixture') throw new Error('Explicit single-fixture invocation required')
-  if (['CONVEX_DEPLOY_KEY', 'CONVEX_SELF_HOSTED_ADMIN_KEY', 'CONVEX_SELF_HOSTED_URL'].some(k => process.env[k])) {
+// `io` is the testable seam for the invocation contract: argv, environment and the
+// three transports. Real runs use process.argv/process.env and the live transports.
+export async function main(io = {}) {
+  const argv = io.argv ?? process.argv
+  const env = io.env ?? process.env
+  const dispatch = io.clerk ?? clerk
+  const fetchImpl = io.fetch ?? fetch
+  const query = io.query ?? convexQuery
+  mainStage = 'invocation'
+  if (argv.length !== 3 || argv[2] !== '--one-authorized-fixture') throw new Error('Explicit single-fixture invocation required')
+  if (['CONVEX_DEPLOY_KEY', 'CONVEX_SELF_HOSTED_ADMIN_KEY', 'CONVEX_SELF_HOSTED_URL'].some(k => env[k])) {
     throw new Error('Inherited deployment credentials are not allowed')
   }
-  const email = validateFixtureEmail(process.env.H1_2C_FIXTURE_EMAIL)
+  const email = validateFixtureEmail(env.H1_2C_FIXTURE_EMAIL)
   mainStage = 'target-metadata'
-  const metadata = clerk('GET', `/platform/applications/${target.app}`, undefined, true)
+  const metadata = dispatch('GET', `/platform/applications/${target.app}`, undefined, true)
   if (metadata.application_id !== target.app || !metadata.instances.some(
     x => x.instance_id === target.instance && x.environment_type === 'development')) throw new Error('Clerk DEV target mismatch')
   mainStage = 'issuer-discovery'
-  const discovery = await (await fetch(`${target.issuer}/.well-known/openid-configuration`)).json()
+  const discovery = await (await fetchImpl(`${target.issuer}/.well-known/openid-configuration`)).json()
   if (discovery.issuer !== target.issuer) throw new Error('OIDC issuer mismatch')
-  const query = async token => {
-    const client = new ConvexHttpClient(target.endpoint)
-    if (token) client.setAuth(token)
-    return client.query(makeFunctionReference('session:current'), {})
-  }
   mainStage = 'smoke'
-  console.log(JSON.stringify(await smoke(clerk, query, undefined, email)))
+  console.log(JSON.stringify(await smoke(dispatch, query, undefined, email, untrustedSources(env))))
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  main().catch(error => {
+// The module-level exit contract: one sanitized summary line plus the stop line on
+// stderr and a failing exit code, never a success line.
+export async function runMain(invoke = main) {
+  try { await invoke() } catch (error) {
     console.error(JSON.stringify(failureSummary(mainStage, error)))
     console.error('Stop: inspect cleanup evidence before any separately authorized retry.')
     process.exitCode = 1
-  })
+  }
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  void runMain()
 }
