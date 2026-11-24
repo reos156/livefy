@@ -261,52 +261,57 @@ it('reaches the authenticated surface from the instance after a completed reset,
   expect(screen.queryByText('Loading')).toBeNull()
   expect(windowNavigate).not.toHaveBeenCalled()
 })
-// Reproduced by the operator in a real browser: the reset had succeeded, but the session
-// was only observable moments after the half-second window the first cut allowed, so the
-// flow declared failure and a manual reload then showed the app authenticated. The window
-// has to stay open long enough to catch that late-but-real session.
-it('resets the document when the activated session only becomes observable after the old half-second window', async () => {
+// The confirmation window is not a failure threshold and never was: the measured reset case
+// never becomes observable inside this document at all (L6), so its expiry performs the bounded
+// reset instead of waiting for a late session (covered below). What the window still has to
+// protect is the transition that does converge on its own: a sign-in or OAuth return whose
+// session publishes a moment after control comes back. Shortening the window to 400ms must not
+// turn that converging binding into a document reset, and it must still end authenticated.
+it('protects a binding that reports signed-in inside the window and reaches the authenticated surface', async () => {
   state.staleBinding = true
   state.signedIn = false
   state.confirmed = false
   clerk.session = null
-  const { completionUrl, documentReset, replaceState } = entryHarness('/#/')
-  documentReset.mockImplementation((data, title, url) => {
-    replaceState(data, title, url)
-    if (url !== completionUrl) return
-    state.staleBinding = false
-    state.signedIn = true
-    state.confirmed = true
-    reloadDocument()
-  })
+  const { completionUrl, documentReset } = entryHarness('/#/')
   const router = createAppRouter(createMemoryHistory({ initialEntries: ['/'] }))
   router.routeTree.update({ component: () => <SessionContent><Outlet /></SessionContent> })
   const windowNavigate = vi.fn()
-  render(<AuthState.Provider value={authState()}>
+  const tree = () => <AuthState.Provider value={authState()}>
     <SessionInfrastructure>
       <AuthBoundary {...props}
         modalNavigation={createBrowserNavigation(completionUrl, replace => router.navigate({ to: '/', replace }))}>
         <RouterProvider router={router} />
       </AuthBoundary>
     </SessionInfrastructure>
-  </AuthState.Provider>)
+  </AuthState.Provider>
+  const view = render(tree())
   await screen.findByText('Public sign-in')
   await act(async () => { await providerProps.routerReplace!(completionUrl, { windowNavigate }) })
-  // Past the old window with neither source reporting the session yet: the observation is
-  // still open, so nothing may be declared a failure and nothing may be reset twice.
-  await act(async () => { await new Promise(resolve => setTimeout(resolve, 700)) })
+  // Neither source reports the session yet, and the observation is open: two looks pass with
+  // nothing to repair, exactly as they do while clerk-js finishes emitting the new session.
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 250)) })
+  expect(documentReset).not.toHaveBeenCalled()
+  // The session arrives inside the 400ms window, publishing to the instance and the binding
+  // together, which is how a converging sign-in or OAuth return lands.
+  clerk.session = { id: 'sess_inside_window' }
+  state.staleBinding = false
+  state.signedIn = true
+  state.confirmed = true
+  view.rerender(tree())
+  // The rest of the window passes with no document reset and no failure surface: the normal
+  // transition needs no repair, and it ends on the authenticated surface.
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 300)) })
   expect(documentReset).not.toHaveBeenCalled()
   expect(screen.queryByRole('alert')).toBeNull()
-  // The activation lands inside the window: the single reset happens as soon as it is visible.
-  clerk.session = { id: 'sess_late' }
-  await waitFor(() => expect(documentReset).toHaveBeenCalledTimes(1), { timeout: 2000 })
-  expect(documentReset).toHaveBeenCalledWith(null, '', completionUrl)
+  expect(screen.queryByText(/Password reset incomplete/)).toBeNull()
+  expect(screen.queryByText('Public sign-in')).toBeNull()
   await screen.findByRole('button', { name: 'Open app' })
   expect(screen.getByText('Backend access confirmed')).toBeTruthy()
-  expect(screen.queryByText(/Password reset incomplete/)).toBeNull()
-  // The navigation adapter's no-session fallback is unchanged and unrelated: the caller handed
-  // control back before the session existed, so it asks the window to complete the document.
+  // The navigation adapter's no-session fallback is unchanged and unrelated: control came back
+  // before the session existed, so it asks the window to complete the document once. What this
+  // case pins is that the component performed no reset of its own.
   expect(windowNavigate).toHaveBeenCalledExactlyOnceWith(completionUrl)
+  expect(documentReset).not.toHaveBeenCalled()
 })
 // A sign-in or OAuth return hands control back through the same callback as a reset, and
 // clerk-js awaits that callback before it emits the new session, so the binding necessarily
@@ -404,8 +409,10 @@ it('performs the single bounded document reset when the window expires with no s
   // ever becomes observable in this document.
   await act(async () => { await providerProps.routerReplace!(completionUrl, { windowNavigate }) })
   expect(windowNavigate).toHaveBeenCalledExactlyOnceWith(completionUrl)
-  // The window expires: the app resets its own document instead of declaring failure.
-  await waitFor(() => expect(documentReset).toHaveBeenCalledTimes(1), { timeout: 4000 })
+  // The window expires: the app resets its own document instead of declaring failure. The bound
+  // is what pins the window length: a 2000ms window cannot reset inside it, while the 400ms
+  // observation expires well before it.
+  await waitFor(() => expect(documentReset).toHaveBeenCalledTimes(1), { timeout: 1200 })
   expect(documentReset).toHaveBeenCalledWith(null, '', completionUrl)
   // The failure surface is gone with its copy and its resume button.
   expect(screen.queryByRole('alert')).toBeNull()

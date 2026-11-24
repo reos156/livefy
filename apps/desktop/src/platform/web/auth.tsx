@@ -30,8 +30,11 @@ type BindingSnapshot = { isLoaded: boolean; isSignedIn: boolean | undefined }
 // (their own recovery reload came up authenticated), which fits clerk-js `setActive` awaiting
 // the completion navigation that `createBrowserNavigation.complete` intercepts. Polling longer
 // cannot change that, so expiry means "reset the document now", and the bound only exists so
-// the observation can never become a reload loop.
-const EntryConfirmationWindow = 2000
+// the observation can never become a reload loop. It is also only as long as the case it still
+// protects needs: a sign-in or OAuth return whose binding converges, which is measured well
+// inside 100ms, so a longer window would only add dead wait to every reset (measured seconds,
+// never observed to converge on the reset path) before the same document reset happened.
+const EntryConfirmationWindow = 400
 const EntryConfirmationInterval = 100
 
 function resetToCompletion() {
