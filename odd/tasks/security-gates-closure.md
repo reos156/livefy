@@ -31,6 +31,10 @@ signed JWT negatives (`mvp-h1-access-windows.md:257`), production CSP delivery
 - **S7** A session revoked by the provider MUST NOT grant private access.
 - **S8** When OS encryption is unavailable, the app MUST disclose the memory-only
   mode truthfully and MUST NOT claim the session survives restart.
+- **S9** A negative MAY be reported as passed only from a token this script minted
+  itself from the authorized instance through a named JWT template, which attests
+  its provenance. An environment-supplied token stays pending exactly as S3
+  requires.
 
 ## Tasks
 
@@ -46,10 +50,15 @@ signed JWT negatives (`mvp-h1-access-windows.md:257`), production CSP delivery
   Commit: pending.
 - T4 — route gentle-ai-verify. Independent verification of T1–T3 (Risk item 2 and
   item 3 apply). Not optional.
-- T5 (S1, S2) — BLOCKED. Executing the genuinely signed negatives needs Clerk
-  service configuration: a second instance for the issuer case, or a JWT template
-  with a different `aud` for the audience case. Awaiting explicit human
-  authorization; no configuration is touched before it.
+- T5 (S1, S2) — BLOCKED on an interactive CLI login. The audience case is
+  authorized: a JWT template with a different `aud` in the DEV instance, no second
+  instance. It needs two things in order: (a) S9, the attested mint path, without
+  which even a genuinely signed token still reports pending; (b) `clerk auth
+  login`, because the CLI is unauthenticated and `.env.local` is blocked by the
+  safety policy, so no secret key is reachable. S2 stays open by explicit
+  decision: without a second instance there is no genuinely signed foreign issuer
+  to test, and the record must say so rather than implying the issuer pin is
+  verified.
 
 ## Allowed edit surfaces
 
@@ -122,3 +131,18 @@ Per task, held by the writer that owns it, narrow and disjoint:
   so the candidate is a commit range. Follow-ups recorded, not fixed here: only
   `script-src` is pinned exactly (an origin added to `connect-src` would not fail
   that assertion), and S1/S2 stay open until T5.
+
+## Delivery
+
+Five work units, in this order on `feat/mvp`:
+
+- `ce8b72d` docs(odd): reconcile H1 evidence with the current tree
+- `c6b788d` feat(security): deliver the production CSP as a response header
+- `86d47e4` test(auth): cover offline logout, revoked session and memory-only disclosure
+- `b45c8ff` fix(verify): keep the JWT negatives pending unless provenance is attested
+- `f45864d` docs(odd): track the security gates closure feature
+
+Each unit carries its own tests; each was verified independently before commit.
+The branch is already 13,445 authored lines across 58 commits since `main`, far
+past a single review slice, so publishing needs a delivery-shape decision
+(chained PRs) rather than one PR. Not decided here and not authorized here.
