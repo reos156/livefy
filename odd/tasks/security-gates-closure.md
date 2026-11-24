@@ -12,7 +12,7 @@ signed JWT negatives (`mvp-h1-access-windows.md:257`), production CSP delivery
 
 - **S1** A validly signed token whose audience is not `convex` MUST be rejected.
   `applicationID: 'convex'` in `apps/desktop/convex/auth.config.ts:4` is the only
-  audience control; today nothing proves it is enforced.
+  audience control. CLOSED by live measurement, see L11.
 - **S2** A token signed by an issuer other than the configured
   `CLERK_JWT_ISSUER_DOMAIN` MUST be rejected.
 - **S3** The verification script MUST NOT report a negative as passed when it was
@@ -35,6 +35,11 @@ signed JWT negatives (`mvp-h1-access-windows.md:257`), production CSP delivery
   itself from the authorized instance through a named JWT template, which attests
   its provenance. An environment-supplied token stays pending exactly as S3
   requires.
+- **S10** The preflight MUST NOT require an empty instance. It MUST record the
+  initial user count, and a run MUST succeed only when the final count equals that
+  initial count AND the fixture user is absent by ``external_id``. The count delta
+  alone is not proof of cleanup; the absent-fixture read is part of the same
+  verdict.
 
 ## Tasks
 
@@ -50,12 +55,12 @@ signed JWT negatives (`mvp-h1-access-windows.md:257`), production CSP delivery
   Commit: pending.
 - T4 — route gentle-ai-verify. Independent verification of T1–T3 (Risk item 2 and
   item 3 apply). Not optional.
-- T5 (S1, S2) — IN PROGRESS. Clerk CLI authenticated (DEV, the only app/instance).
-  The authorized audience case exists: template `livefy-h1-2c-wrong-aud`
+- T5 (S1, S2) — S1 CLOSED, S2 OPEN BY DECISION. Clerk CLI authenticated (DEV, the
+  only app/instance). The authorized audience case exists: template
+  `livefy-h1-2c-wrong-aud`
   (`jtmp_3MXHKSGkp6QoTj6qc22lenb5Pqa`, claims `{"aud":"livefy-h1-2c-wrong-aud"}`,
   RS256, Clerk's own signing key) and S9, the attested mint path, is implemented
-  and verified. What remains is the live execution, which needs a controlled
-  fixture mailbox: it creates and revokes a real user. Operator command, after
+  and verified, and the live execution succeeded (L11). Re-run command, after
   exporting nothing that holds `CONVEX_DEPLOY_KEY`, `CONVEX_SELF_HOSTED_ADMIN_KEY`
   or `CONVEX_SELF_HOSTED_URL`:
 
@@ -121,7 +126,8 @@ Per task, held by the writer that owns it, narrow and disjoint:
   is gone, and a regression test pins that a forged token never starts with
   `rejected:`. The exact `script-src` token list is also pinned in
   `electron/protocol.test.js`. S1 and S2 therefore remain honestly open until T5.
-- **L6** Pre-existing work in the same worktree, not part of this feature:  `README.md` and the eight `odd/tasks/*.md` documentation corrections made
+- **L6** Pre-existing work in the same worktree, not part of this feature:
+  `README.md` and the eight `odd/tasks/*.md` documentation corrections made
   earlier in the session, plus the untracked `.agents/`, `.github/`, `.mcp.json`,
   `.pi/`, `apps/desktop/.h1-2c-recovery/`, `prototypes/` and `skills-lock.json`.
   Only the paths under `## Allowed edit surfaces` belong to T1–T3.
@@ -161,6 +167,45 @@ Per task, held by the writer that owns it, narrow and disjoint:
   preflight runs before the conflict guard; and three verifier probes worth adding
   are listed in its report (conflict must not consume the single-use transport,
   foreign-issuer fail-closed, conflict exits 1).
+- **L10** Decision (verbatim option selected): «Cambiar a delta cero y correr en
+  vivo». The live attested negative could not run: `smoke()` aborts at stage
+  `initial-inventory` unless `GET /users/count` returns `total_count === 0`, and
+  the DEV instance holds 2 real users, so no fixture email could unblock it. The
+  guard existed because `usersAfter: 0` proved cleanup on an empty instance; with
+  existing users that proof has to become a delta plus an explicit absent-fixture
+  read (S10). Authorized: replace the empty-instance preflight with the delta
+  contract, then run the attested negative live.
+- **L11** S1 CLOSED by measurement, exit 0:
+  `{"validAccepted":true,"anonymousRejected":true,"sessionRevoked":true,"usersBefore":2,"usersAfter":2,"wrongIssuer":"pending: no authorized genuinely signed untrusted issuer source","wrongAudience":"rejected: attested wrong-audience token refused by the query"}`.
+  Same session and signing key, only `aud` differs: the `convex` token is accepted
+  and the foreign-audience token is refused. A direct probe of the deployment
+  returned, for that same token,
+  `401 {"code":"NoAuthProvider","message":"No auth provider found matching the given
+  token. Check that your JWT's issuer and audience match one of your configured
+  providers: [OIDC(domain=https://organic-snake-7233.clerk.accounts.dev,
+  app_id=convex)]"}` — so the deployment names both checks and names `app_id=convex`.
+  Reaching that verdict needed two corrections found by running it for real: the
+  empty-instance preflight (S10) and a refusal predicate that only knew
+  `Unauthorized` while the deployment answers `NoAuthProvider`, which made a real
+  refusal look inconclusive.
+- **L12** Independent verification of S10 plus the refusal predicate
+  (`mwu571cw-5-6rsw`) allowed S1 to be recorded closed: 13 bypass attempts on the
+  attested path all aborted with no verdict, the single-use transport is checked
+  before the preflight, ownership is re-read before every delete, both S10 halves
+  are load-bearing and `cleanupChecks` emits `null` rather than `true` when a half
+  was not evaluated, and the accepted-versus-refused differential was confirmed to
+  be one session with two audiences rather than two reporting paths. 411 tests,
+  `tsc --noEmit` exit 0. Advisories recorded: `NoAuthProvider` is Convex's generic
+  provider-mismatch body, so a template token refused for a non-audience reason
+  would still attest (mitigated by the accepted control, not eliminated); the
+  narrowed predicate now aborts on prose forms like `401 Unauthorized` that the
+  baseline reported as verdicts (fail-closed only); `sessionRevoked: true` is a
+  literal backed by a confirmed revoke rather than derived from it; and
+  `cleanupChecks: null` must never be read as clean by a consumer. Also recorded:
+  a manual probe I ran to diagnose this left a temporary user behind for a few
+  minutes because I used the readonly shell variable `UID` as the delete target;
+  it was found by `external_id`, deleted, and the count returned to 2 before any
+  further run.
 
 ## Delivery
 
