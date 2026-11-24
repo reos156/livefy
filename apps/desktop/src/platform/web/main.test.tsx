@@ -376,7 +376,13 @@ it('resets the document once per entry transition while the instance keeps repor
   expect(navigate).toHaveBeenCalledTimes(3)
   expect(windowNavigate).not.toHaveBeenCalled()
 })
-it('shows a failure surface instead of the waiting ring when the instance reports no session after the attempt', async () => {
+// Measured by the operator twice (L6): after a completed reset the session exists and
+// persists -- their own "Return to sign in" reload came up authenticated -- while the
+// in-document providers never observe it, which fits clerk-js `setActive` awaiting the
+// completion navigation this adapter intercepts. So an expired window is not a failure and
+// not a timing problem: the recovery is the single bounded document reset itself, exactly the
+// action the removed failure card's button performed. No card, no copy, no resume button.
+it('performs the single bounded document reset when the window expires with no session observable', async () => {
   state.staleBinding = true
   state.signedIn = false
   state.confirmed = false
@@ -394,62 +400,24 @@ it('shows a failure surface instead of the waiting ring when the instance report
     </SessionInfrastructure>
   </AuthState.Provider>)
   await screen.findByText('Public sign-in')
-  // The completed attempt hands control back with no session on the instance.
+  // The completed attempt hands control back with no session on either source, and none
+  // ever becomes observable in this document.
   await act(async () => { await providerProps.routerReplace!(completionUrl, { windowNavigate }) })
   expect(windowNavigate).toHaveBeenCalledExactlyOnceWith(completionUrl)
-  const failure = await screen.findByRole('alert', {}, { timeout: 3000 })
-  expect(failure.textContent).toContain('Password reset incomplete')
-  // A real failure stays visible: no endless ring and no stale private surface.
-  expect(screen.queryByText('Loading')).toBeNull()
-  expect(screen.queryByText('Public sign-in')).toBeNull()
-  expect(screen.queryByText('Backend access confirmed')).toBeNull()
-  expect(documentReset).not.toHaveBeenCalled()
-  // The failure surface is bounded too: one operator-driven document reset.
-  fireEvent.click(screen.getByRole('button', { name: 'Return to sign in' }))
-  expect(documentReset).toHaveBeenCalledTimes(1)
+  // The window expires: the app resets its own document instead of declaring failure.
+  await waitFor(() => expect(documentReset).toHaveBeenCalledTimes(1), { timeout: 4000 })
   expect(documentReset).toHaveBeenCalledWith(null, '', completionUrl)
-})
-// S7 and S8: the failure surface belongs only to an exhausted window, its copy reports an
-// unconfirmed session instead of the unobserved claim that none was created, and it renders
-// inside the shared visual shell as the same centred card every other surface uses.
-it('surfaces the unconfirmed session only after the window is exhausted, inside the shared shell', async () => {
-  state.staleBinding = true
-  state.signedIn = false
-  state.confirmed = false
-  clerk.session = null
-  const { completionUrl, documentReset } = entryHarness('/#/')
-  const router = createAppRouter(createMemoryHistory({ initialEntries: ['/'] }))
-  router.routeTree.update({ component: () => <SessionContent><Outlet /></SessionContent> })
-  const windowNavigate = vi.fn()
-  render(<AuthState.Provider value={authState()}>
-    <SessionInfrastructure>
-      <AuthBoundary {...props}
-        modalNavigation={createBrowserNavigation(completionUrl, replace => router.navigate({ to: '/', replace }))}>
-        <RouterProvider router={router} />
-      </AuthBoundary>
-    </SessionInfrastructure>
-  </AuthState.Provider>)
-  await screen.findByText('Public sign-in')
-  await act(async () => { await providerProps.routerReplace!(completionUrl, { windowNavigate }) })
-  // The old window has closed and nothing is declared yet: the observation is still open.
-  await act(async () => { await new Promise(resolve => setTimeout(resolve, 700)) })
+  // The failure surface is gone with its copy and its resume button.
   expect(screen.queryByRole('alert')).toBeNull()
-  const failure = await screen.findByRole('alert', {}, { timeout: 3000 })
-  expect(failure.textContent).toContain('Password reset incomplete')
-  // The session may exist and simply not be observable here, so the copy must not deny it.
-  expect(failure.textContent).toMatch(/could not be confirmed/i)
-  expect(failure.textContent).not.toMatch(/No session was created/i)
-  // S8: the shared shell's card, composed from the Alert and Button primitives, no competing visual.
-  const main = screen.getByRole('main')
-  expect(main.classList.contains('visual-shell')).toBe(true)
-  expect(main.querySelector('[data-slot="card"]')).not.toBeNull()
-  expect(main.querySelector('[data-slot="card-title"] h1')).not.toBeNull()
-  const content = main.querySelector('[data-slot="card-content"].visual-content')
-  expect(content?.contains(failure)).toBe(true)
-  expect(content?.contains(screen.getByRole('button', { name: 'Return to sign in' }))).toBe(true)
-  expect(screen.getAllByRole('main')).toHaveLength(1)
-  expect(screen.queryByText('Public sign-in')).toBeNull()
-  expect(documentReset).not.toHaveBeenCalled()
+  expect(screen.queryByText(/Password reset incomplete/)).toBeNull()
+  expect(screen.queryByRole('button', { name: 'Return to sign in' })).toBeNull()
+  // S3 holds on this path too: the expired window is one transition, so it owns one reset
+  // and the settle loop stops instead of re-arming another window.
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 300)) })
+  expect(documentReset).toHaveBeenCalledTimes(1)
+  await act(async () => { await providerProps.routerReplace!(completionUrl, { windowNavigate }) })
+  expect(documentReset).toHaveBeenCalledTimes(1)
+  expect(screen.queryByRole('alert')).toBeNull()
 })
 it('keeps private content hidden and renders no placeholder while Clerk still reports a session', async () => {
   state.staleBinding = true

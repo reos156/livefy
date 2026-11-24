@@ -2,9 +2,6 @@ import { ClerkProvider, useAuth, useClerk } from '@clerk/react'
 import { ConvexReactClient } from 'convex/react'
 import { ConvexProviderWithClerk } from 'convex/react-clerk'
 import { type ReactNode, type MutableRefObject, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Button } from '@/components/ui/button'
-import { VisualShell } from '@/components/visual-shell'
 import { AuthConfiguration } from '../../lib/auth'
 import { SessionBoundary } from '../../lib/session'
 import { browserCompletionUrl, createBrowserNavigation } from './auth-ui'
@@ -14,11 +11,13 @@ type BrowserClerk = ReturnType<typeof useClerk>
 // The binding value the provider captured at mount, as the session boundary observes it.
 type BindingSnapshot = { isLoaded: boolean; isSignedIn: boolean | undefined }
 // A completed entry can hand control back well before the session it activated is
-// observable here. The operator's browser reproduced exactly that: the reset had succeeded,
-// but the session only became observable moments after the half-second window the first cut
-// allowed, so the flow declared a failure the session contradicted. The window is therefore
-// long enough to catch that late activation, and still bounded so an instance that never
-// converges cannot turn the observation into a reload loop.
+// observable here, so the transition observes both sources it holds for a bounded window.
+// The window is not a failure threshold any more: measured twice by the operator, an expired
+// window still ended with the session present and only the in-document providers blind to it
+// (their own recovery reload came up authenticated), which fits clerk-js `setActive` awaiting
+// the completion navigation that `createBrowserNavigation.complete` intercepts. Polling longer
+// cannot change that, so expiry means "reset the document now", and the bound only exists so
+// the observation can never become a reload loop.
 const EntryConfirmationWindow = 2000
 const EntryConfirmationInterval = 100
 
@@ -41,7 +40,9 @@ function BrowserSession({ children, onSignedOut, clerkRef, bindingRef, signingOu
 }) {
   const clerk = useClerk()
   const { isLoaded, isSignedIn } = useAuth()
-  const [entry, setEntry] = useState<'idle' | 'recovered' | 'failed'>('idle')
+  // Set when this transition has asked for its one document reset: the document is being
+  // replaced, so nothing is rendered in the meantime.
+  const [resetting, setResetting] = useState(false)
   const entryResetDone = useRef(false)
   useEffect(() => {
     clerkRef.current = clerk
@@ -87,18 +88,20 @@ function BrowserSession({ children, onSignedOut, clerkRef, bindingRef, signingOu
         const binding = bindingRef.current
         if (binding?.isLoaded && binding.isSignedIn) return
         const instance = clerkRef.current
-        if (instance?.loaded && instance.session) {
-          // Bounded: one document reset per transition. The instance can keep reporting
-          // the same session forever inside this document, and that must not become a
-          // reload loop.
+        // Two shapes of the same blind document both end here: a session the instance reports
+        // while the binding stays stale, and a window that expires with no session observable
+        // at all. The operator measured the second shape twice -- the session exists and
+        // persists, only this document cannot see it -- so the answer to both is the recovery
+        // the operator performed by hand, not a surface claiming the session is missing.
+        //
+        // Bounded: one document reset per transition. The instance can keep reporting the
+        // same session forever inside this document, and that must not become a reload loop.
+        if ((instance?.loaded && instance.session) || Date.now() >= deadline) {
           entryResetDone.current = true
-          setEntry('recovered')
+          setResetting(true)
           resetToCompletion()
           return
         }
-        // Only an exhausted window is a failure: a session that activates late is followed,
-        // never pre-empted by a surface the session would contradict.
-        if (Date.now() >= deadline) { setEntry('failed'); return }
       }
       firstLook = false
       timer = setTimeout(settle, EntryConfirmationInterval)
@@ -110,17 +113,10 @@ function BrowserSession({ children, onSignedOut, clerkRef, bindingRef, signingOu
   // rendering the access landing first would flash its loading state. A binding that does
   // report the closed session keeps rendering the public surface as before.
   const bindingSignedOut = isLoaded && !isSignedIn
-  // A real failure stays visible: the whole window closed with neither source reporting the
-  // session, so the operator gets the reason and a way out instead of a ring. The copy states
-  // what was observed -- no confirmation -- because the session may exist and simply not be
-  // observable in this document, which is the very defect this window guards against.
-  if (entry === 'failed') return <VisualShell title="Livefy">
-    <Alert variant="destructive">
-      <AlertDescription>Password reset incomplete. The new session could not be confirmed on this device; sign in again to continue.</AlertDescription>
-    </Alert>
-    <Button onClick={resetToCompletion}>Return to sign in</Button>
-  </VisualShell>
-  if (entry === 'recovered') return null
+  // The document is being replaced, so nothing is painted: no waiting ring, no failure card
+  // and no claim about the session. The new document decides on its own -- if it still cannot
+  // confirm, it shows the ordinary sign-in surface like any other signed-out document.
+  if (resetting) return null
   return <SessionBoundary browser logout={logout} completedReady={bindingSignedOut} completedContent={bindingSignedOut ? children : null}>
     {children}
   </SessionBoundary>

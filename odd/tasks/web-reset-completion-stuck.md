@@ -14,8 +14,13 @@
   than the spinner it replaces.
 - **S4** The native Electron path keeps its accepted behaviour, and the existing
   browser sign-out behaviour is unchanged.
-- **S5** A real failure stays visible: when the instance reports no session after
-  the reset attempt, the operator sees a failure surface, not an endless ring.
+- **S5** When the confirmation window expires with no session observable in the
+  document, the app MUST perform its single bounded document reset instead of
+  declaring failure. Measured twice by the operator: the session exists and only the
+  in-document providers cannot see it, so re-initializing the document — the very
+  action its own recovery button performed successfully — is the correct outcome,
+  not a terminal card. A failure surface that asserts no session was created is
+  forbidden: the operator demonstrated that claim was false.
 
 ## Tasks
 
@@ -74,3 +79,18 @@
   never loop. And if clerk-js completes a code-based reset with no navigation
   callback at all, the recovery never fires and the operator falls back to today's
   ring plus manual refresh, with no failure surface shown.
+- **L6** Operator re-test after the two-second window (verbatim): «no entiendo porque en
+  la app de desktop todo es mas rapido y transparente que en la web que se queda
+  colgado, volvio a pasar lo mismo y si le doy al return entra a la app, ademas luego de
+  cambiar el password aparece una pantalla con un mensaje pero no alcance a tomarle foto
+  por que se fue muy rapido a la pantalla del anillo de espera». Two facts follow. First,
+  the card now renders centred inside the shared shell, so the earlier off-centre
+  rendering was a stale bundle, not a layout defect. Second, and decisive: an expired
+  window without a session is not a timing problem. The session is created and persists —
+  the operator's own recovery button reloads straight into an authenticated app — while the
+  in-document providers never observe it. That fits `setActive` awaiting the completion
+  navigation that `createBrowserNavigation.complete` intercepts. Polling longer cannot fix
+  it, so S5 was rewritten: the correct response to an expired window is the bounded
+  document reset itself. The desktop shell differs structurally — it builds its own
+  `Clerk` in process, with no CDN clerk-js and no hash-router completion interception —
+  so its session is already present when the native resource boots.
