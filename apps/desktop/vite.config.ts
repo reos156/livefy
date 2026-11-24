@@ -1,10 +1,15 @@
 import { fileURLToPath } from 'node:url'
+import { createRequire } from 'node:module'
 import { defineConfig } from 'vitest/config'
 import tailwindcss from '@tailwindcss/vite'
 
-export function productionCsp(html: string) {
-  return html.replace(' ws://127.0.0.1:5173', '')
+// The production policy lives in electron/csp-policy.cjs so the build transform
+// and the packaged renderer response header (electron/protocol.cjs) cannot drift.
+const { productionCsp } = createRequire(import.meta.url)('./electron/csp-policy.cjs') as {
+  productionCsp: (html: string) => string
 }
+
+export { productionCsp }
 
 export default defineConfig(({ command }) => ({
   base: './',
