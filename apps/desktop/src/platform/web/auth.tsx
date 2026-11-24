@@ -13,9 +13,13 @@ export { BrowserAuthUi } from './auth-ui'
 type BrowserClerk = ReturnType<typeof useClerk>
 // The binding value the provider captured at mount, as the session boundary observes it.
 type BindingSnapshot = { isLoaded: boolean; isSignedIn: boolean | undefined }
-// A completed entry can hand control back a beat before the session lands, so the
-// instance gets a bounded window to report it before the attempt is called a failure.
-const EntryConfirmationAttempts = 5
+// A completed entry can hand control back well before the session it activated is
+// observable here. The operator's browser reproduced exactly that: the reset had succeeded,
+// but the session only became observable moments after the half-second window the first cut
+// allowed, so the flow declared a failure the session contradicted. The window is therefore
+// long enough to catch that late activation, and still bounded so an instance that never
+// converges cannot turn the observation into a reload loop.
+const EntryConfirmationWindow = 2000
 const EntryConfirmationInterval = 100
 
 function resetToCompletion() {
@@ -64,17 +68,22 @@ function BrowserSession({ children, onSignedOut, clerkRef, bindingRef, signingOu
     // A binding that already published the session needs no repair.
     if (!(isLoaded && !isSignedIn)) return
     if (entryResetDone.current) return
-    let attempts = 0
-    let ticked = false
+    const deadline = Date.now() + EntryConfirmationWindow
+    let firstLook = true
     let timer: ReturnType<typeof setTimeout> | undefined
     let cancelled = false
     function settle() {
       if (cancelled || signingOutRef.current) return
-      if (ticked) {
+      if (!firstLook) {
         // clerk-js awaits this completion callback before it emits the new session, so the
         // binding necessarily still reports signed-out at the first look: a sign-in or OAuth
-        // return converges on its own a tick later. Re-read the binding now and leave that
-        // normal transition alone; only a binding that never converges is repaired here.
+        // return converges on its own a moment later. Only a later look may decide, and it
+        // reads both sources this component can observe.
+        //
+        // A converged binding is the normal transition and needs no repair. A session on the
+        // instance with the binding still stale is the reset's activation, which neither the
+        // binding nor the Convex client can serve inside this document, so the reset follows
+        // as soon as it is visible -- not after the window expires.
         const binding = bindingRef.current
         if (binding?.isLoaded && binding.isSignedIn) return
         const instance = clerkRef.current
@@ -87,9 +96,11 @@ function BrowserSession({ children, onSignedOut, clerkRef, bindingRef, signingOu
           resetToCompletion()
           return
         }
-        if (++attempts >= EntryConfirmationAttempts) { setEntry('failed'); return }
+        // Only an exhausted window is a failure: a session that activates late is followed,
+        // never pre-empted by a surface the session would contradict.
+        if (Date.now() >= deadline) { setEntry('failed'); return }
       }
-      ticked = true
+      firstLook = false
       timer = setTimeout(settle, EntryConfirmationInterval)
     }
     settle()
@@ -99,11 +110,13 @@ function BrowserSession({ children, onSignedOut, clerkRef, bindingRef, signingOu
   // rendering the access landing first would flash its loading state. A binding that does
   // report the closed session keeps rendering the public surface as before.
   const bindingSignedOut = isLoaded && !isSignedIn
-  // A real failure stays visible: the attempt handed control back and the instance never
-  // reported a session, so the operator gets the reason and a way out instead of a ring.
+  // A real failure stays visible: the whole window closed with neither source reporting the
+  // session, so the operator gets the reason and a way out instead of a ring. The copy states
+  // what was observed -- no confirmation -- because the session may exist and simply not be
+  // observable in this document, which is the very defect this window guards against.
   if (entry === 'failed') return <VisualShell title="Livefy">
     <Alert variant="destructive">
-      <AlertDescription>Password reset incomplete. No session was created on this device; sign in again to continue.</AlertDescription>
+      <AlertDescription>Password reset incomplete. The new session could not be confirmed on this device; sign in again to continue.</AlertDescription>
     </Alert>
     <Button onClick={resetToCompletion}>Return to sign in</Button>
   </VisualShell>
