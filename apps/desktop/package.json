@@ -9,6 +9,8 @@
     "desktop:dev": "electron . --livefy-dev",
     "start": "electron .",
     "build": "vite build && node electron/build-preload.mjs",
+    "dist:win": "bun run build && electron-builder --win",
+    "dist:win:unpacked": "bun run build && electron-builder --win dir",
     "typecheck": "tsc --noEmit && node --check electron/main.cjs && node --check electron/security.cjs",
     "test": "vitest run"
   },
@@ -36,6 +38,7 @@
     "@types/react-dom": "^19.0.0",
     "convex-test": "0.0.60",
     "electron": "41.10.7",
+    "electron-builder": "^26.18.0",
     "jsdom": "^26.0.0",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.0.0",

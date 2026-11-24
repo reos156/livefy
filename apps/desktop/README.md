@@ -362,6 +362,161 @@ usuario hace que reload vuelva al acceso público **sin borrar la sesión**;
 Convex debe volver a confirmar antes de ofrecer entrada. Producción carga mediante
 `livefy://renderer`. La inicialización estándar de Shadcn seleccionó Base UI / base-nova; su componente Button está incluido en el repositorio.
 
+## Empaquetado Windows (portable) — preparación H1.12
+
+Alcance de esta configuración: producir y ejecutar en Windows un paquete **sin
+instalador** (salida sin empaquetar `dir` y ejecutable único `portable`), para
+poder validar el recorrido real de acceso desde una aplicación empaquetada.
+Instalador, firma de código, MSIX/Store y actualización automática quedan
+deliberadamente fuera: son una decisión de distribución separada y no están
+configurados aquí. Nada de esta sección se ejecutó en el host Linux de autoría;
+ver «Lo que no se verificó» al final.
+
+### Herramienta y versiones
+
+`electron-builder` 26.18.0 como `devDependency` de este paquete, configurado en
+`electron-builder.yml`. La versión de Electron no se fija a mano: electron-builder
+la resuelve a **41.10.7** desde `devDependencies.electron` de este `package.json`
+(aunque `node_modules/electron` esté izado a la raíz del workspace).
+
+### Comandos exactos (host Windows x64)
+
+Desde la raíz del repositorio:
+
+```bat
+bun install --frozen-lockfile
+cd apps\desktop
+bun run dist:win
+```
+
+`dist:win` ejecuta `vite build` (incluye `dist/preload.cjs`) y después
+`electron-builder --win`, que aplica los dos objetivos del archivo de
+configuración y produce:
+
+- `apps\desktop\release\win-unpacked\Livefy.exe` — árbol sin empaquetar (lo que
+  se inspecciona para verificar contenido);
+- `apps\desktop\release\Livefy-0.0.0-portable.exe` — ejecutable único.
+
+Solo el árbol sin empaquetar (iteración más rápida, sin recompresión):
+
+```bat
+bun run dist:win:unpacked
+```
+
+Ejecutar lo producido:
+
+```bat
+release\win-unpacked\Livefy.exe
+release\Livefy-0.0.0-portable.exe
+```
+
+`release/` está ignorado por git (`apps/desktop/.gitignore`). No hay firma de
+código configurada: Windows mostrará su advertencia habitual de SmartScreen para
+el `.exe` portable. No existe ningún paso de publicación ni de actualización.
+
+### Qué contiene el paquete
+
+`electron-builder.yml` declara solo archivos de ejecución; electron-builder añade
+por su cuenta el árbol `node_modules` de **dependencias de producción** (nunca
+`devDependencies`):
+
+| Entra | Por qué |
+| --- | --- |
+| `package.json` | metadatos y `main: electron/main.cjs` |
+| `electron/*.cjs` | proceso principal: `main`, `protocol`, `csp-policy`, `security`, `clerk-storage` y `preload` fuente |
+| `dist/**/*` | renderizador compilado servido por `livefy://renderer/` y `dist/preload.cjs` que carga `main.cjs` |
+| `node_modules` de producción | dependencias de ejecución (`@clerk/electron`, `electron-store`, …) |
+
+No entran `src/`, `index.html`, `vite.config.ts`, `csp.test.ts`, el backend
+remoto `convex/`, `scripts/`, `electron/build-preload.mjs` ni ningún `*.test.*`.
+La regla práctica: un módulo nuevo del proceso principal se empaqueta solo si es
+`electron/*.cjs`; un script de compilación (`.mjs`) o una prueba (`.test.js`) no
+se empaqueta aunque viva en `electron/`.
+
+### Decisión sobre asar: archivo deshabilitado (`asar: false`)
+
+`electron/main.cjs:10` calcula el documento de entrada como
+`path.join(__dirname, '../dist/index.html')` y entrega a `protocol.cjs` el
+directorio `dist` (`main.cjs:56`). `electron/protocol.cjs:39-41` exige que
+`fs.realpath(root)` y `fs.realpath(target)` compartan ancestro (`path.relative`
+no puede empezar por `..` ni ser absoluto) y solo después pasa la ruta real a
+`net.fetch(pathToFileURL(file).href)` (`protocol.cjs:42`). Esa comprobación es la
+que impide servir un archivo fuera de `dist`, y `electron/protocol.test.js:66`
+la fija sobre rutas reales del sistema de archivos.
+
+Dentro de un asar esas dos rutas son virtuales del archivo, no del disco: ni
+`fs.realpath` ni `net.fetch('file://…app.asar/…')` están cubiertos por este
+repositorio, y `asarUnpack` no elimina el problema sino que lo agrava — el
+archivo conserva la ruta virtual `app.asar/dist/...` mientras los bytes viven en
+`app.asar.unpacked/dist/...`, justo el caso que el cálculo de ancestro común
+rechaza. Si esa comprobación falla, cada respuesta del renderizador es 403/404 y
+`main.cjs:49-52` cierra la aplicación: el empaquetado no arrancaría.
+
+Por eso este objetivo de validación usa `asar: false` y el paquete queda como un
+árbol de archivos idéntico al que el código ya sirve hoy desde disco. Habilitar
+asar requiere un cambio de código en `electron/protocol.cjs` (o en la raíz del
+renderizador) **más** una ejecución empaquetada observada en Windows; no es un
+interruptor de configuración. Esa decisión no cambia el renderizador, la CSP ni
+los ajustes de seguridad.
+
+### Checklist manual del paquete (Windows)
+
+Registrar modo y artefacto (`win-unpacked` o `portable`), versión y resultado de
+cada paso; no marcar aceptado un paso no observado.
+
+1. **Arranque**: la ventana abre el renderizador y no aparece
+   «Unable to load the local Livefy renderer». Si aparece, el paquete no cargó
+   `livefy://renderer/` desde `dist` y la validación se detiene aquí.
+2. **CSP en el renderizador empaquetado**: con DevTools abierto en esa ventana,
+   ejecutar en la consola
+   `await fetch('livefy://renderer/').then(r => r.headers.get('content-security-policy'))`
+   y comprobar que devuelve la política de producción —sin `ws://127.0.0.1:5173`
+   y sin `unsafe-eval`— y no `null`. Si el panel Network registra la petición
+   `livefy://renderer/`, la misma cabecera debe aparecer en sus response headers.
+   La fuente única sigue siendo `electron/csp-policy.cjs`: la cabecera
+   (`protocol.cjs:23-27`) y el `<meta>` compilado deben coincidir.
+3. **Registro**: crear una cuenta real y confirmar el código.
+4. **Login**: entrar con esa cuenta y comprobar acceso privado (`/app`).
+5. **Reinicio**: cerrar y volver a abrir el artefacto; la sesión se restaura
+   desde el almacén cifrado del paquete (`%APPDATA%\Livefy`, nombre
+   `productName`, separado del usado en desarrollo) o se informa explícitamente
+   que la sesión quedó solo en memoria si `safeStorage` no está disponible.
+6. **Logout**: cerrar sesión; la aplicación borra el almacén local y termina. Al
+   reabrir debe pedir acceso de nuevo.
+7. **Recuperación**: recorrer «Forgot password?» completo dentro de la ventana
+   (código, contraseña nueva, la nueva entra y la vieja no).
+
+### Límites de un build portable
+
+- No hay registro `livefy://` a nivel de sistema sin instalador. `@clerk/electron`
+  registra el esquema para el ejecutable en tiempo de arranque
+  (`node_modules/@clerk/electron/dist/cjs/index.js:89`) y `main.cjs:27-33` solo
+  añade el directorio de la app cuando corre en modo desarrollo. El objetivo
+  `portable` se autoextrae en `%TEMP%` en cada ejecución, de modo que cualquier
+  registro apuntaría a una ruta volátil. **El retorno de OAuth por deep link
+  sigue siendo solo de desarrollo** y no se valida con este paquete; definir la
+  distribución (instalador) es otra decisión.
+- `portable` extrae el árbol en cada arranque: el primer inicio es más lento que
+  `win-unpacked` y consume espacio temporal. Para validar contenido y rendimiento
+  de arranque usar `win-unpacked`; `portable` solo confirma que el ejecutable
+  único funciona.
+- Sin firma: SmartScreen puede avisar; no es un defecto del paquete.
+
+### Lo que no se verificó al escribir esta configuración
+
+El host de autoría es Linux/WSL sin wine ni Windows, y la tarea prohíbe explícitamente
+producir el artefacto. Verificado aquí: el archivo de configuración carga con el
+cargador real de electron-builder y pasa su validación de esquema, los objetivos
+resueltos son `dir` y `portable` para x64, la versión de Electron resuelta es
+41.10.7, y `test`/`typecheck`/`build` siguen verdes en este host. **No** verificado
+aquí: que el `.exe` resultante arranque, el contenido final del paquete (incluida
+la recolección de `node_modules` de producción en un workspace con dependencias
+izadas: esta versión de electron-builder trae un colector específico de bun por
+recorrido de archivos, `out/node-module-collector/bunNodeModulesCollector.js`, y
+un respaldo por recorrido en `out/util/appFileCopier.js:305-320`, pero ninguno se
+ejecutó aquí), la cabecera CSP en la ventana empaquetada ni ningún paso del
+checklist anterior. Todo eso pertenece a la ejecución Windows de H1.12.
+
 ## Seguridad y límites de verificación
 
 - El aislamiento de contexto y el entorno aislado (sandbox) están habilitados; la integración Node y las vistas web están deshabilitadas.
@@ -371,7 +526,9 @@ Convex debe volver a confirmar antes de ofrecer entrada. Producción carga media
 
 Las pruebas Vitest históricas comprueban políticas deterministas y la interfaz de acceso no disponible, no la seguridad de Electron en ejecución. Un intento histórico en Linux registró caídas de procesos GPU (salida 139) y terminó por límite de tiempo (124); no constituye certificación visual ni demuestra por sí solo que la ventana no se abriera.
 
-**H1.1 cuenta con un lanzamiento básico de la vista previa en Windows observado por el usuario.** Esto no certifica seguridad en ejecución, flujos Auth, reinicio/persistencia ni el recorrido de una aplicación empaquetada en Windows. No se ha seleccionado herramienta de instalación, firma o distribución.
+**H1.1 cuenta con un lanzamiento básico de la vista previa en Windows observado por el usuario.** Esto no certifica seguridad en ejecución, flujos Auth, reinicio/persistencia ni el recorrido de una aplicación empaquetada en Windows. El empaquetado se limita por ahora al objetivo de validación sin instalador descrito en
+«Empaquetado Windows (portable)»; no se ha seleccionado herramienta de instalación, firma ni
+distribución.
 
 ## Historial H1.2: autenticación DEV y contrato de sesión
 

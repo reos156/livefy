@@ -1,2 +1,5 @@
 
 .env.local
+
+# Salida local del empaquetado Windows (electron-builder)
+release/
