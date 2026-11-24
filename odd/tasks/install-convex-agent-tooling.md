@@ -72,7 +72,7 @@ Installing agent tooling now provides current Convex workflows and deployment in
   - Route: delegated writer when app development begins.
   - Acceptance: install current Convex AI files from the chosen Convex app root with Pi explicitly selected, without enabling deployment access or overwriting non-managed user content.
   - Checks: inspect AI file status and managed sections after install.
-  - Evidence: deferred; the root currently has no `package.json` or Convex app target, and the user deferred app setup/dependency/deployment until development begins.
+  - Evidence: still deferred, but the blocker recorded above no longer holds: `apps/desktop/package.json` and `apps/desktop/convex/` now exist (no `convex.json` was found in that directory). The remaining gate is choosing the Convex app target (repository root versus `apps/desktop`) and the operator's authorization to run the install. Nothing was installed or verified.
 
 ## Progress
 

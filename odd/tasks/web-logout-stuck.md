@@ -6,6 +6,12 @@ After a completed local sign-out in the web platform the app never leaves the
 reloads the page. Close the transition and remove the raw placeholder without
 weakening the existing fail-closed gating.
 
+This document is the authoritative record for the web sign-out transition. The
+related W4/W5 work in [Web authentication parity](web-auth-parity.md) addressed a
+different root cause in the same transition (a router acknowledgement deadlock
+plus a transient status text); it is not a duplicate of this defect and neither
+record closes the other.
+
 ## Specs
 
 - **S1** After a completed local sign-out, the operator MUST reach the sign-in
@@ -40,7 +46,7 @@ binding is re-initialized. `@clerk/react` 6.17.6 bundles its own core and does
 not expose `addListener`, so the binding cannot be notified directly.
 
 ## Tasks
-- [ ] T1 (S1, S3) Write the RED first, then fix the transition. The current test
+- [ ] **DROPPED — superseded by T3, not open work.** T1 (S1, S3) Write the RED first, then fix the transition. The current test
   passes only because it calls `view.rerender(tree())` to manufacture the
   re-render the browser never performs; the new case must model the measured
   behavior instead: the binding value observed at mount stays stale after
@@ -51,7 +57,7 @@ not expose `addListener`, so the binding cannot be notified directly.
 - [x] T2 (S2) PARTIAL — the raw `<p role="status">` is gone and the surface now
   renders inside `VisualShell` with `Alert role="status"`. S2 holds; the surface
   is still terminal, which is S1's failure below.
-- [ ] T3 (S1, S3) REPLACES T1's mechanism. T1 remounted the consumer of the
+- [x] T3 (S1, S3) DONE. REPLACES T1's mechanism. T1 remounted the consumer of the
   binding (`BindingReader` keyed by a generation counter) on the assumption that
   a fresh mount re-reads the Clerk instance. Measured in Chromium: it does not.
   The stale value lives in the provider context, so remounting a consumer

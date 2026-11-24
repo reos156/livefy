@@ -28,14 +28,20 @@ document reset. `src/lib/session.tsx` is shared with Electron, so every change
 there must be browser-scoped.
 
 ## Tasks
-- [ ] T1 (S1, S4) Make the initial-load statuses silent but still announced:
-  `src/access.tsx` (`ConfiguredAccess`), `src/private-access.tsx`
-  (`ConfirmedAccess`). Keep the rejected/required messages visible.
-- [ ] T2 (S2, S3, S4) In `src/lib/session.tsx`, suppress the browser `pending`
-  and `ended` screens while keeping the native path, the `failed` alert and the
-  retry action exactly as they are.
-- [ ] T3 (S5) Check that `routes.tsx` and any remaining surface expose no jargon
-  in these paths.
+- [x] T1 (S1, S4) DONE. The waiting branch paints only the Kibo ring on the
+  shared shell through `src/components/waiting-screen.tsx`; the status survives
+  as an `sr-only` `role="status"` Alert in `src/access.tsx` (`ConfiguredAccess`)
+  and `src/private-access.tsx` (`ConfirmedAccess`). The rejected and required
+  messages stay visible, pinned by `src/access.test.tsx:37,126`.
+- [x] T2 (S2, S3, S4) DONE. `src/lib/session.tsx` suppresses the browser
+  `pending`/`ended` screens and keeps the native path, the `failed` alert and
+  the retry action unchanged; `src/platform/web/main.test.tsx:91,185,212` and
+  `src/lib/session.test.tsx:52` assert the suppressed strings never reach the
+  browser.
+- [ ] T3 (S5) PARTIAL. No visible jargon remains on these paths, but the
+  accessible labels still read `Checking backend access`
+  (`src/private-access.tsx:11`) by design from L5. S5 holds for visible strings;
+  the `sr-only` wording needs the operator's decision before this closes.
 
 ## Allowed edit surfaces
 - apps/desktop/src/access.tsx

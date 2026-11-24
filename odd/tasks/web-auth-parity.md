@@ -7,6 +7,8 @@ Independent verification completed: focused 178/178, full 300/300 across 23 file
 
 DEV scope accepted; no production certification. Auth refs #8/#10/#12/#13 remain closed; issue #14 is untouched. Commit evidence: pending — parent records authorized local commit after creation; no push/PR/merge authorized.
 
+W4/W5 are not superseded and not duplicated by [Web logout stuck](web-logout-stuck.md): both describe the same sign-out transition but different root causes (router acknowledgement deadlock plus transient status text here; the stale Clerk React binding there). That document is the authoritative record for the sign-out transition; neither closes the other.
+
 ## Objective
 Support browser sign-in, Google sign-up and sign-out with the same shared application UI and backend-confirmed private access as Electron.
 

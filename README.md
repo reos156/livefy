@@ -4,9 +4,10 @@ Livefy busca facilitar la gestión comercial de transmisiones en vivo de TikTok.
 
 ## Estado actual
 
-- **Implementado:** ventana Electron aislada, vista previa de acceso en React, navegación con TanStack Router y backend Convex Auth de correo/contraseña con consulta de sesión.
-- **Pendiente:** interfaz de registro e inicio de sesión, recorrido completo de acceso y recuperación, y funciones comerciales. Los controles de acceso de la vista previa siguen deshabilitados; inicializar el proveedor no equivale a autenticar al usuario.
-- **Windows:** existe evidencia humana del lanzamiento básico de la vista previa (H1.1). La seguridad en ejecución, los flujos Auth y la aplicación empaquetada en Windows no están certificados.
+- **Implementado (DEV):** ventana Electron aislada con fronteras IPC, Clerk como único emisor de autenticación en web y Electron con la UI oficial del proveedor, registro, inicio de sesión, rutas privadas con guard, sesión nativa y navegación con TanStack Router sobre Convex. Ver H1.1–H1.7 en el [hito de acceso Windows](odd/tasks/mvp-h1-access-windows.md).
+- **Pendiente:** recuperación de contraseña (H1.8–H1.12), la attestation negativa de Clerk y la CSP de producción, la aplicación empaquetada en Windows y todas las funciones comerciales del MVP (wizard de tienda, dashboard, panel de live, productos, leads, Kapso e ingestor local).
+- **Windows:** existe evidencia humana del lanzamiento básico de la vista previa (H1.1) y del acceso en DEV. La seguridad en ejecución, la attestation negativa de Clerk y la aplicación empaquetada en Windows no están certificados.
+- **Alcance:** DEV aceptado, sin certificación de producción ni despliegue.
 
 ## Tecnologías
 

@@ -26,12 +26,13 @@ navigates to the private route from an authenticated tree.
 
 ## Tasks
 
-- [ ] T1 (S2) RED at the navigation seam: a same-origin in-app target that is not
-  the completion route must not throw, and must not strand the view. Then fix,
-  keeping the throw for cross-origin or unsupported targets.
-- [ ] T2 (S1, S3) Confirm `Authentication required` renders at `/#/app`
-  unauthenticated, still fail-closed, and re-run the matrix row for the private
-  route at 320/375/1000 in both themes.
+- [x] T1 (S2) DONE. The same-origin in-app target that is not the completion
+  route is now left to the app (no throw, no delegation) in
+  `src/platform/web/auth-ui.tsx`; cross-origin, wrong-protocol and credentialed
+  targets still throw. RED 6 failed/19 passed → GREEN 25/25 focused.
+- [x] T2 (S1, S3) DONE. `Authentication required` with its `Return to access`
+  link renders at `/#/app` unauthenticated, still fail-closed, at 320/375/1000
+  in light and dark with zero page errors (L2).
 
 ## Allowed edit surfaces
 - apps/desktop/src/platform/web/auth-ui.tsx
