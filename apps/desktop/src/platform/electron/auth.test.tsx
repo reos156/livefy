@@ -204,9 +204,11 @@ describe('safe native auth configuration', () => {
     const logout = vi.fn(() => storage.logout()), preserveAndQuit = vi.fn()
     window.livefySession = { logout, preserveAndQuit, persistence: async () => storage.persistence }
     const enter = vi.fn()
-    const view = render(<AuthBoundary endpoint={endpoint} publishableKey={publishableKey}><AccessLanding onEnterApp={enter} /></AuthBoundary>)
+    const view = render(<AuthBoundary endpoint={endpoint} publishableKey={publishableKey}><AccessLanding onEnterApp={enter} /><LogoutButton /></AuthBoundary>)
     await act(async () => {})
-    expect(screen.getByText('Backend access confirmed')).toBeTruthy()
+    // Confirmed access enters the app by itself and paints no landing to click.
+    expect(enter).toHaveBeenCalledOnce()
+    expect(screen.queryByText('Backend access confirmed')).toBeNull()
     expect(records.size).toBe(1)
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'Sign out' })))
     expect(client.removeSessions).toHaveBeenCalledExactlyOnceWith()
@@ -227,12 +229,15 @@ describe('safe native auth configuration', () => {
     mocks.resource.mockReturnValue({ client: { ...client, sessions: [], signedInSessions: [] }, session: null })
     mocks.auth.mockReturnValue({ isLoaded: true, isSignedIn: false })
     mocks.convexAuth.mockReturnValue({ isLoading: false, isAuthenticated: false, isRefreshing: false })
-    render(<AuthBoundary endpoint={endpoint} publishableKey={publishableKey}><AccessLanding onEnterApp={enter} /></AuthBoundary>)
+    // Its own spy: the first phase legitimately entered the app once, and what this
+    // phase proves is that a fresh process grants nothing.
+    const enterAfterRestart = vi.fn()
+    render(<AuthBoundary endpoint={endpoint} publishableKey={publishableKey}><AccessLanding onEnterApp={enterAfterRestart} /></AuthBoundary>)
     await act(async () => {})
     expect(screen.queryByText('Backend access confirmed')).toBeNull()
     expect(screen.queryByRole('button', { name: 'Open app' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Sign out' })).toBeNull()
-    expect(enter).not.toHaveBeenCalled()
+    expect(enterAfterRestart).not.toHaveBeenCalled()
   })
   it('denies private access to a provider-revoked session and grants it only once the provider authenticates', async () => {
     mocks.resource.mockReturnValue({ client: { id: 'client', sessions: [], signedInSessions: [] }, session: {} })
@@ -255,8 +260,9 @@ describe('safe native auth configuration', () => {
     mocks.convexAuth.mockReturnValue({ isLoading: false, isAuthenticated: true, isRefreshing: false })
     view.rerender(<AuthBoundary endpoint={endpoint} publishableKey={publishableKey}><AccessLanding onEnterApp={enter} /></AuthBoundary>)
     await act(async () => {})
-    expect(screen.getByText('Backend access confirmed')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Open app' }))
+    // Entered without a click: the confirmed surface is the ring, not a button.
     expect(enter).toHaveBeenCalledOnce()
+    expect(screen.queryByText('Backend access confirmed')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Open app' })).toBeNull()
   })
 })
