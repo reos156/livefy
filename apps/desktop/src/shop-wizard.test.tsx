@@ -111,6 +111,17 @@ describe('shop wizard — platform-owned bot identifiers', () => {
   })
 })
 
+describe('shop wizard — footer controls', () => {
+  it('does not submit the form when a footer control is clicked', () => {
+    const onSubmit = vi.fn()
+    render(<ShopWizard onSubmit={onSubmit} initial={shop} footer={<button>Sign out</button>} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
+
+    expect(onSubmit).not.toHaveBeenCalled()
+  })
+})
+
 describe('shop wizard — pending submission', () => {
   it('disables the submit control and paints the ring while the mutation runs', () => {
     const onSubmit = vi.fn()

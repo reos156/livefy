@@ -103,6 +103,25 @@ describe('shops.completeWizard — identity-owned shop creation', () => {
     })).rejects.toThrow()
   })
 
+  it.each([
+    ['description', { ...wizardInput, description: 'x'.repeat(501) }, { ...wizardInput, description: 'x'.repeat(500) }],
+    ['list item', { ...wizardInput, categories: ['c'.repeat(41)] }, { ...wizardInput, categories: ['c'.repeat(40)] }],
+    ['payment methods',
+      { ...wizardInput, paymentMethods: Array.from({ length: 11 }, (_, index) => `medio-${index}`) },
+      { ...wizardInput, paymentMethods: Array.from({ length: 10 }, (_, index) => `medio-${index}`) }],
+    ['personal WhatsApp', { ...wizardInput, personalWhatsapp: '+'.repeat(33) }, { ...wizardInput, personalWhatsapp: '+'.repeat(32) }],
+  ])('rejects a %s beyond its bound and leaves the stored shop unchanged', async (_bound, invalid, boundary) => {
+    const t = convexTest(schema, modules)
+    const caller = t.withIdentity(first)
+    const before = await caller.mutation(completeWizard, wizardInput)
+
+    await expect(caller.mutation(completeWizard, invalid)).rejects.toThrow()
+    expect(await caller.query(current, {})).toEqual(before)
+    expect(await t.run(async ctx => ctx.db.query('shops').collect())).toHaveLength(1)
+    // The value exactly at the bound is the one the backend accepts.
+    await expect(caller.mutation(completeWizard, boundary)).resolves.toBeTruthy()
+  })
+
   it('edits the existing shop instead of creating a second one', async () => {
     const t = convexTest(schema, modules)
     const caller = t.withIdentity(first)

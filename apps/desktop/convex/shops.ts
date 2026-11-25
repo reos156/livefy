@@ -114,13 +114,14 @@ export const completeWizard = mutation({
       .first()
 
     const now = Date.now()
-    // Only operator-owned fields are written here. The platform-owned bot identifiers
-    // are absent from these arguments on purpose, so an edit can never rewrite them.
-    const fields = { ownerId, name, description, categories, paymentMethods, personalWhatsapp, updatedAt: now }
+    // Ownership invariant: `ownerId` is server-derived and written only when the shop is
+    // created, never on an edit. The platform-owned bot identifiers are absent from these
+    // arguments too, so no later completion can rewrite either of them.
+    const operatorFields = { name, description, categories, paymentMethods, personalWhatsapp, updatedAt: now }
 
     const shopId = existing
-      ? (await ctx.db.patch(existing._id, fields), existing._id)
-      : await ctx.db.insert('shops', { ...fields, wizardCompletedAt: now })
+      ? (await ctx.db.patch(existing._id, operatorFields), existing._id)
+      : await ctx.db.insert('shops', { ...operatorFields, ownerId, wizardCompletedAt: now })
 
     const saved = await ctx.db.get(shopId)
     if (!saved) throw new ConvexError({ code: 'shop-not-found', field: 'shopId' })

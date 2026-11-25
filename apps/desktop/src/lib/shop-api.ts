@@ -21,6 +21,20 @@ export type WizardInput = {
   personalWhatsapp?: string
 }
 
+// Closed set the backend publishes. Typing the copy map against it turns a renamed or
+// new code into a typecheck failure instead of a silent generic fallback.
+export type ShopValidationCode =
+  | 'shop-name-required'
+  | 'shop-description-required'
+  | 'shop-categories-required'
+  | 'shop-payment-methods-required'
+  | 'shop-item-empty'
+  | 'shop-item-too-long'
+  | 'shop-list-too-long'
+  | 'shop-field-too-long'
+
+// `code` stays a plain string because the value arrives from the network; the lookup
+// below narrows it back to the closed set at runtime.
 export type ShopValidationPayload = { code?: string; field?: string }
 
 // Typed references keep the renderer honest about the backend contract while
@@ -30,7 +44,7 @@ export const shopFunctions = {
   completeWizard: makeFunctionReference<'mutation', WizardInput, ShopView>('shops:completeWizard'),
 }
 
-const copy: Record<string, string> = {
+const copy: Record<ShopValidationCode, string> = {
   'shop-name-required': 'Ingresá el nombre de la tienda.',
   'shop-description-required': 'Ingresá una descripción.',
   'shop-categories-required': 'Agregá al menos una categoría.',
@@ -44,6 +58,7 @@ const copy: Record<string, string> = {
 /** Turns a backend validation code into the sentence the operator reads. */
 export function shopErrorMessage(cause: unknown): string {
   const payload = (cause as { data?: ShopValidationPayload })?.data
-  const known = payload?.code ? copy[payload.code] : undefined
+  const code = payload?.code
+  const known = code && Object.hasOwn(copy, code) ? copy[code as ShopValidationCode] : undefined
   return known ?? 'No pudimos guardar la tienda. Probá de nuevo.'
 }

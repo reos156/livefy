@@ -45,10 +45,12 @@ function validate(form: Form): Errors {
   else if (description.length > MAX_DESCRIPTION) errors.description = 'La descripción es demasiado larga.'
 
   if (form.categories.length === 0) errors.categories = 'Agregá al menos una categoría.'
+  else if (form.categories.length > MAX_LIST_ITEMS) errors.categories = 'Quitá algún ítem: la lista es demasiado larga.'
   else if (form.categories.some(item => !item.trim())) errors.categories = 'Completá o quitá el ítem vacío.'
   else if (form.categories.some(item => item.trim().length > MAX_LIST_ITEM)) errors.categories = 'Ese ítem es demasiado largo.'
 
   if (form.paymentMethods.length === 0) errors.paymentMethods = 'Agregá al menos un medio de pago.'
+  else if (form.paymentMethods.length > MAX_LIST_ITEMS) errors.paymentMethods = 'Quitá algún ítem: la lista es demasiado larga.'
   else if (form.paymentMethods.some(item => !item.trim())) errors.paymentMethods = 'Completá o quitá el ítem vacío.'
   else if (form.paymentMethods.some(item => item.trim().length > MAX_LIST_ITEM)) errors.paymentMethods = 'Ese ítem es demasiado largo.'
 
@@ -225,8 +227,10 @@ export function ShopWizard({ initial, pending = false, error, footer, onSubmit }
           {pending && <Spinner data-icon="inline-start" />}
           {pending ? 'Guardando…' : 'Guardar tienda'}
         </Button>
-        {footer}
       </div>
     </form>
+    {/* Outside the form on purpose: a caller-supplied control that omits
+        `type="button"` defaults to a submit button, and would then save the shop. */}
+    {footer && <div className="flex items-center gap-2">{footer}</div>}
   </VisualShell>
 }
