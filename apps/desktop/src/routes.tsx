@@ -1,9 +1,8 @@
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { createRootRoute, createRoute, createRouter, Link, Outlet, useNavigate, type RouterHistory } from '@tanstack/react-router'
-import { VisualShell } from './components/visual-shell'
+import { AppEntry } from './app-entry'
 import { AccessLanding } from './access'
 import { PrivateAccess } from './private-access'
-import { LogoutButton } from './lib/session'
 
 function PublicAccess() {
   const navigate = useNavigate()
@@ -11,11 +10,7 @@ function PublicAccess() {
 }
 function PrivateApp() {
   return <PrivateAccess rejected={<><Alert role="status"><AlertDescription>Authentication required</AlertDescription></Alert><Link to="/">Return to access</Link></>}>
-    <VisualShell title="Livefy app">
-      <p>Backend access confirmed.</p>
-      <LogoutButton />
-      <Link to="/">Return to access</Link>
-    </VisualShell>
+    <AppEntry />
   </PrivateAccess>
 }
 // The browser document keeps Clerk's hash routing while in-app routes live in a

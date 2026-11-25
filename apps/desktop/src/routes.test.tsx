@@ -17,7 +17,11 @@ vi.mock('convex/react', async () => {
     const [, update] = useReducer(value => value + 1, 0)
     useEffect(() => { listeners.add(update); return () => { listeners.delete(update) } }, [])
     return state
-  } }
+  },
+  // The private entry reads the operator's shop; an unconfigured shop keeps it on
+  // the wizard, which is the screen these route assertions look for.
+  useQuery: () => null,
+  useMutation: () => async () => null }
 })
 beforeEach(() => { vi.spyOn(window, 'scrollTo').mockImplementation(() => {}) })
 import { AuthConfiguration } from './lib/auth'
@@ -50,7 +54,7 @@ it('rejects anonymous direct navigation and provides a public return', async () 
   const required = await screen.findByText('Authentication required')
   // A real refusal stays fully visible; only transient waits are announced-only.
   expect(required.closest('.sr-only')).toBeNull()
-  expect(screen.queryByRole('heading', { name: 'Livefy app' })).toBeNull()
+  expect(screen.queryByRole('heading', { name: 'Configurá tu tienda' })).toBeNull()
   fireEvent.click(screen.getByRole('link', { name: 'Return to access' }))
   expect(await screen.findByRole('heading', { name: 'Livefy' })).toBeTruthy()
   expect(router.state.location.pathname).toBe('/')
@@ -79,21 +83,21 @@ it.each(['loading', 'refresh', 'unavailable'] as const)('blocks composed private
     expect(screen.getByTitle('Loading...').closest('svg')).not.toBeNull()
     expect(screen.getAllByRole('status')).toHaveLength(1)
   }
-  expect(screen.queryByRole('heading', { name: 'Livefy app' })).toBeNull()
+  expect(screen.queryByRole('heading', { name: 'Configurá tu tienda' })).toBeNull()
   if (mode === 'unavailable') expect(authHook).not.toHaveBeenCalled()
 })
 it('allows confirmed public navigation and removes private content on auth loss', async () => {
   state.isAuthenticated = true
   const { router } = setup('/')
   fireEvent.click(await screen.findByRole('button', { name: 'Open app' }))
-  expect(await screen.findByRole('heading', { name: 'Livefy app' })).toBeTruthy()
+  expect(await screen.findByRole('heading', { name: 'Configurá tu tienda' })).toBeTruthy()
   expect(router.state.location.pathname).toBe('/app')
   act(() => {
     state.isAuthenticated = false
     listeners.forEach(update => update())
   })
   expect(await screen.findByText('Authentication required')).toBeTruthy()
-  expect(screen.queryByRole('heading', { name: 'Livefy app' })).toBeNull()
+  expect(screen.queryByRole('heading', { name: 'Configurá tu tienda' })).toBeNull()
 })
 it('does not offer navigation before backend confirmation', async () => {
   setup('/')
