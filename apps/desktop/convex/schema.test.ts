@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import schema from './schema'
 
 describe('Clerk-only application schema', () => {
-  it('declares no application tables, including legacy Convex Auth tables', () => {
-    expect(Object.keys(schema.tables)).toEqual([])
+  it('declares the shop table and no legacy Convex Auth table', () => {
+    expect(Object.keys(schema.tables)).toEqual(['shops'])
   })
 })

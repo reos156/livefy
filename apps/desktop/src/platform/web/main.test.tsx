@@ -50,7 +50,10 @@ vi.mock('../../platform/auth', () => ({
   useAuth: useLiveAuth,
   AuthUi: () => <p>Public sign-in</p>,
 }))
-vi.mock('convex/react', () => ({ ConvexReactClient: class {}, useConvexAuth: useLiveAuth }))
+vi.mock('convex/react', () => ({ ConvexReactClient: class {}, useConvexAuth: useLiveAuth,
+  // The private entry reads the operator's shop; no shop keeps it on the wizard, which
+  // is where this suite looks for the session control.
+  useQuery: () => null, useMutation: () => async () => null }))
 vi.mock('convex/react-clerk', () => ({ ConvexProviderWithClerk: ({ children }: { children: React.ReactNode }) => children }))
 import { AuthBoundary } from './auth'
 import { LogoutButton, SessionContent, SessionInfrastructure } from '../../lib/session'
