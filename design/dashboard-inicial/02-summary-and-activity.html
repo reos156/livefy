@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard — resumen a la izquierda, actividad a la derecha</title>
+<style>
+  :root {
+    --background: oklch(1.0000 0 0); --foreground: oklch(0.2850 0 0); --card: oklch(1.0000 0 0);
+    --muted: oklch(0.9845 0.0026 106.4477); --muted-foreground: oklch(0.5103 0 0);
+    --border: oklch(0.9269 0.0160 110.5685); --input: oklch(0.9448 0.0134 115.8392);
+    --primary: oklch(0.9347 0.1825 120.5229); --primary-foreground: oklch(0 0 0);
+    --ring: oklch(0.9347 0.1825 120.5229); --radius: 1rem;
+  }
+  html.dark { --background: oklch(0.2679 0.0036 106.6427); --foreground: oklch(0.9576 0.0027 106.4494);
+    --card: oklch(0.2928 0.0018 106.5092); --muted: oklch(0.3300 0.0030 106.5000);
+    --muted-foreground: oklch(0.7200 0.0040 106.4500); --border: oklch(0.3618 0.0101 106.8928);
+    --input: oklch(0.3400 0.0090 106.8000); --primary-foreground: oklch(0 0 0); }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--background); color: var(--foreground);
+    font-family: ui-sans-serif, system-ui, sans-serif; font-size: 14px; line-height: 1.5; }
+  :focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; }
+  .app { max-width: 1000px; margin: 0 auto; padding: 26px 28px 40px; }
+  header.top { display: flex; align-items: center; gap: 12px; margin-bottom: 22px; }
+  .mark { width: 38px; height: 38px; border-radius: 12px; background: var(--primary);
+    color: var(--primary-foreground); display: grid; place-items: center; font-weight: 700; }
+  h1 { font-size: 19px; margin: 0; } .sub { margin: 0; font-size: 12.5px; color: var(--muted-foreground); }
+  .sp { flex: 1; }
+  button.b { height: 36px; padding: 0 14px; border-radius: 10px; font: inherit; font-weight: 600;
+    border: 1px solid transparent; background: var(--primary); color: var(--primary-foreground); cursor: pointer; }
+  button.g { background: transparent; border-color: var(--border); color: var(--foreground); font-weight: 500; }
+  .cols { display: grid; grid-template-columns: 300px 1fr; gap: 16px; align-items: start; }
+  .panel { border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); }
+  .panel > header { padding: 16px 18px 8px; }
+  .panel > header h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .05em;
+    color: var(--muted-foreground); margin: 0; }
+  dl { margin: 0; padding: 6px 18px 18px; display: flex; flex-direction: column; }
+  .row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+    padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .row:last-child { border-bottom: 0; }
+  dt { color: var(--muted-foreground); font-size: 13px; }
+  dd { margin: 0; font-size: 20px; font-weight: 700; }
+  .empty { border: 1px dashed var(--border); background: var(--muted); border-radius: var(--radius);
+    padding: 40px 26px; text-align: center; }
+  .empty h2 { font-size: 17px; margin: 0 0 6px; }
+  .empty p { margin: 0 auto; max-width: 26rem; color: var(--muted-foreground); font-size: 13px; }
+  .empty .cta { margin-top: 18px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .empty .note { font-size: 12px; color: var(--muted-foreground); }
+  .disabled { opacity: .45; pointer-events: none; }
+  .toggle { position: fixed; top: 12px; right: 12px; font-size: 11px; padding: 6px 10px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--card); color: var(--muted-foreground); cursor: pointer; }
+</style>
+</head>
+<body>
+<button class="toggle" type="button" onclick="document.documentElement.classList.toggle('dark')">claro / oscuro</button>
+<main class="app">
+  <header class="top">
+    <span class="mark" aria-hidden="true">L</span>
+    <div><h1>Mundo Kawaii</h1><p class="sub">Tu tienda está configurada.</p></div>
+    <span class="sp"></span>
+    <button class="b g" type="button">Editar tienda</button>
+    <button class="b g" type="button">Sign out</button>
+  </header>
+
+  <div class="cols">
+    <section class="panel" aria-labelledby="r">
+      <header><h2 id="r">Resumen</h2></header>
+      <dl>
+        <div class="row"><dt>Lives activos</dt><dd>0</dd></div>
+        <div class="row"><dt>Leads nuevos</dt><dd>0</dd></div>
+        <div class="row"><dt>Pendientes</dt><dd>0</dd></div>
+        <div class="row"><dt>Conversión</dt><dd>0 %</dd></div>
+        <div class="row"><dt>Ventas estimadas</dt><dd>$0</dd></div>
+      </dl>
+    </section>
+
+    <section class="empty" aria-labelledby="e">
+      <h2 id="e">Todavía no hay actividad</h2>
+      <p>Cuando conectes un live, en este lugar aparece la actividad: leads que entran, pendientes y ventas.</p>
+      <div class="cta">
+        <button class="b disabled" type="button" disabled aria-describedby="n">Conectá tu primer live</button>
+        <span class="note" id="n">La conexión de lives llega en la próxima etapa.</span>
+      </div>
+    </section>
+  </div>
+</main>
+</body>
+</html>
