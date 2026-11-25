@@ -75,6 +75,20 @@ Independent verification (`gentle-ai-verify`, read-only, risk item 2) found **no
 
 The new table adds no migration concern: the baseline schema declared zero tables, so there is no row to backfill and Convex creates the table on deploy.
 
+## First review round and its corrections
+
+The first native review approved the three unit commits (`lineage review-2291edf0b6f7ca17`, authority burned) and left five non-blocking findings. They were fixed in `c81b538` before delivery, because one of them was a real defect:
+
+- **Sign out also submitted the shop form.** The wizard painted its `footer` slot inside `<form>`, and the caller passes `LogoutButton` there; a button without `type="button"` defaults to submit. The case was written first and failed for the right reason — clicking it called `onSubmit` with the current values — which is behaviour-level RED, not module resolution. The footer is now a sibling of the form, so no caller-supplied control can submit it.
+- The form now mirrors the list-length bound it already uses to hide the add control.
+- The edit path no longer writes the server-owned `ownerId`; the insert path still writes it.
+- The operator-copy map is typed against the closed set of backend codes, so a renamed code fails the typecheck instead of silently falling back.
+- One boundary test per remaining validation bound (description, list item, payment methods, personal WhatsApp), each asserting rejection plus unchanged stored data.
+
+Suite after the corrections: 26 files, 460 tests, exit 0; both typechecks and the build exit 0.
+
+The final review receipt for this candidate is recorded in the PR body, since a committed document cannot contain the review of its own commit.
+
 ## Follow-ups, deliberately outside this scope
 
 - **S2 edit form has no cancel control.** An operator who opens the prefilled form can only save (idempotent, harmless) or sign out. Not required by R1; left out rather than expanding the diff. Candidate for R2 or a small polish unit.
