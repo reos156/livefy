@@ -28,6 +28,14 @@ const legacySchema = defineSchema({
     wizardCompletedAt: v.number(),
     updatedAt: v.number(),
   }).index('by_owner', ['ownerId']),
+  // The migration resolves an explicit international prefix against the catalogue, so
+  // the fixture database needs it to behave like a seeded deployment.
+  dialCodes: defineTable({
+    iso2: v.string(),
+    label: v.string(),
+    dial: v.string(),
+    order: v.number(),
+  }).index('by_iso2', ['iso2']).index('by_order', ['order']),
 })
 
 const legacyShop = {
@@ -47,6 +55,11 @@ async function seededLegacy(rows: Record<string, unknown>[]) {
   const t = convexTest(legacySchema, modules)
   await t.run(async ctx => {
     for (const row of rows) await ctx.db.insert('shops', row as never)
+    const dials = [
+      { iso2: 'CO', label: 'Colombia', dial: '+57', order: 0 },
+      { iso2: 'AR', label: 'Argentina', dial: '+54', order: 1 },
+    ]
+    for (const dial of dials) await ctx.db.insert('dialCodes', dial)
   })
   return t
 }
@@ -91,7 +104,7 @@ describe('migrations.migrateShopsToCatalogs — existing shops move to the catal
   it('drops the values with no catalogue match and counts them', async () => {
     const t = await seededLegacy([{
       ...legacyShop,
-      categories: ['ropa', 'juguetes', 'mascotas'],
+      categories: ['ropa', 'juguetes', 'zapatillas raras'],
       paymentMethods: ['nequi', 'efectivo', 'tarjeta'],
     }])
 
@@ -99,6 +112,25 @@ describe('migrations.migrateShopsToCatalogs — existing shops move to the catal
     const [row] = await shops(t)
     expect(row.categorySlugs).toEqual(['ropa-y-accesorios'])
     expect(row.paymentMethodSlugs).toEqual(['nequi'])
+  })
+
+  it('keeps every catalogue category a legacy shop already used', async () => {
+    const t = await seededLegacy([{
+      ...legacyShop,
+      categories: ['mascotas', 'Tecnología y accesorios', 'otros'],
+    }])
+
+    expect(await t.mutation(migrateShopsToCatalogs, {})).toEqual({ migrated: 1, skipped: 0, unmapped: 0, droppedWhatsapp: 0 })
+    const [row] = await shops(t)
+    expect(row.categorySlugs).toEqual(['mascotas', 'tecnologia-y-accesorios', 'otros'])
+  })
+
+  it('keeps the country a legacy number declared instead of relocating it to Colombia', async () => {
+    const t = await seededLegacy([{ ...legacyShop, personalWhatsapp: '+54 11 5555-0000' }])
+
+    expect(await t.mutation(migrateShopsToCatalogs, {})).toEqual({ migrated: 1, skipped: 0, unmapped: 0, droppedWhatsapp: 0 })
+    const [row] = await shops(t)
+    expect(row.whatsapp).toEqual({ dialCode: '+54', number: '1155550000' })
   })
 
   it('leaves an empty WhatsApp when the legacy number has fewer than seven digits', async () => {

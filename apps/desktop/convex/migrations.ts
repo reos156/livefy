@@ -1,5 +1,5 @@
 import { v } from 'convex/values'
-import { internalMutation } from './_generated/server'
+import { internalMutation, type MutationCtx } from './_generated/server'
 import type { Doc } from './_generated/dataModel'
 
 // Shops written before the catalogues existed still hold free text (decision D-D:
@@ -11,14 +11,31 @@ type LegacyShop = Doc<'shops'> & {
   personalWhatsapp?: string
 }
 
-// Every legacy value the catalogues can place. Anything else is dropped and counted:
-// guessing a category for the operator would be worse than leaving the wizard to ask.
+// Every legacy value the catalogues can place. The ten catalogue slugs are all covered,
+// so a legacy shop keeps any category that still exists; anything the catalogues do not
+// contain is dropped and counted. Guessing for the operator would be worse than asking.
 const CATEGORY_MAP: Record<string, string> = {
   'ropa': 'ropa-y-accesorios',
   'ropa y accesorios': 'ropa-y-accesorios',
-  'calzado': 'calzado',
   'belleza': 'belleza-y-cuidado-personal',
   'belleza y cuidado personal': 'belleza-y-cuidado-personal',
+  'calzado': 'calzado',
+  'hogar': 'hogar-y-cocina',
+  'hogar y cocina': 'hogar-y-cocina',
+  'tecnologia': 'tecnologia-y-accesorios',
+  'tecnología': 'tecnologia-y-accesorios',
+  'tecnologia y accesorios': 'tecnologia-y-accesorios',
+  'tecnología y accesorios': 'tecnologia-y-accesorios',
+  'alimentos': 'alimentos-y-bebidas',
+  'alimentos y bebidas': 'alimentos-y-bebidas',
+  'deportes': 'deportes-y-aire-libre',
+  'deportes y aire libre': 'deportes-y-aire-libre',
+  'bebes': 'bebes-y-ninos',
+  'bebés': 'bebes-y-ninos',
+  'bebes y ninos': 'bebes-y-ninos',
+  'bebés y niños': 'bebes-y-ninos',
+  'mascotas': 'mascotas',
+  'otros': 'otros',
 }
 
 const PAYMENT_METHOD_MAP: Record<string, string> = {
@@ -50,19 +67,44 @@ function mapLegacyValues(values: string[] | undefined, catalogue: Record<string,
   return { slugs, unmapped }
 }
 
-function whatsappFromLegacy(personalWhatsapp: string | undefined) {
-  const digits = (personalWhatsapp ?? '').replace(/[^0-9]/g, '')
-  // The dial code lives in its own field, so a legacy value typed as `+57 300 123-4567`
-  // must not store the country code twice. Only a Colombian number is normalised, and
-  // only when what remains is still a full-length number.
-  const country = DEFAULT_DIAL_CODE.slice(1)
-  const national = digits.startsWith(country) && digits.length - country.length === 10
-    ? digits.slice(country.length)
-    : digits
-  return {
-    dialCode: DEFAULT_DIAL_CODE,
-    number: national.length >= MIN_WHATSAPP_DIGITS ? national : '',
+// A legacy number may carry an explicit international prefix, and the operator was free
+// to type any country into it. Reading every value as Colombian would relocate a
+// `+54 11 5555-0000` to Colombia and duplicate its digits, so the explicit prefix wins
+// when the catalogue knows it; without a prefix the shop is read as Colombian, which is
+// the only default this migration can defend.
+const LEADING_DIAL = /^\s*\+(\d{1,4})/
+
+async function whatsappFromLegacy(
+  ctx: MutationCtx,
+  personalWhatsapp: string | undefined,
+): Promise<{ whatsapp: { dialCode: string; number: string }; dropped: boolean }> {
+  const typed = (personalWhatsapp ?? '').trim()
+  let dialCode = DEFAULT_DIAL_CODE
+  let rest = typed
+
+  const leading = LEADING_DIAL.exec(typed)
+  if (leading) {
+    const candidate = `+${leading[1]}`
+    const known = await ctx.db
+      .query('dialCodes')
+      .filter(q => q.eq(q.field('dial'), candidate))
+      .first()
+    if (known) {
+      dialCode = candidate
+      rest = typed.slice(leading[0].length)
+    }
   }
+
+  let digits = rest.replace(/[^0-9]/g, '')
+  // No explicit prefix: a Colombian mobile typed with its country code loses it, so the
+  // dial code is not stored twice.
+  const country = DEFAULT_DIAL_CODE.slice(1)
+  if (!leading && digits.startsWith(country) && digits.length - country.length === 10) {
+    digits = digits.slice(country.length)
+  }
+
+  const number = digits.length >= MIN_WHATSAPP_DIGITS && digits.length <= 15 ? digits : ''
+  return { whatsapp: { dialCode, number }, dropped: number === '' }
 }
 
 // Internal and argument-free: the operator never triggers it, and it can be run twice
@@ -93,8 +135,8 @@ export const migrateShopsToCatalogs = internalMutation({
       const categories = mapLegacyValues(shop.categories, CATEGORY_MAP)
       const paymentMethods = mapLegacyValues(shop.paymentMethods, PAYMENT_METHOD_MAP)
       unmapped += categories.unmapped + paymentMethods.unmapped
-      const whatsapp = whatsappFromLegacy(shop.personalWhatsapp)
-      if (shop.personalWhatsapp && whatsapp.number === '') droppedWhatsapp += 1
+      const { whatsapp, dropped } = await whatsappFromLegacy(ctx, shop.personalWhatsapp)
+      if (shop.personalWhatsapp && dropped) droppedWhatsapp += 1
 
       // `replace` writes exactly this shape, which is what removes the old fields and
       // keeps everything the platform owns intact.
