@@ -1,21 +1,28 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import type { ShopView } from './lib/shop-api'
+import type { DashboardStats, ShopView } from './lib/shop-api'
 
 const state = vi.hoisted(() => ({
   shop: undefined as ShopView | null | undefined,
+  stats: undefined as DashboardStats | undefined,
   submitted: [] as unknown[],
   mutationError: null as Error | null,
 }))
 
-vi.mock('convex/react', () => ({
-  useQuery: () => state.shop,
-  useMutation: () => async (input: unknown) => {
-    state.submitted.push(input)
-    if (state.mutationError) throw state.mutationError
-    return state.shop
-  },
-}))
+// The entry reads two query references: the operator's shop and, once it has one,
+// the dashboard stats. Answering both from one value would paint the panel with a
+// shop document, so the stub branches on the reference it received.
+vi.mock('convex/react', async () => {
+  const { dashboardFunctions, shopFunctions } = await import('./lib/shop-api')
+  return {
+    useQuery: (reference: unknown) => (reference === shopFunctions.current ? state.shop : state.stats),
+    useMutation: () => async (input: unknown) => {
+      state.submitted.push(input)
+      if (state.mutationError) throw state.mutationError
+      return state.shop
+    },
+  }
+})
 
 import { AppEntry } from './app-entry'
 
@@ -30,9 +37,17 @@ const shop: ShopView = {
   whatsappBotNumber: '+54 11 4000-0001',
 }
 
+const stats: DashboardStats = {
+  shopId: 'shop_1',
+  shopName: 'Tienda Uno',
+  liveConnection: null,
+  metrics: { activeLives: 0, newLeads: 0, pendingLeads: 0, conversionRate: 0, estimatedSales: 0 },
+  lives: [],
+}
+
 afterEach(() => {
   cleanup()
-  Object.assign(state, { shop: undefined, submitted: [], mutationError: null })
+  Object.assign(state, { shop: undefined, stats: undefined, submitted: [], mutationError: null })
 })
 
 describe('app entry — which screen the operator gets', () => {
@@ -54,6 +69,7 @@ describe('app entry — which screen the operator gets', () => {
 
   it('leads a completed wizard to the exact first-live call to action', () => {
     state.shop = shop
+    state.stats = stats
     render(<AppEntry />)
 
     expect(screen.getByText('Tienda Uno')).toBeTruthy()
@@ -78,15 +94,17 @@ describe('app entry — which screen the operator gets', () => {
     expect(state.submitted[0]).toMatchObject({ name: 'Tienda Nueva', categories: ['ropa'], paymentMethods: ['transferencia'] })
 
     state.shop = { ...shop, name: 'Tienda Nueva' }
+    state.stats = { ...stats, shopName: 'Tienda Nueva' }
     rerender(<AppEntry />)
     expect(screen.getByRole('button', { name: 'Conectá tu primer live' })).toBeTruthy()
   })
 
-  it('reopens the wizard from the summary prefilled with the stored shop and saves an edit', async () => {
+  it('reopens the wizard from the panel prefilled with the stored shop and saves an edit', async () => {
     state.shop = shop
+    state.stats = stats
     const { rerender } = render(<AppEntry />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Editar datos de la tienda' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Editar tienda' }))
 
     expect((screen.getByLabelText('Nombre de la tienda') as HTMLInputElement).value).toBe('Tienda Uno')
     expect((screen.getByLabelText('Descripción') as HTMLInputElement).value).toBe('Ropa urbana')
@@ -106,9 +124,20 @@ describe('app entry — which screen the operator gets', () => {
     })
 
     state.shop = { ...shop, name: 'Tienda Renombrada' }
+    state.stats = { ...stats, shopName: 'Tienda Renombrada' }
     rerender(<AppEntry />)
     expect(screen.getByRole('button', { name: 'Conectá tu primer live' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Guardar tienda' })).toBeNull()
+  })
+
+  it('replaces the retired shop summary with the panel', () => {
+    state.shop = shop
+    state.stats = stats
+    render(<AppEntry />)
+
+    expect(screen.getByRole('heading', { level: 2, name: 'Live de TikTok' })).toBeTruthy()
+    expect(screen.queryByText(/Categorías:/)).toBeNull()
+    expect(screen.queryByText(/Medios de pago:/)).toBeNull()
   })
 
   it('reports a failed save without dropping back to a blank form', async () => {
