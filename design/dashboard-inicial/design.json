@@ -1,6 +1,6 @@
 {
   "title": "Dashboard inicial — R2 (estado vacío)",
-  "brief": "Pantalla de inicio para un vendedor colombiano de TikTok LIVE después de configurar su tienda. Debe mostrar las cinco métricas del requisito R2 (lives activos, leads nuevos, pendientes, conversión y ventas estimadas) y, como todavía no existe captura de lives ni de leads, mostrarlas en cero con un estado vacío y el CTA 'Conectá tu primer live' deshabilitado y con nota. La edición de la tienda y Sign out tienen que seguir alcanzables. Criterio de éxito: el operador entiende que la tienda está lista y que el siguiente paso es un live, sin creer que el panel está roto por mostrar ceros.",
+  "brief": "Pantalla de inicio del operador, en la anatomía de un dashboard shadcn: sidebar de navegación, barra superior con estado del live, tarjetas de métricas y área de contenido. Debe mostrar las cinco métricas del requisito R2 (lives activos, leads nuevos, pendientes, conversión y ventas estimadas) y, como todavía no existe captura de lives ni de leads, mostrarlas en cero con un estado vacío y el CTA 'Conectá tu primer live' deshabilitado y con nota. La edición de la tienda y Sign out siguen alcanzables. Criterio de éxito: el operador entiende que la tienda está lista y que el siguiente paso es un live, sin creer que el panel está roto. El scope define además que el dashboard distingue los estados connected, reconnecting, offline, suspended-risk, disconnected y ended, y que navega a Live, Productos, Leads y Ventas: esas secciones se muestran como próximas, no se inventan. Nada de deltas, series ni filas ficticias.",
   "feature": "odd/tasks/initial-dashboard.md",
   "artboards": [
     {
@@ -21,6 +21,27 @@
       "file": "03-empty-hero-strip.html",
       "title": "El estado vacío manda, métricas como tira",
       "tradeoff": "Pone el siguiente paso arriba y a la vista, con las métricas como referencia secundaria: el mejor orden para un producto que todavía no tiene datos. Cuando haya actividad real, el hero deja de tener sentido y hay que decidir qué lo reemplaza.",
+      "width": 1280,
+      "height": 900
+    },
+    {
+      "file": "04-shell-sidebar-kpis.html",
+      "title": "Shell con sidebar fija, KPIs y vacío en el contenido",
+      "tradeoff": "Es la anatomía del kit tal cual: navegación completa siempre visible, cinco KPIs en fila y el estado vacío como área principal. Ocupa 232px de ancho permanente y, con cinco columnas, comprime etiquetas en ventanas angostas.",
+      "width": 1280,
+      "height": 900
+    },
+    {
+      "file": "05-rail-and-live-status.html",
+      "title": "Rail de iconos y panel de estado del live",
+      "tradeoff": "Gana ancho de contenido y pone a la vista los seis estados del live que el scope exige distinguir, junto al resumen de la tienda. Pierde legibilidad de la navegación (iconos solos, con tooltip) y gasta una columna fija en estados que hoy no ocurren.",
+      "width": 1280,
+      "height": 900
+    },
+    {
+      "file": "06-shell-grouped-nav-tabs.html",
+      "title": "Sidebar agrupada y pestañas dentro del contenido",
+      "tradeoff": "Agrupa Operación y Catálogo y adelanta las pestañas de Resumen, Actividad y Seguimiento, que es hacia donde crece el producto. Suma dos niveles de navegación para una pantalla que hoy tiene una sola vista real, y duplica el CTA en la barra superior y en el vacío.",
       "width": 1280,
       "height": 900
     }
