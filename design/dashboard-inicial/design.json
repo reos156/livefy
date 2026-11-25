@@ -1,6 +1,6 @@
 {
-  "title": "Dashboard inicial — R2 (estado vacío)",
-  "brief": "Pantalla de inicio del operador, en la anatomía de un dashboard shadcn: sidebar de navegación, barra superior con estado del live, tarjetas de métricas y área de contenido. Debe mostrar las cinco métricas del requisito R2 (lives activos, leads nuevos, pendientes, conversión y ventas estimadas) y, como todavía no existe captura de lives ni de leads, mostrarlas en cero con un estado vacío y el CTA 'Conectá tu primer live' deshabilitado y con nota. La edición de la tienda y Sign out siguen alcanzables. Criterio de éxito: el operador entiende que la tienda está lista y que el siguiente paso es un live, sin creer que el panel está roto. El scope define además que el dashboard distingue los estados connected, reconnecting, offline, suspended-risk, disconnected y ended, y que navega a Live, Productos, Leads y Ventas: esas secciones se muestran como próximas, no se inventan. Nada de deltas, series ni filas ficticias.",
+  "title": "Panel del operador — R2/R3 (tres columnas en estado vacío)",
+  "brief": "Panel de control del operador, en la anatomía de un dashboard shadcn y con las tres columnas que define el scope: Columna 1 Live de TikTok (superficie aislada, login manual que no autentica al ingestor, salud del ingestor y advertencia de brecha), Columna 2 Productos (disponibles, activo, drag & drop, crear), Columna 3 Leads (handle, WhatsApp, estado, ítems, total, última actividad, comprobante y cierre). Arriba, las cinco métricas de R2: lives activos, leads nuevos, pendientes, conversión y ventas estimadas. Como todavía no existe captura de lives ni de leads, cada columna muestra su estado vacío honesto y el CTA 'Conectá tu primer live' queda deshabilitado con nota. El panel distingue connected, reconnecting, offline, suspended-risk, disconnected y ended. No se inventan deltas, series, productos ni leads. Las direcciones 01–06 quedaron superadas: leían R2 como una página de métricas y no como el panel de tres columnas.",
   "feature": "odd/tasks/initial-dashboard.md",
   "artboards": [
     {
@@ -42,6 +42,27 @@
       "file": "06-shell-grouped-nav-tabs.html",
       "title": "Sidebar agrupada y pestañas dentro del contenido",
       "tradeoff": "Agrupa Operación y Catálogo y adelanta las pestañas de Resumen, Actividad y Seguimiento, que es hacia donde crece el producto. Suma dos niveles de navegación para una pantalla que hoy tiene una sola vista real, y duplica el CTA en la barra superior y en el vacío.",
+      "width": 1280,
+      "height": 900
+    },
+    {
+      "file": "07-panel-three-equal-columns.html",
+      "title": "Panel con sidebar y tres columnas iguales",
+      "tradeoff": "Las tres columnas reciben el mismo ancho, así que ninguna tarea parece más importante y el panel se lee de izquierda a derecha como el scope lo enumera. La tabla de leads queda angosta para seis columnas, y la sidebar come 196px fijos.",
+      "width": 1280,
+      "height": 900
+    },
+    {
+      "file": "08-panel-viewer-first.html",
+      "title": "Panel sin sidebar, el visor manda",
+      "tradeoff": "Gana todo el ancho para el live (1.5fr), que es lo que el operador mira durante la sesión, y la navegación se reduce a un top bar. Menos espacio para la tabla de leads y sin lugar permanente para la salud del ingestor, que queda como una línea.",
+      "width": 1280,
+      "height": 900
+    },
+    {
+      "file": "09-panel-ingestor-health-leads-wide.html",
+      "title": "Panel con salud del ingestor en la barra y leads anchos",
+      "tradeoff": "Pone la salud del ingestor y la brecha siempre visibles en la barra lateral y le da el mayor ancho a leads (1.5fr), que es donde vive la operación con seis columnas. Ajusta el visor del live a menos espacio, que es el costo de priorizar los leads.",
       "width": 1280,
       "height": 900
     }
