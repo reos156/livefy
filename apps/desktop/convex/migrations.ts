@@ -4,12 +4,18 @@ import type { Doc } from './_generated/dataModel'
 
 // Shops written before the catalogues existed still hold free text (decision D-D:
 // those rows are migrated, never dropped). The old fields are no longer in the schema,
-// so the migration reads them through this shape and writes only the new one.
-type LegacyShop = Doc<'shops'> & {
-  categories?: string[]
-  paymentMethods?: string[]
-  personalWhatsapp?: string
-}
+// so the migration reads them through this shape and writes only the current one. A row
+// saved after the catalogue migration but before a payment method captured its own datum
+// holds slugs and a WhatsApp already, and only its single Bre-B key is left to map.
+type ShopRow = Doc<'shops'>
+type LegacyShop =
+  Partial<Pick<ShopRow, 'categorySlugs' | 'paymentMethodSlugs' | 'whatsapp' | 'paymentData'>> &
+  Omit<ShopRow, 'categorySlugs' | 'paymentMethodSlugs' | 'whatsapp' | 'paymentData'> & {
+    categories?: string[]
+    paymentMethods?: string[]
+    personalWhatsapp?: string
+    breBKey?: string
+  }
 
 // Every legacy value the catalogues can place. The ten catalogue slugs are all covered,
 // so a legacy shop keeps any category that still exists; anything the catalogues do not
@@ -52,6 +58,9 @@ const PAYMENT_METHOD_MAP: Record<string, string> = {
 // next save.
 const DEFAULT_DIAL_CODE = '+57'
 const MIN_WHATSAPP_DIGITS = 7
+
+// The method the single legacy key belonged to.
+const BRE_B_METHOD = 'llave-bre-b'
 
 function mapLegacyValues(values: string[] | undefined, catalogue: Record<string, string>) {
   const slugs: string[] = []
@@ -109,34 +118,64 @@ async function whatsappFromLegacy(
 
 // Internal and argument-free: the operator never triggers it, and it can be run twice
 // without duplicating or re-dropping anything. `unmapped` counts dropped catalogue
-// values (not rows), `droppedWhatsapp` counts legacy numbers too short to keep, so a
-// value is never removed without being reported, and `skipped` counts rows already in
-// the new shape.
+// values (not rows), `droppedWhatsapp` counts legacy numbers too short to keep and
+// `droppedPaymentKey` counts a legacy Bre-B key whose method was not among the migrated
+// ones, so a value is never removed without being reported; `skipped` counts rows already
+// in the current shape.
 export const migrateShopsToCatalogs = internalMutation({
   args: {},
-  returns: v.object({ migrated: v.number(), skipped: v.number(), unmapped: v.number(), droppedWhatsapp: v.number() }),
+  returns: v.object({
+    migrated: v.number(),
+    skipped: v.number(),
+    unmapped: v.number(),
+    droppedWhatsapp: v.number(),
+    droppedPaymentKey: v.number(),
+  }),
   handler: async ctx => {
     const shops = (await ctx.db.query('shops').collect()) as LegacyShop[]
     let migrated = 0
     let skipped = 0
     let unmapped = 0
     let droppedWhatsapp = 0
+    let droppedPaymentKey = 0
 
     for (const shop of shops) {
       const holdsLegacyFields =
         shop.categories !== undefined ||
         shop.paymentMethods !== undefined ||
         shop.personalWhatsapp !== undefined
-      if (!holdsLegacyFields) {
+      // A row that already holds every current field is done; one that only lacks the
+      // datum list still has a key to carry, so it is migrated too.
+      if (!holdsLegacyFields && shop.paymentData !== undefined) {
         skipped += 1
         continue
       }
 
-      const categories = mapLegacyValues(shop.categories, CATEGORY_MAP)
-      const paymentMethods = mapLegacyValues(shop.paymentMethods, PAYMENT_METHOD_MAP)
-      unmapped += categories.unmapped + paymentMethods.unmapped
-      const { whatsapp, dropped } = await whatsappFromLegacy(ctx, shop.personalWhatsapp)
-      if (shop.personalWhatsapp && dropped) droppedWhatsapp += 1
+      let categorySlugs = shop.categorySlugs ?? []
+      let paymentMethodSlugs = shop.paymentMethodSlugs ?? []
+      let whatsapp = shop.whatsapp ?? { dialCode: DEFAULT_DIAL_CODE, number: '' }
+      if (holdsLegacyFields) {
+        const categories = mapLegacyValues(shop.categories, CATEGORY_MAP)
+        const paymentMethods = mapLegacyValues(shop.paymentMethods, PAYMENT_METHOD_MAP)
+        unmapped += categories.unmapped + paymentMethods.unmapped
+        categorySlugs = categories.slugs
+        paymentMethodSlugs = paymentMethods.slugs
+        const legacy = await whatsappFromLegacy(ctx, shop.personalWhatsapp)
+        whatsapp = legacy.whatsapp
+        if (shop.personalWhatsapp && legacy.dropped) droppedWhatsapp += 1
+      }
+
+      // The key the previous shape held becomes the datum of the method it was captured
+      // for. A key whose method is not selected anymore is dropped, and counted, because
+      // no screen may receive a payment through it.
+      const paymentData = [...(shop.paymentData ?? [])]
+      const key = (shop.breBKey ?? '').trim()
+      if (key.length > 0) {
+        if (!paymentMethodSlugs.includes(BRE_B_METHOD)) droppedPaymentKey += 1
+        else if (!paymentData.some(entry => entry.slug === BRE_B_METHOD)) {
+          paymentData.push({ slug: BRE_B_METHOD, value: key })
+        }
+      }
 
       // `replace` writes exactly this shape, which is what removes the old fields and
       // keeps everything the platform owns intact.
@@ -144,8 +183,9 @@ export const migrateShopsToCatalogs = internalMutation({
         ownerId: shop.ownerId,
         name: shop.name,
         description: shop.description,
-        categorySlugs: categories.slugs,
-        paymentMethodSlugs: paymentMethods.slugs,
+        categorySlugs,
+        paymentMethodSlugs,
+        paymentData,
         whatsapp,
         ...(shop.tiktokBotHandle === undefined ? {} : { tiktokBotHandle: shop.tiktokBotHandle }),
         ...(shop.whatsappBotNumber === undefined ? {} : { whatsappBotNumber: shop.whatsappBotNumber }),
@@ -155,6 +195,6 @@ export const migrateShopsToCatalogs = internalMutation({
       migrated += 1
     }
 
-    return { migrated, skipped, unmapped, droppedWhatsapp }
+    return { migrated, skipped, unmapped, droppedWhatsapp, droppedPaymentKey }
   },
 })

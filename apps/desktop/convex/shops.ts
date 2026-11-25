@@ -12,12 +12,14 @@ const MAX_DESCRIPTION = 500
 const MAX_CATEGORIES = 10
 const MAX_PAYMENT_METHODS = 4
 
-// Bre-B's key is validated as part of the method (decision D-B) and belongs to the
-// shop, not to the catalogue entry.
-const BRE_B_METHOD = 'llave-bre-b'
-const MIN_BRE_B_KEY = 3
-const MAX_BRE_B_KEY = 40
-const BRE_B_KEY = /^[A-Za-z0-9._@-]+$/
+// Every accepted method carries exactly one datum, and its kind decides the rule: a
+// wallet captures a phone number, Bre-B a key and a savings account an account number.
+const PHONE_SEPARATORS = /[\s.-]/g
+const PHONE_DIGITS = /^[0-9]{7,15}$/
+const KEY_VALUE = /^[A-Za-z0-9._@-]{3,40}$/
+// Letters (accented included), digits, spaces and `.` `-` `#`: enough for
+// "Bancolombia 123-456789-00" and no room for a value that cannot be an account.
+const ACCOUNT_VALUE = /^[\p{L}0-9 .#-]{5,60}$/u
 
 // The contact WhatsApp is mandatory; only its digits are stored, next to the dial code
 // the operator chose from the `dialCodes` catalogue.
@@ -33,9 +35,10 @@ type ValidationCode =
   | 'shop-list-too-long'
   | 'shop-category-unknown'
   | 'shop-payment-method-unknown'
-  | 'shop-breb-key-required'
-  | 'shop-breb-key-invalid'
-  | 'shop-breb-key-unexpected'
+  | 'shop-payment-data-required'
+  | 'shop-payment-data-unexpected'
+  | 'shop-payment-data-duplicate'
+  | 'shop-payment-data-invalid'
   | 'shop-dial-code-unknown'
   | 'shop-whatsapp-invalid'
 
@@ -67,32 +70,51 @@ async function knownCategories(ctx: MutationCtx, values: string[]) {
   return slugs
 }
 
+// The catalogue rows, not just their slugs: the datum of each method is validated
+// against the kind the row declares.
 async function knownPaymentMethods(ctx: MutationCtx, values: string[]) {
   if (values.length === 0) invalid('shop-payment-methods-required', 'paymentMethodSlugs')
   if (values.length > MAX_PAYMENT_METHODS) invalid('shop-list-too-long', 'paymentMethodSlugs')
   const slugs = values.map(value => value.trim())
+  const rows: Doc<'paymentMethods'>[] = []
   for (const slug of slugs) {
     const row = await ctx.db
       .query('paymentMethods')
       .withIndex('by_slug', q => q.eq('slug', slug))
       .first()
     if (!row) invalid('shop-payment-method-unknown', 'paymentMethodSlugs')
+    rows.push(row)
   }
-  return slugs
+  return rows
 }
 
-// Required exactly while `llave-bre-b` is selected: without the method the key must not
-// be there, so a stale value cannot outlive the payment method it belongs to.
-function validBreBKey(paymentMethodSlugs: string[], value: string | undefined) {
-  const text = (value ?? '').trim()
-  if (!paymentMethodSlugs.includes(BRE_B_METHOD)) {
-    if (text.length > 0) invalid('shop-breb-key-unexpected', 'breBKey')
-    return undefined
+function validDatum(kind: Doc<'paymentMethods'>['dataKind'], value: string) {
+  if (kind === 'phone') return PHONE_DIGITS.test(value.replace(PHONE_SEPARATORS, ''))
+  if (kind === 'key') return KEY_VALUE.test(value)
+  return ACCOUNT_VALUE.test(value)
+}
+
+// Exactly one datum per accepted method and none for a method that is not selected, so
+// a value cannot outlive the method it belongs to and cannot arrive without one. Each
+// failure has its own code: the screen tells the operator which of the three it is.
+function validPaymentData(selected: Doc<'paymentMethods'>[], data: { slug: string; value: string }[]) {
+  const kinds = new Map(selected.map(row => [row.slug, row.dataKind]))
+  const seen = new Set<string>()
+  const accepted: { slug: string; value: string }[] = []
+  for (const entry of data) {
+    const slug = entry.slug.trim()
+    const kind = kinds.get(slug)
+    if (kind === undefined) invalid('shop-payment-data-unexpected', 'paymentData')
+    if (seen.has(slug)) invalid('shop-payment-data-duplicate', 'paymentData')
+    seen.add(slug)
+    const value = entry.value.trim()
+    if (!validDatum(kind, value)) invalid('shop-payment-data-invalid', 'paymentData')
+    accepted.push({ slug, value })
   }
-  if (text.length === 0) invalid('shop-breb-key-required', 'breBKey')
-  if (text.length < MIN_BRE_B_KEY || text.length > MAX_BRE_B_KEY) invalid('shop-breb-key-invalid', 'breBKey')
-  if (!BRE_B_KEY.test(text)) invalid('shop-breb-key-invalid', 'breBKey')
-  return text
+  for (const row of selected) {
+    if (!seen.has(row.slug)) invalid('shop-payment-data-required', 'paymentData')
+  }
+  return accepted
 }
 
 async function validWhatsapp(ctx: MutationCtx, whatsapp: { dialCode: string; number: string }) {
@@ -108,6 +130,7 @@ async function validWhatsapp(ctx: MutationCtx, whatsapp: { dialCode: string; num
 }
 
 const whatsappView = v.object({ dialCode: v.string(), number: v.string() })
+const paymentDataView = v.array(v.object({ slug: v.string(), value: v.string() }))
 
 const shopView = v.object({
   shopId: v.id('shops'),
@@ -115,7 +138,7 @@ const shopView = v.object({
   description: v.string(),
   categorySlugs: v.array(v.string()),
   paymentMethodSlugs: v.array(v.string()),
-  breBKey: v.union(v.string(), v.null()),
+  paymentData: paymentDataView,
   whatsapp: whatsappView,
   tiktokBotHandle: v.union(v.string(), v.null()),
   whatsappBotNumber: v.union(v.string(), v.null()),
@@ -128,7 +151,7 @@ function toView(shop: Doc<'shops'>) {
     description: shop.description,
     categorySlugs: shop.categorySlugs,
     paymentMethodSlugs: shop.paymentMethodSlugs,
-    breBKey: shop.breBKey ?? null,
+    paymentData: shop.paymentData,
     whatsapp: shop.whatsapp,
     tiktokBotHandle: shop.tiktokBotHandle ?? null,
     whatsappBotNumber: shop.whatsappBotNumber ?? null,
@@ -158,7 +181,7 @@ export const completeWizard = mutation({
     description: v.string(),
     categorySlugs: v.array(v.string()),
     paymentMethodSlugs: v.array(v.string()),
-    breBKey: v.optional(v.string()),
+    paymentData: paymentDataView,
     whatsapp: whatsappView,
   },
   returns: shopView,
@@ -167,8 +190,9 @@ export const completeWizard = mutation({
     const name = requiredText(args.name, 'shop-name-required', 'name', MAX_NAME)
     const description = requiredText(args.description, 'shop-description-required', 'description', MAX_DESCRIPTION)
     const categorySlugs = await knownCategories(ctx, args.categorySlugs)
-    const paymentMethodSlugs = await knownPaymentMethods(ctx, args.paymentMethodSlugs)
-    const breBKey = validBreBKey(paymentMethodSlugs, args.breBKey)
+    const paymentMethodRows = await knownPaymentMethods(ctx, args.paymentMethodSlugs)
+    const paymentMethodSlugs = paymentMethodRows.map(row => row.slug)
+    const paymentData = validPaymentData(paymentMethodRows, args.paymentData)
     const whatsapp = await validWhatsapp(ctx, args.whatsapp)
 
     const existing = await ctx.db
@@ -185,7 +209,7 @@ export const completeWizard = mutation({
       description,
       categorySlugs,
       paymentMethodSlugs,
-      breBKey,
+      paymentData,
       whatsapp,
       updatedAt: now,
     }

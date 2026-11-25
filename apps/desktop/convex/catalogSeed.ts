@@ -28,21 +28,60 @@ export const CATEGORIES: CategoryRow[] = [
   { slug: 'otros', label: 'Otros', order: 9 },
 ]
 
+// Every accepted method captures one datum (its `dataKind`), and the label and hint are
+// the copy the screen shows around that input, so the catalogue decides both the field
+// and its rule instead of the app naming a single method.
+export type PaymentDataKind = 'phone' | 'key' | 'account'
+
 export type PaymentMethodRow = {
   slug: string
   label: string
   description: string
-  requiresKey: boolean
+  dataKind: PaymentDataKind
+  dataLabel: string
+  dataHint: string
   order: number
 }
 
 // Colombia first launch: the methods the operator can actually receive money with.
 // Contraentrega and card/link were left out on purpose (S2).
 export const PAYMENT_METHODS: PaymentMethodRow[] = [
-  { slug: 'nequi', label: 'Nequi', description: 'Billetera, celular o QR', requiresKey: false, order: 0 },
-  { slug: 'llave-bre-b', label: 'Llave Bre-B', description: 'Transferencia inmediata 24/7 entre bancos', requiresKey: true, order: 1 },
-  { slug: 'daviplata', label: 'Daviplata', description: 'Billetera, celular', requiresKey: false, order: 2 },
-  { slug: 'transferencia-ahorros', label: 'Transferencia a cuenta de ahorros', description: 'Bancolombia, Davivienda y otros', requiresKey: false, order: 3 },
+  {
+    slug: 'nequi',
+    label: 'Nequi',
+    description: 'Billetera, celular o QR',
+    dataKind: 'phone',
+    dataLabel: 'Tu Nequi',
+    dataHint: 'El número con el que recibís los pagos.',
+    order: 0,
+  },
+  {
+    slug: 'llave-bre-b',
+    label: 'Llave Bre-B',
+    description: 'Transferencia inmediata 24/7 entre bancos',
+    dataKind: 'key',
+    dataLabel: 'Tu llave Bre-B',
+    dataHint: 'Celular, documento o llave alfanumérica.',
+    order: 1,
+  },
+  {
+    slug: 'daviplata',
+    label: 'Daviplata',
+    description: 'Billetera, celular',
+    dataKind: 'phone',
+    dataLabel: 'Tu Daviplata',
+    dataHint: 'El número con el que recibís los pagos.',
+    order: 2,
+  },
+  {
+    slug: 'transferencia-ahorros',
+    label: 'Transferencia a cuenta de ahorros',
+    description: 'Bancolombia, Davivienda y otros',
+    dataKind: 'account',
+    dataLabel: 'Tu cuenta',
+    dataHint: 'Banco y número de cuenta, por ejemplo Bancolombia 123-456789-00.',
+    order: 3,
+  },
 ]
 
 export type DialCodeRow = { iso2: string; label: string; dial: string; order: number }

@@ -20,8 +20,13 @@ const wizardInput = {
   description: 'Ropa urbana',
   categorySlugs: ['ropa-y-accesorios'],
   paymentMethodSlugs: ['nequi'],
+  paymentData: [{ slug: 'nequi', value: '3001234567' }],
   whatsapp: { dialCode: '+57', number: '3001234567' },
 }
+
+// Both wallet methods capture a phone number and the savings account captures an
+// account number, so every kind is reachable from the same fixture.
+const everyMethod = ['nequi', 'llave-bre-b', 'daviplata', 'transferencia-ahorros']
 
 // The catalogues are data, so every case starts from a seeded database: the backend
 // validates against the rows, never against a list compiled into the function.
@@ -57,11 +62,13 @@ describe('shops.completeWizard — catalogue-backed shop configuration', () => {
       description: 'Ropa urbana',
       categorySlugs: ['ropa-y-accesorios'],
       paymentMethodSlugs: ['nequi'],
-      breBKey: null,
+      paymentData: [{ slug: 'nequi', value: '3001234567' }],
       whatsapp: { dialCode: '+57', number: '3001234567' },
       tiktokBotHandle: null,
       whatsappBotNumber: null,
     })
+    // One datum per accepted method: the single Bre-B key is gone.
+    expect(shop).not.toHaveProperty('breBKey')
     expect(typeof shop.shopId).toBe('string')
     const rows = await t.run(async ctx => ctx.db.query('shops').collect())
     expect(rows).toHaveLength(1)
@@ -75,6 +82,7 @@ describe('shops.completeWizard — catalogue-backed shop configuration', () => {
       description: '  Ropa urbana  ',
       categorySlugs: [' ropa-y-accesorios ', 'calzado'],
       paymentMethodSlugs: [' nequi '],
+      paymentData: [{ slug: ' nequi ', value: '  3001234567  ' }],
       whatsapp: { dialCode: '+57', number: ' 300-123 4567 ' },
     })
 
@@ -82,6 +90,7 @@ describe('shops.completeWizard — catalogue-backed shop configuration', () => {
     expect(shop.description).toBe('Ropa urbana')
     expect(shop.categorySlugs).toEqual(['ropa-y-accesorios', 'calzado'])
     expect(shop.paymentMethodSlugs).toEqual(['nequi'])
+    expect(shop.paymentData).toEqual([{ slug: 'nequi', value: '3001234567' }])
     expect(shop.whatsapp).toEqual({ dialCode: '+57', number: '3001234567' })
   })
 
@@ -100,14 +109,23 @@ describe('shops.completeWizard — catalogue-backed shop configuration', () => {
   it.each([
     ['an unknown category', { categorySlugs: ['ropa-y-accesorios', 'juguetes'] }, { code: 'shop-category-unknown', field: 'categorySlugs' }],
     ['no category', { categorySlugs: [] }, { code: 'shop-categories-required', field: 'categorySlugs' }],
-    ['an unknown payment method', { paymentMethodSlugs: ['efectivo'] }, { code: 'shop-payment-method-unknown', field: 'paymentMethodSlugs' }],
-    ['no payment method', { paymentMethodSlugs: [] }, { code: 'shop-payment-methods-required', field: 'paymentMethodSlugs' }],
-    ['a missing Bre-B key', { paymentMethodSlugs: ['llave-bre-b'] }, { code: 'shop-breb-key-required', field: 'breBKey' }],
-    ['a blank Bre-B key', { paymentMethodSlugs: ['llave-bre-b'], breBKey: '   ' }, { code: 'shop-breb-key-required', field: 'breBKey' }],
-    ['a Bre-B key shorter than three characters', { paymentMethodSlugs: ['llave-bre-b'], breBKey: 'ab' }, { code: 'shop-breb-key-invalid', field: 'breBKey' }],
-    ['a Bre-B key longer than forty characters', { paymentMethodSlugs: ['llave-bre-b'], breBKey: 'a'.repeat(41) }, { code: 'shop-breb-key-invalid', field: 'breBKey' }],
-    ['a Bre-B key with unsupported characters', { paymentMethodSlugs: ['llave-bre-b'], breBKey: 'llave bre-b#' }, { code: 'shop-breb-key-invalid', field: 'breBKey' }],
-    ['a Bre-B key without the Bre-B method', { breBKey: '@llave' }, { code: 'shop-breb-key-unexpected', field: 'breBKey' }],
+    ['an unknown payment method', { paymentMethodSlugs: ['efectivo'], paymentData: [{ slug: 'efectivo', value: '3001234567' }] }, { code: 'shop-payment-method-unknown', field: 'paymentMethodSlugs' }],
+    ['no payment method', { paymentMethodSlugs: [], paymentData: [] }, { code: 'shop-payment-methods-required', field: 'paymentMethodSlugs' }],
+    ['no payment datum at all', { paymentData: [] }, { code: 'shop-payment-data-required', field: 'paymentData' }],
+    ['a method without its datum', { paymentMethodSlugs: ['nequi', 'daviplata'], paymentData: [{ slug: 'nequi', value: '3001234567' }] }, { code: 'shop-payment-data-required', field: 'paymentData' }],
+    ['a datum for a method that is not selected', { paymentData: [{ slug: 'nequi', value: '3001234567' }, { slug: 'daviplata', value: '3001234568' }] }, { code: 'shop-payment-data-unexpected', field: 'paymentData' }],
+    ['a duplicated datum slug', { paymentData: [{ slug: 'nequi', value: '3001234567' }, { slug: 'nequi', value: '3001234568' }] }, { code: 'shop-payment-data-duplicate', field: 'paymentData' }],
+    ['a blank datum value', { paymentData: [{ slug: 'nequi', value: '   ' }] }, { code: 'shop-payment-data-invalid', field: 'paymentData' }],
+    ['a phone datum with six digits', { paymentData: [{ slug: 'nequi', value: '300123' }] }, { code: 'shop-payment-data-invalid', field: 'paymentData' }],
+    ['a phone datum with sixteen digits', { paymentData: [{ slug: 'nequi', value: '3'.repeat(16) }] }, { code: 'shop-payment-data-invalid', field: 'paymentData' }],
+    ['a phone datum with letters', { paymentData: [{ slug: 'nequi', value: '300abc4567' }] }, { code: 'shop-payment-data-invalid', field: 'paymentData' }],
+    ['a Daviplata number with six digits', { paymentMethodSlugs: ['daviplata'], paymentData: [{ slug: 'daviplata', value: '300123' }] }, { code: 'shop-payment-data-invalid', field: 'paymentData' }],
+    ['a Bre-B key shorter than three characters', { paymentMethodSlugs: ['llave-bre-b'], paymentData: [{ slug: 'llave-bre-b', value: 'ab' }] }, { code: 'shop-payment-data-invalid', field: 'paymentData' }],
+    ['a Bre-B key longer than forty characters', { paymentMethodSlugs: ['llave-bre-b'], paymentData: [{ slug: 'llave-bre-b', value: 'a'.repeat(41) }] }, { code: 'shop-payment-data-invalid', field: 'paymentData' }],
+    ['a Bre-B key with unsupported characters', { paymentMethodSlugs: ['llave-bre-b'], paymentData: [{ slug: 'llave-bre-b', value: 'llave bre-b#' }] }, { code: 'shop-payment-data-invalid', field: 'paymentData' }],
+    ['an account with four characters', { paymentMethodSlugs: ['transferencia-ahorros'], paymentData: [{ slug: 'transferencia-ahorros', value: '1234' }] }, { code: 'shop-payment-data-invalid', field: 'paymentData' }],
+    ['an account with sixty-one characters', { paymentMethodSlugs: ['transferencia-ahorros'], paymentData: [{ slug: 'transferencia-ahorros', value: 'x'.repeat(61) }] }, { code: 'shop-payment-data-invalid', field: 'paymentData' }],
+    ['an account with unsupported characters', { paymentMethodSlugs: ['transferencia-ahorros'], paymentData: [{ slug: 'transferencia-ahorros', value: 'Bancolombia 123/456' }] }, { code: 'shop-payment-data-invalid', field: 'paymentData' }],
     ['an unknown dial code', { whatsapp: { dialCode: '+999', number: '3001234567' } }, { code: 'shop-dial-code-unknown', field: 'dialCode' }],
     ['a WhatsApp number with fewer than seven digits', { whatsapp: { dialCode: '+57', number: '300 123' } }, { code: 'shop-whatsapp-invalid', field: 'number' }],
     ['a WhatsApp number with more than fifteen digits', { whatsapp: { dialCode: '+57', number: '1'.repeat(16) } }, { code: 'shop-whatsapp-invalid', field: 'number' }],
@@ -138,43 +156,83 @@ describe('shops.completeWizard — catalogue-backed shop configuration', () => {
     expect(await caller.query(current, {})).toEqual(before)
   })
 
-  it('accepts the documented boundaries of the Bre-B key and the WhatsApp number', async () => {
+  it('accepts the shortest datum of every kind', async () => {
     const t = await seeded()
-    const caller = t.withIdentity(first)
-
-    const shortest = await caller.mutation(completeWizard, {
+    const shop = await t.withIdentity(first).mutation(completeWizard, {
       ...wizardInput,
-      paymentMethodSlugs: ['llave-bre-b'],
-      breBKey: 'a.b',
-      whatsapp: { dialCode: '+57', number: '3001234' },
+      paymentMethodSlugs: everyMethod,
+      paymentData: [
+        { slug: 'nequi', value: '3001234' },
+        { slug: 'llave-bre-b', value: 'a.b' },
+        { slug: 'daviplata', value: '3001234' },
+        { slug: 'transferencia-ahorros', value: '12345' },
+      ],
     })
-    expect(shortest.breBKey).toBe('a.b')
-    expect(shortest.whatsapp.number).toBe('3001234')
 
-    const longest = await caller.mutation(completeWizard, {
-      ...wizardInput,
-      paymentMethodSlugs: ['llave-bre-b'],
-      breBKey: `${'a_b-c.@'.repeat(6).slice(0, 39)}9`,
-      whatsapp: { dialCode: '+57', number: '1'.repeat(15) },
-    })
-    expect(longest.breBKey).toBe(`${'a_b-c.@'.repeat(6).slice(0, 39)}9`)
-    expect(longest.whatsapp.number).toBe('1'.repeat(15))
+    expect(shop.paymentData).toEqual([
+      { slug: 'nequi', value: '3001234' },
+      { slug: 'llave-bre-b', value: 'a.b' },
+      { slug: 'daviplata', value: '3001234' },
+      { slug: 'transferencia-ahorros', value: '12345' },
+    ])
   })
 
-  it('stores the Bre-B key only while the Bre-B method stays selected', async () => {
+  it('accepts the longest datum of every kind', async () => {
+    const t = await seeded()
+    const key = `${'a_b-c.@'.repeat(6).slice(0, 39)}9`
+    const account = `Bancolombia ${'1'.repeat(47)}#`
+    expect(account).toHaveLength(60)
+
+    const shop = await t.withIdentity(first).mutation(completeWizard, {
+      ...wizardInput,
+      paymentMethodSlugs: everyMethod,
+      paymentData: [
+        { slug: 'nequi', value: '1'.repeat(15) },
+        { slug: 'llave-bre-b', value: key },
+        { slug: 'daviplata', value: '1'.repeat(15) },
+        { slug: 'transferencia-ahorros', value: account },
+      ],
+    })
+
+    expect(shop.paymentData).toEqual([
+      { slug: 'nequi', value: '1'.repeat(15) },
+      { slug: 'llave-bre-b', value: key },
+      { slug: 'daviplata', value: '1'.repeat(15) },
+      { slug: 'transferencia-ahorros', value: account },
+    ])
+  })
+
+  it('counts a phone datum ignoring the spaces, dashes and dots it was typed with', async () => {
+    const t = await seeded()
+    const shop = await t.withIdentity(first).mutation(completeWizard, {
+      ...wizardInput,
+      paymentData: [{ slug: 'nequi', value: ' 300 508-9676. ' }],
+    })
+
+    // Only the surrounding space is trimmed: the separators are the operator's.
+    expect(shop.paymentData).toEqual([{ slug: 'nequi', value: '300 508-9676.' }])
+  })
+
+  it('stores each datum only while its method stays selected', async () => {
     const t = await seeded()
     const caller = t.withIdentity(first)
     const withKey = await caller.mutation(completeWizard, {
       ...wizardInput,
       paymentMethodSlugs: ['llave-bre-b', 'nequi'],
-      breBKey: '  @livefy.tienda  ',
+      paymentData: [
+        { slug: 'llave-bre-b', value: '  @livefy.tienda  ' },
+        { slug: 'nequi', value: '3001234567' },
+      ],
     })
-    expect(withKey.breBKey).toBe('@livefy.tienda')
+    expect(withKey.paymentData).toEqual([
+      { slug: 'llave-bre-b', value: '@livefy.tienda' },
+      { slug: 'nequi', value: '3001234567' },
+    ])
 
     const withoutKey = await caller.mutation(completeWizard, wizardInput)
-    expect(withoutKey.breBKey).toBeNull()
+    expect(withoutKey.paymentData).toEqual([{ slug: 'nequi', value: '3001234567' }])
     const rows = await t.run(async ctx => ctx.db.query('shops').collect())
-    expect(rows[0].breBKey).toBeUndefined()
+    expect(rows[0].paymentData).toEqual([{ slug: 'nequi', value: '3001234567' }])
   })
 
   it('edits the existing shop instead of creating a second one', async () => {
@@ -189,6 +247,7 @@ describe('shops.completeWizard — catalogue-backed shop configuration', () => {
       description: 'Ropa urbana y calzado',
       categorySlugs: ['ropa-y-accesorios', 'calzado'],
       paymentMethodSlugs: ['daviplata'],
+      paymentData: [{ slug: 'daviplata', value: '3009998877' }],
       whatsapp: { dialCode: '+57', number: '3009998877' },
     })
 
@@ -227,6 +286,7 @@ describe('platform-owned bot identifiers', () => {
         description: 'Ropa urbana',
         categorySlugs: ['ropa-y-accesorios'],
         paymentMethodSlugs: ['nequi'],
+        paymentData: [{ slug: 'nequi', value: '3001234567' }],
         whatsapp: { dialCode: '+57', number: '3001234567' },
         tiktokBotHandle: '@livefy_tienda_uno',
         whatsappBotNumber: '+57 300 400 0001',

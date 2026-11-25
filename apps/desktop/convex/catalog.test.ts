@@ -22,13 +22,48 @@ describe('catalog queries — the screen reads the catalogues from the database'
     )
   })
 
-  it('returns the seeded payment methods with their label, description and key flag', async () => {
+  it('returns the seeded payment methods with the datum each one captures, in catalogue order', async () => {
     const t = convexTest(schema, modules)
     await t.mutation(seedCatalog, {})
 
-    expect(await t.query(paymentMethods, {})).toEqual(
-      PAYMENT_METHODS.map(({ slug, label, description, requiresKey }) => ({ slug, label, description, requiresKey })),
-    )
+    const rows = await t.query(paymentMethods, {})
+    expect(rows).toEqual([
+      {
+        slug: 'nequi',
+        label: 'Nequi',
+        description: 'Billetera, celular o QR',
+        dataKind: 'phone',
+        dataLabel: 'Tu Nequi',
+        dataHint: 'El número con el que recibís los pagos.',
+      },
+      {
+        slug: 'llave-bre-b',
+        label: 'Llave Bre-B',
+        description: 'Transferencia inmediata 24/7 entre bancos',
+        dataKind: 'key',
+        dataLabel: 'Tu llave Bre-B',
+        dataHint: 'Celular, documento o llave alfanumérica.',
+      },
+      {
+        slug: 'daviplata',
+        label: 'Daviplata',
+        description: 'Billetera, celular',
+        dataKind: 'phone',
+        dataLabel: 'Tu Daviplata',
+        dataHint: 'El número con el que recibís los pagos.',
+      },
+      {
+        slug: 'transferencia-ahorros',
+        label: 'Transferencia a cuenta de ahorros',
+        description: 'Bancolombia, Davivienda y otros',
+        dataKind: 'account',
+        dataLabel: 'Tu cuenta',
+        dataHint: 'Banco y número de cuenta, por ejemplo Bancolombia 123-456789-00.',
+      },
+    ])
+    // The kind decides the rule the shop validation applies to the datum.
+    expect(rows.map((row: { dataKind: string }) => row.dataKind)).toEqual(['phone', 'key', 'phone', 'account'])
+    expect(rows[0]).not.toHaveProperty('requiresKey')
   })
 
   it('returns every seeded dial code in catalogue order', async () => {

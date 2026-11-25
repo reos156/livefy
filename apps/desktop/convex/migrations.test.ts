@@ -9,8 +9,8 @@ const modules = { ...import.meta.glob('./**/*.ts') }
 const migrateShopsToCatalogs = makeFunctionReference<'mutation'>('migrations:migrateShopsToCatalogs')
 
 // Fixture-only schema: the migration exists to rewrite rows written under the previous
-// shape, so the fixture database has to accept those fields. `schema.ts` no longer
-// declares them, and the migration writes only the new shape.
+// shapes, so the fixture database has to accept those fields. `schema.ts` no longer
+// declares them, and the migration writes only the current shape.
 const legacySchema = defineSchema({
   shops: defineTable({
     ownerId: v.string(),
@@ -21,7 +21,9 @@ const legacySchema = defineSchema({
     personalWhatsapp: v.optional(v.string()),
     categorySlugs: v.optional(v.array(v.string())),
     paymentMethodSlugs: v.optional(v.array(v.string())),
+    // A single Bre-B key was the only payment datum the previous shape could hold.
     breBKey: v.optional(v.string()),
+    paymentData: v.optional(v.array(v.object({ slug: v.string(), value: v.string() }))),
     whatsapp: v.optional(v.object({ dialCode: v.string(), number: v.string() })),
     tiktokBotHandle: v.optional(v.string()),
     whatsappBotNumber: v.optional(v.string()),
@@ -51,6 +53,21 @@ const legacyShop = {
   updatedAt: 1,
 }
 
+// A shop saved through the wizard after the catalogues landed but before a method
+// captured its own datum: it already holds slugs and a WhatsApp, and only its Bre-B key
+// has to become a `paymentData` entry.
+const catalogShop = {
+  ownerId: 'https://fixture.clerk.accounts.dev|user_second',
+  name: 'Tienda Dos',
+  description: 'Calzado urbano',
+  categorySlugs: ['calzado'],
+  paymentMethodSlugs: ['nequi', 'llave-bre-b'],
+  breBKey: '@livefy.calzado',
+  whatsapp: { dialCode: '+57', number: '3009998877' },
+  wizardCompletedAt: 2,
+  updatedAt: 2,
+}
+
 async function seededLegacy(rows: Record<string, unknown>[]) {
   const t = convexTest(legacySchema, modules)
   await t.run(async ctx => {
@@ -69,14 +86,16 @@ async function shops(t: ReturnType<typeof convexTest>) {
 }
 
 describe('migrations.migrateShopsToCatalogs — existing shops move to the catalogues', () => {
-  it('maps the known legacy values and writes only the new shape', async () => {
+  it('maps the known legacy values and writes only the current shape', async () => {
     const t = await seededLegacy([{ ...legacyShop }])
     const counts = await t.mutation(migrateShopsToCatalogs, {})
 
-    expect(counts).toEqual({ migrated: 1, skipped: 0, unmapped: 0, droppedWhatsapp: 0 })
+    expect(counts).toEqual({ migrated: 1, skipped: 0, unmapped: 0, droppedWhatsapp: 0, droppedPaymentKey: 0 })
     const [row] = await shops(t)
     expect(row.categorySlugs).toEqual(['ropa-y-accesorios', 'calzado', 'belleza-y-cuidado-personal'])
     expect(row.paymentMethodSlugs).toEqual(['nequi', 'transferencia-ahorros', 'llave-bre-b'])
+    // No legacy key means the shop keeps an empty list, never a missing field.
+    expect(row.paymentData).toEqual([])
     // The contract keeps every digit the free-text field held, so a legacy number that
     // already carried its country code keeps it; the wizard shows it for correction.
     // The dial code moves to its own field: a legacy `+57 300 123-4567` must not keep
@@ -90,6 +109,7 @@ describe('migrations.migrateShopsToCatalogs — existing shops move to the catal
       'description',
       'name',
       'ownerId',
+      'paymentData',
       'paymentMethodSlugs',
       'tiktokBotHandle',
       'updatedAt',
@@ -101,6 +121,60 @@ describe('migrations.migrateShopsToCatalogs — existing shops move to the catal
     expect(row.whatsappBotNumber).toBe('+57 300 400 0001')
   })
 
+  it('maps the legacy Bre-B key into the datum of the method it belongs to', async () => {
+    const t = await seededLegacy([{ ...legacyShop, breBKey: '  @livefy.tienda  ' }])
+
+    expect(await t.mutation(migrateShopsToCatalogs, {})).toEqual({
+      migrated: 1,
+      skipped: 0,
+      unmapped: 0,
+      droppedWhatsapp: 0,
+      droppedPaymentKey: 0,
+    })
+    const [row] = await shops(t)
+    expect(row.paymentMethodSlugs).toEqual(['nequi', 'transferencia-ahorros', 'llave-bre-b'])
+    expect(row.paymentData).toEqual([{ slug: 'llave-bre-b', value: '@livefy.tienda' }])
+    expect(row).not.toHaveProperty('breBKey')
+  })
+
+  it('counts the legacy key it drops when its method is not among the migrated ones', async () => {
+    const t = await seededLegacy([{
+      ...legacyShop,
+      paymentMethods: ['nequi', 'efectivo'],
+      breBKey: '@livefy.tienda',
+    }])
+
+    expect(await t.mutation(migrateShopsToCatalogs, {})).toEqual({
+      migrated: 1,
+      skipped: 0,
+      unmapped: 1,
+      droppedWhatsapp: 0,
+      droppedPaymentKey: 1,
+    })
+    const [row] = await shops(t)
+    expect(row.paymentMethodSlugs).toEqual(['nequi'])
+    expect(row.paymentData).toEqual([])
+    expect(row).not.toHaveProperty('breBKey')
+  })
+
+  it('gives an already-catalogued shop its datum and keeps its stored fields', async () => {
+    const t = await seededLegacy([{ ...catalogShop }])
+
+    expect(await t.mutation(migrateShopsToCatalogs, {})).toEqual({
+      migrated: 1,
+      skipped: 0,
+      unmapped: 0,
+      droppedWhatsapp: 0,
+      droppedPaymentKey: 0,
+    })
+    const [row] = await shops(t)
+    expect(row.categorySlugs).toEqual(['calzado'])
+    expect(row.paymentMethodSlugs).toEqual(['nequi', 'llave-bre-b'])
+    expect(row.whatsapp).toEqual({ dialCode: '+57', number: '3009998877' })
+    expect(row.paymentData).toEqual([{ slug: 'llave-bre-b', value: '@livefy.calzado' }])
+    expect(row).not.toHaveProperty('breBKey')
+  })
+
   it('drops the values with no catalogue match and counts them', async () => {
     const t = await seededLegacy([{
       ...legacyShop,
@@ -108,7 +182,13 @@ describe('migrations.migrateShopsToCatalogs — existing shops move to the catal
       paymentMethods: ['nequi', 'efectivo', 'tarjeta'],
     }])
 
-    expect(await t.mutation(migrateShopsToCatalogs, {})).toEqual({ migrated: 1, skipped: 0, unmapped: 4, droppedWhatsapp: 0 })
+    expect(await t.mutation(migrateShopsToCatalogs, {})).toEqual({
+      migrated: 1,
+      skipped: 0,
+      unmapped: 4,
+      droppedWhatsapp: 0,
+      droppedPaymentKey: 0,
+    })
     const [row] = await shops(t)
     expect(row.categorySlugs).toEqual(['ropa-y-accesorios'])
     expect(row.paymentMethodSlugs).toEqual(['nequi'])
@@ -120,7 +200,13 @@ describe('migrations.migrateShopsToCatalogs — existing shops move to the catal
       categories: ['mascotas', 'Tecnología y accesorios', 'otros'],
     }])
 
-    expect(await t.mutation(migrateShopsToCatalogs, {})).toEqual({ migrated: 1, skipped: 0, unmapped: 0, droppedWhatsapp: 0 })
+    expect(await t.mutation(migrateShopsToCatalogs, {})).toEqual({
+      migrated: 1,
+      skipped: 0,
+      unmapped: 0,
+      droppedWhatsapp: 0,
+      droppedPaymentKey: 0,
+    })
     const [row] = await shops(t)
     expect(row.categorySlugs).toEqual(['mascotas', 'tecnologia-y-accesorios', 'otros'])
   })
@@ -128,7 +214,13 @@ describe('migrations.migrateShopsToCatalogs — existing shops move to the catal
   it('keeps the country a legacy number declared instead of relocating it to Colombia', async () => {
     const t = await seededLegacy([{ ...legacyShop, personalWhatsapp: '+54 11 5555-0000' }])
 
-    expect(await t.mutation(migrateShopsToCatalogs, {})).toEqual({ migrated: 1, skipped: 0, unmapped: 0, droppedWhatsapp: 0 })
+    expect(await t.mutation(migrateShopsToCatalogs, {})).toEqual({
+      migrated: 1,
+      skipped: 0,
+      unmapped: 0,
+      droppedWhatsapp: 0,
+      droppedPaymentKey: 0,
+    })
     const [row] = await shops(t)
     expect(row.whatsapp).toEqual({ dialCode: '+54', number: '1155550000' })
   })
@@ -139,18 +231,34 @@ describe('migrations.migrateShopsToCatalogs — existing shops move to the catal
       { ...legacyShop, personalWhatsapp: undefined },
     ])
 
-    expect(await t.mutation(migrateShopsToCatalogs, {})).toEqual({ migrated: 2, skipped: 0, unmapped: 0, droppedWhatsapp: 1 })
+    expect(await t.mutation(migrateShopsToCatalogs, {})).toEqual({
+      migrated: 2,
+      skipped: 0,
+      unmapped: 0,
+      droppedWhatsapp: 1,
+      droppedPaymentKey: 0,
+    })
     const rows = await shops(t)
     expect(rows[0].whatsapp).toEqual({ dialCode: '+57', number: '' })
     expect(rows[1].whatsapp).toEqual({ dialCode: '+57', number: '' })
   })
 
   it('is safe on a second run and leaves migrated rows untouched', async () => {
-    const t = await seededLegacy([{ ...legacyShop }])
+    const t = await seededLegacy([{ ...legacyShop, breBKey: '@livefy.tienda' }, { ...catalogShop }])
     await t.mutation(migrateShopsToCatalogs, {})
     const afterFirst = await shops(t)
+    expect(afterFirst.map(row => row.paymentData)).toEqual([
+      [{ slug: 'llave-bre-b', value: '@livefy.tienda' }],
+      [{ slug: 'llave-bre-b', value: '@livefy.calzado' }],
+    ])
 
-    expect(await t.mutation(migrateShopsToCatalogs, {})).toEqual({ migrated: 0, skipped: 1, unmapped: 0, droppedWhatsapp: 0 })
+    expect(await t.mutation(migrateShopsToCatalogs, {})).toEqual({
+      migrated: 0,
+      skipped: 2,
+      unmapped: 0,
+      droppedWhatsapp: 0,
+      droppedPaymentKey: 0,
+    })
     expect(await shops(t)).toEqual(afterFirst)
   })
 })

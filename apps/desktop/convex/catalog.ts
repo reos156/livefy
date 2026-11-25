@@ -21,11 +21,22 @@ export const paymentMethods = query({
     slug: v.string(),
     label: v.string(),
     description: v.string(),
-    requiresKey: v.boolean(),
+    // The datum the method captures: its kind picks the validation rule and the label
+    // and hint are the copy the screen renders above and below the input.
+    dataKind: v.union(v.literal('phone'), v.literal('key'), v.literal('account')),
+    dataLabel: v.string(),
+    dataHint: v.string(),
   })),
   handler: async ctx => {
     const rows = await ctx.db.query('paymentMethods').withIndex('by_order').collect()
-    return rows.map(({ slug, label, description, requiresKey }) => ({ slug, label, description, requiresKey }))
+    return rows.map(({ slug, label, description, dataKind, dataLabel, dataHint }) => ({
+      slug,
+      label,
+      description,
+      dataKind,
+      dataLabel,
+      dataHint,
+    }))
   },
 })
 
@@ -43,6 +54,9 @@ export const dialCodes = query({
 //
 // Upserts by natural key (`slug` / `iso2`), which makes a second run patch the same
 // rows instead of adding duplicates, and lets a corrected label reach every row.
+// Payment methods are replaced rather than patched: a row seeded by an older version
+// still holds a field the schema no longer declares, and only a whole-document write
+// removes it.
 export const seedCatalog = internalMutation({
   args: {},
   returns: v.object({ categories: v.number(), paymentMethods: v.number(), dialCodes: v.number() }),
@@ -60,7 +74,7 @@ export const seedCatalog = internalMutation({
         .query('paymentMethods')
         .withIndex('by_slug', q => q.eq('slug', row.slug))
         .first()
-      if (existing) await ctx.db.patch(existing._id, row)
+      if (existing) await ctx.db.replace(existing._id, row)
       else await ctx.db.insert('paymentMethods', row)
     }
     for (const row of DIAL_CODES) {
