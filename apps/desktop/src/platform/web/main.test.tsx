@@ -116,17 +116,12 @@ it.each([
   const view = render(tree())
   await screen.findByRole('button', { name: 'Sign out' })
   fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
-  expect(screen.queryByRole('button', { name: 'Open app' })).toBeNull()
   // Nothing is painted between the click and the document reset.
   expect(screen.queryByText('Signing out locally…')).toBeNull()
   expect(screen.queryByRole('heading', { level: 1, name: 'Signing out' })).toBeNull()
-  expect(screen.queryByText('Backend access confirmed.')).toBeNull()
-  expect(screen.queryByText('Backend access confirmed')).toBeNull()
   await act(async () => remove())
   if (failFirst) {
     await screen.findByRole('button', { name: 'Retry sign-out' })
-    expect(screen.queryByText('Backend access confirmed')).toBeNull()
-    expect(screen.queryByText('Backend access confirmed.')).toBeNull()
     expect(screen.queryByText(/secret sign-out failure/)).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Retry sign-out' }))
   }
@@ -138,10 +133,12 @@ it.each([
   expect(router.state.location.pathname).toBe('/')
   state.signedIn = true
   view.rerender(tree())
-  expect(screen.queryByRole('button', { name: 'Open app' })).toBeNull()
+  expect(router.state.location.pathname).toBe('/')
   state.confirmed = true
   view.rerender(tree())
-  await screen.findByRole('button', { name: 'Open app' })
+  // Confirmed again: the landing enters the app on its own, with no click in between.
+  expect(await screen.findByRole('button', { name: 'Sign out' })).toBeTruthy()
+  expect(router.state.location.pathname).toBe('/app')
 })
 it('wires browser completion to public memory navigation, not native navigation', async () => {
   const capturedRender = vi.fn(), navigate = vi.fn(), native = vi.fn(), update = vi.fn()
@@ -268,8 +265,8 @@ it('reaches the authenticated surface from the instance after a completed reset,
   // The reset is deferred by one tick so the binding can be re-read before it fires.
   await waitFor(() => expect(documentReset).toHaveBeenCalledTimes(1))
   expect(documentReset).toHaveBeenCalledWith(null, '', completionUrl)
-  await screen.findByRole('button', { name: 'Open app' })
-  expect(screen.getByText('Backend access confirmed')).toBeTruthy()
+  await screen.findByRole('button', { name: 'Sign out' })
+  expect(router.state.location.pathname).toBe('/app')
   expect(screen.queryByText('Loading')).toBeNull()
   expect(windowNavigate).not.toHaveBeenCalled()
 })
@@ -317,8 +314,8 @@ it('protects a binding that reports signed-in inside the window and reaches the 
   expect(screen.queryByRole('alert')).toBeNull()
   expect(screen.queryByText(/Password reset incomplete/)).toBeNull()
   expect(screen.queryByText('Public sign-in')).toBeNull()
-  await screen.findByRole('button', { name: 'Open app' })
-  expect(screen.getByText('Backend access confirmed')).toBeTruthy()
+  await screen.findByRole('button', { name: 'Sign out' })
+  expect(router.state.location.pathname).toBe('/app')
   // The navigation adapter's no-session fallback is unchanged and unrelated: control came back
   // before the session existed, so it asks the window to complete the document once. What this
   // case pins is that the component performed no reset of its own.
@@ -362,8 +359,8 @@ it('lets a binding that converges on the next tick finish the transition without
   expect(documentReset).not.toHaveBeenCalled()
   expect(screen.queryByText(/Password reset incomplete/)).toBeNull()
   expect(screen.queryByText('Public sign-in')).toBeNull()
-  await screen.findByRole('button', { name: 'Open app' })
-  expect(screen.getByText('Backend access confirmed')).toBeTruthy()
+  await screen.findByRole('button', { name: 'Sign out' })
+  expect(router.state.location.pathname).toBe('/app')
   expect(windowNavigate).not.toHaveBeenCalled()
 })
 it('resets the document once per entry transition while the instance keeps reporting the session', async () => {
@@ -471,10 +468,10 @@ function stalledEntry({ converge, reload = true }: { converge: boolean; reload?:
       </AuthBoundary>
     </SessionInfrastructure>
   </AuthState.Provider>
-  return { completionUrl, documentReset, windowNavigate, tree }
+  return { completionUrl, documentReset, windowNavigate, tree, router }
 }
 it('recovers a stalled reset the client holds but the instance never activates, with no completion navigation', async () => {
-  const { completionUrl, documentReset, windowNavigate, tree } = stalledEntry({ converge: true })
+  const { completionUrl, documentReset, windowNavigate, tree, router } = stalledEntry({ converge: true })
   render(tree())
   // The waiting ring owns the document; the sign-in form is not painted.
   await screen.findByText('Loading')
@@ -486,8 +483,8 @@ it('recovers a stalled reset the client holds but the instance never activates, 
   await waitFor(() => expect(documentReset).toHaveBeenCalledTimes(1), { timeout: 2000 })
   expect(documentReset).toHaveBeenCalledWith(null, '', completionUrl)
   expect(windowNavigate).not.toHaveBeenCalled()
-  await screen.findByRole('button', { name: 'Open app' })
-  expect(screen.getByText('Backend access confirmed')).toBeTruthy()
+  await screen.findByRole('button', { name: 'Sign out' })
+  expect(router.state.location.pathname).toBe('/app')
   expect(screen.queryByText('Loading')).toBeNull()
 })
 it('performs no second document reset when the same stalled flow is still stalled in the new document', async () => {
@@ -539,22 +536,23 @@ it('performs one document reset when the stalled state and a completion navigati
   expect(documentReset).toHaveBeenCalledWith(null, '', completionUrl)
 })
 it('clears the per-tab stall bound once a session is confirmed, so a later reset can recover again', async () => {
-  const { documentReset, tree } = stalledEntry({ converge: true })
+  const { documentReset, tree, router } = stalledEntry({ converge: true })
   const view = render(tree())
   await screen.findByText('Loading')
   await waitFor(() => expect(documentReset).toHaveBeenCalledTimes(1), { timeout: 2000 })
   // The replaced document confirms an authenticated session, which is the only event that
   // has to restore the recovery for the rest of this tab's life.
-  await screen.findByRole('button', { name: 'Open app' })
-  expect(screen.getByText('Backend access confirmed')).toBeTruthy()
-  // A later reset in the same tab stalls in exactly the same way and recovers again.
+  await screen.findByRole('button', { name: 'Sign out' })
+  expect(router.state.location.pathname).toBe('/app')
+  // A later reset in the same tab stalls in exactly the same way and recovers again. The app is
+  // the current route now, so the stall is the private gate's ring rather than the landing's.
   Object.assign(state, { staleBinding: true, signedIn: false, confirmed: false, waiting: true })
   clerk.session = null
   clerk.client = { sessions: [{ id: 'sess_reset_again' }] }
   view.rerender(tree())
-  await screen.findByText('Loading')
+  await screen.findByText('Checking backend access')
   await waitFor(() => expect(documentReset).toHaveBeenCalledTimes(2), { timeout: 2000 })
-  await screen.findByRole('button', { name: 'Open app' })
+  await screen.findByRole('button', { name: 'Sign out' })
 })
 it('keeps private content hidden and renders no placeholder while Clerk still reports a session', async () => {
   state.staleBinding = true

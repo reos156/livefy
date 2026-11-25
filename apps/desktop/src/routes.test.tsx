@@ -86,12 +86,14 @@ it.each(['loading', 'refresh', 'unavailable'] as const)('blocks composed private
   expect(screen.queryByRole('heading', { name: 'Configurá tu tienda' })).toBeNull()
   if (mode === 'unavailable') expect(authHook).not.toHaveBeenCalled()
 })
-it('allows confirmed public navigation and removes private content on auth loss', async () => {
+it('enters the app by itself on a confirmed session and removes private content on auth loss', async () => {
   state.isAuthenticated = true
   const { router } = setup('/')
-  fireEvent.click(await screen.findByRole('button', { name: 'Open app' }))
+  // No click and no intermediate screen: the confirmed session lands on the private app.
   expect(await screen.findByRole('heading', { name: 'Configurá tu tienda' })).toBeTruthy()
   expect(router.state.location.pathname).toBe('/app')
+  // The way out lives inside the app now that the landing offers nothing.
+  expect(await screen.findByRole('button', { name: 'Sign out' })).toBeTruthy()
   act(() => {
     state.isAuthenticated = false
     listeners.forEach(update => update())
@@ -99,8 +101,8 @@ it('allows confirmed public navigation and removes private content on auth loss'
   expect(await screen.findByText('Authentication required')).toBeTruthy()
   expect(screen.queryByRole('heading', { name: 'Configurá tu tienda' })).toBeNull()
 })
-it('does not offer navigation before backend confirmation', async () => {
-  setup('/')
+it('does not enter before backend confirmation', async () => {
+  const { router } = setup('/')
   expect(await screen.findByText('Official Clerk launchers')).toBeTruthy()
-  expect(screen.queryByRole('button', { name: 'Open app' })).toBeNull()
+  expect(router.state.location.pathname).toBe('/')
 })
