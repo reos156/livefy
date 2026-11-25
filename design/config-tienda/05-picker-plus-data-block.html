@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Paso 2 — elegís arriba, cargás abajo</title>
+<style>
+  :root {
+    --background: oklch(1.0000 0 0); --foreground: oklch(0.2850 0 0); --card: oklch(1.0000 0 0);
+    --muted: oklch(0.9845 0.0026 106.4477); --muted-foreground: oklch(0.5103 0 0);
+    --border: oklch(0.9269 0.0160 110.5685); --input: oklch(0.9448 0.0134 115.8392);
+    --primary: oklch(0.9347 0.1825 120.5229); --primary-foreground: oklch(0 0 0);
+    --destructive: oklch(0.5771 0.2152 27.3250); --ring: oklch(0.9347 0.1825 120.5229); --radius: 1rem;
+  }
+  html.dark { --background: oklch(0.2679 0.0036 106.6427); --foreground: oklch(0.9576 0.0027 106.4494);
+    --card: oklch(0.2928 0.0018 106.5092); --muted: oklch(0.3300 0.0030 106.5000);
+    --muted-foreground: oklch(0.7200 0.0040 106.4500); --border: oklch(0.3618 0.0101 106.8928); --input: oklch(0.3400 0.0090 106.8000); }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--background); color: var(--foreground);
+    font-family: ui-sans-serif, system-ui, sans-serif; font-size: 14px; line-height: 1.5; }
+  :focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; }
+  .app { max-width: 700px; margin: 0 auto; padding: 28px 24px 40px; }
+  .topbar { display: flex; align-items: center; gap: 12px; margin-bottom: 22px; }
+  .mark { width: 36px; height: 36px; border-radius: 11px; background: var(--primary);
+    color: var(--primary-foreground); display: grid; place-items: center; font-weight: 700; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px 24px; }
+  h1 { font-size: 19px; margin: 0; }
+  .lead { color: var(--muted-foreground); font-size: 13px; margin: 4px 0 18px; }
+  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted-foreground); margin: 0 0 12px; }
+  .picker { display: flex; flex-direction: column; gap: 8px; margin-bottom: 24px; }
+  .row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--border);
+    border-radius: 12px; cursor: pointer; background: var(--background); }
+  .row[data-on="true"] { border-color: var(--primary); box-shadow: inset 0 0 0 1px var(--primary); }
+  .box { width: 18px; height: 18px; border-radius: 6px; border: 1.5px solid var(--input);
+    display: grid; place-items: center; flex: none; font-size: 12px; }
+  .row[data-on="true"] .box { background: var(--primary); border-color: var(--primary); color: var(--primary-foreground); }
+  .name { font-weight: 600; } .meta { color: var(--muted-foreground); font-size: 12px; }
+  .data { display: flex; flex-direction: column; gap: 14px; border-top: 1px solid var(--border); padding-top: 20px; }
+  label { font-size: 12.5px; font-weight: 600; display: block; margin-bottom: 6px; }
+  input[type="text"] { width: 100%; height: 38px; padding: 0 11px; border-radius: 10px;
+    border: 1px solid var(--input); background: transparent; color: var(--foreground); font: inherit; }
+  .hint { font-size: 12px; color: var(--muted-foreground); margin: 6px 0 0; }
+  .err { font-size: 12px; color: var(--destructive); margin: 6px 0 0; }
+  input[aria-invalid="true"] { border-color: var(--destructive); }
+  .foot { display: flex; align-items: center; gap: 12px; margin-top: 22px; }
+  .foot .sp { flex: 1; }
+  button.b { height: 38px; padding: 0 16px; border-radius: 10px; font: inherit; font-weight: 600;
+    border: 1px solid transparent; background: var(--primary); color: var(--primary-foreground); cursor: pointer; }
+  button.g { background: transparent; border-color: var(--border); color: var(--foreground); font-weight: 500; }
+  .toggle { position: fixed; top: 12px; right: 12px; font-size: 11px; padding: 6px 10px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--card); color: var(--muted-foreground); cursor: pointer; }
+</style>
+</head>
+<body>
+<button class="toggle" type="button" onclick="document.documentElement.classList.toggle('dark')">claro / oscuro</button>
+<main class="app">
+  <header class="topbar">
+    <span class="mark" aria-hidden="true">L</span>
+    <div><strong>Configurá tu tienda</strong><p class="lead" style="margin:0">Paso 2 de 3</p></div>
+  </header>
+
+  <section class="card" aria-labelledby="t">
+    <h1 id="t">Cómo te pagan</h1>
+    <p class="lead">Marcá los medios que aceptás y cargá el dato de cada uno. Al menos uno.</p>
+
+    <h2>Medios que aceptás</h2>
+    <div class="picker">
+      <div class="row" data-on="true"><span class="box" aria-hidden="true">✓</span>
+        <span><span class="name">Nequi</span> <span class="meta">· billetera</span></span></div>
+      <div class="row" data-on="true"><span class="box" aria-hidden="true">✓</span>
+        <span><span class="name">Llave Bre-B</span> <span class="meta">· transferencia inmediata</span></span></div>
+      <div class="row" data-on="false"><span class="box" aria-hidden="true"></span>
+        <span><span class="name">Daviplata</span> <span class="meta">· billetera</span></span></div>
+      <div class="row" data-on="false"><span class="box" aria-hidden="true"></span>
+        <span><span class="name">Transferencia a cuenta de ahorros</span> <span class="meta">· banco</span></span></div>
+    </div>
+
+    <div class="data">
+      <h2 style="margin:0">Tus datos de cobro</h2>
+      <div>
+        <label for="d-nequi">Tu Nequi</label>
+        <input id="d-nequi" type="text" value="300 508 9676">
+        <p class="hint">El número con el que recibís los pagos.</p>
+      </div>
+      <div>
+        <label for="d-breb">Tu llave Bre-B</label>
+        <input id="d-breb" type="text" value="valentina lopez" aria-invalid="true" aria-describedby="e-breb">
+        <p class="err" id="e-breb">La llave no puede tener espacios.</p>
+        <p class="hint">Celular, documento o llave alfanumérica.</p>
+      </div>
+    </div>
+
+    <div class="foot">
+      <button class="b g" type="button">Atrás</button><span class="sp"></span>
+      <button class="b" type="button">Continuar</button>
+    </div>
+  </section>
+</main>
+</body>
+</html>

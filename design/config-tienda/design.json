@@ -23,6 +23,27 @@
       "tradeoff": "Es la más cercana a la pantalla actual y la más simple de construir y de leer en pantallas chicas; los bots aparecen como datos, no como formulario. Desperdicia el ancho del escritorio y obliga a hacer scroll para llegar al botón si la ventana es baja.",
       "width": 1280,
       "height": 900
+    },
+    {
+      "file": "04-payment-inline-reveal.html",
+      "title": "Pago: el medio se abre en su lugar",
+      "tradeoff": "Mantiene el patrón que ya existe con Bre-B y no agrega una sección nueva: el dato vive pegado a su medio, así que no hay que emparejar dos listas. La página crece al marcar medios y el orden de lectura se alarga cuando hay cuatro elegidos.",
+      "width": 1280,
+      "height": 900
+    },
+    {
+      "file": "05-picker-plus-data-block.html",
+      "title": "Pago: elegís arriba, cargás abajo",
+      "tradeoff": "Separa qué aceptás de con qué dato cobrás, y deja la carga en una sola columna continua que se lee de arriba abajo. El operador tiene que mover la vista entre la marca y el campo, y la lista de datos cambia de tamaño según lo marcado.",
+      "width": 1280,
+      "height": 900
+    },
+    {
+      "file": "06-payment-cards.html",
+      "title": "Pago: una tarjeta por medio",
+      "tradeoff": "Cada medio es una tarjeta con su casilla y su dato adentro, en dos columnas: se compara de un vistazo y el formulario no se estira tanto. Usa más ancho del necesario para cuatro medios y deja huecos vacíos cuando se marcan pocos.",
+      "width": 1280,
+      "height": 900
     }
   ]
 }
