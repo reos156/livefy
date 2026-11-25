@@ -17,8 +17,22 @@ const categories: CatalogCategory[] = [
 ]
 
 const paymentMethods: CatalogPaymentMethod[] = [
-  { slug: 'nequi', label: 'Nequi', description: 'Billetera · te llega al celular o por QR', requiresKey: false },
-  { slug: 'llave-bre-b', label: 'Llave Bre-B', description: 'Transferencia inmediata, 24/7, entre bancos', requiresKey: true },
+  {
+    slug: 'nequi',
+    label: 'Nequi',
+    description: 'Billetera · te llega al celular o por QR',
+    dataKind: 'phone',
+    dataLabel: 'Tu Nequi',
+    dataHint: 'El número con el que recibís los pagos.',
+  },
+  {
+    slug: 'llave-bre-b',
+    label: 'Llave Bre-B',
+    description: 'Transferencia inmediata, 24/7, entre bancos',
+    dataKind: 'key',
+    dataLabel: 'Tu llave Bre-B',
+    dataHint: 'Celular, documento o llave alfanumérica.',
+  },
 ]
 
 const dialCodes: CatalogDialCode[] = [
@@ -54,7 +68,7 @@ const shop: ShopView = {
   description: 'Ropa urbana',
   categorySlugs: ['ropa'],
   paymentMethodSlugs: ['nequi'],
-  breBKey: null,
+  paymentData: [{ slug: 'nequi', value: '3005089676' }],
   whatsapp: { dialCode: '+57', number: '3001234567' },
   tiktokBotHandle: '@livefy_tienda_uno',
   whatsappBotNumber: '3001234567',
@@ -86,6 +100,7 @@ function fillWizard() {
   fireEvent.click(screen.getByRole('button', { name: 'Ropa' }))
   next()
   fireEvent.click(screen.getByRole('button', { name: /nequi/i }))
+  fireEvent.change(screen.getByLabelText('Tu Nequi'), { target: { value: '300 123-4567' } })
   next()
   fireEvent.change(screen.getByLabelText('Número de WhatsApp'), { target: { value: '300 123-4567' } })
 }
@@ -139,8 +154,10 @@ describe('app entry — which screen the operator gets', () => {
       description: 'Ropa urbana',
       categorySlugs: ['ropa'],
       paymentMethodSlugs: ['nequi'],
+      paymentData: [{ slug: 'nequi', value: '300 123-4567' }],
       whatsapp: { dialCode: '+57', number: '3001234567' },
     })
+    expect(Object.hasOwn(state.submitted[0] as object, 'breBKey')).toBe(false)
 
     state.shop = { ...shop, name: 'Tienda Nueva' }
     rerender(<AppEntry />)
@@ -160,6 +177,8 @@ describe('app entry — which screen the operator gets', () => {
     fireEvent.change(screen.getByLabelText('Nombre de la tienda'), { target: { value: 'Tienda Renombrada' } })
     next()
     expect(screen.getByRole('button', { name: /nequi/i }).getAttribute('aria-pressed')).toBe('true')
+    // The stored datum comes back inside its own method instead of a shared section.
+    expect((screen.getByLabelText('Tu Nequi') as HTMLInputElement).value).toBe('3005089676')
     next()
     fireEvent.click(screen.getByRole('button', { name: 'Guardar tienda' }))
     await Promise.resolve()
@@ -170,8 +189,10 @@ describe('app entry — which screen the operator gets', () => {
       description: 'Ropa urbana',
       categorySlugs: ['ropa'],
       paymentMethodSlugs: ['nequi'],
+      paymentData: [{ slug: 'nequi', value: '3005089676' }],
       whatsapp: { dialCode: '+57', number: '3001234567' },
     })
+    expect(Object.hasOwn(state.submitted[0] as object, 'breBKey')).toBe(false)
 
     state.shop = { ...shop, name: 'Tienda Renombrada' }
     rerender(<AppEntry />)

@@ -8,7 +8,8 @@ export type ShopView = {
   description: string
   categorySlugs: string[]
   paymentMethodSlugs: string[]
-  breBKey: string | null
+  // One datum per accepted method; the catalogue declares its kind, label and hint.
+  paymentData: { slug: string; value: string }[]
   whatsapp: { dialCode: string; number: string }
   tiktokBotHandle: string | null
   whatsappBotNumber: string | null
@@ -19,14 +20,23 @@ export type WizardInput = {
   description: string
   categorySlugs: string[]
   paymentMethodSlugs: string[]
-  breBKey?: string
+  paymentData: { slug: string; value: string }[]
   whatsapp: { dialCode: string; number: string }
 }
 
 // Catalogue rows as the backend publishes them: the screen renders whatever the
 // database holds, so a new category or country is a data change, never a code change.
 export type CatalogCategory = { slug: string; label: string }
-export type CatalogPaymentMethod = { slug: string; label: string; description: string; requiresKey: boolean }
+// `dataKind` picks the validation rule; `dataLabel` and `dataHint` are the copy the screen
+// renders above and below the input of that method.
+export type CatalogPaymentMethod = {
+  slug: string
+  label: string
+  description: string
+  dataKind: 'phone' | 'key' | 'account'
+  dataLabel: string
+  dataHint: string
+}
 export type CatalogDialCode = { iso2: string; label: string; dial: string }
 
 // Closed set the backend publishes. Typing the copy map against it turns a renamed or
@@ -40,9 +50,10 @@ export type ShopValidationCode =
   | 'shop-list-too-long'
   | 'shop-category-unknown'
   | 'shop-payment-method-unknown'
-  | 'shop-breb-key-required'
-  | 'shop-breb-key-invalid'
-  | 'shop-breb-key-unexpected'
+  | 'shop-payment-data-required'
+  | 'shop-payment-data-unexpected'
+  | 'shop-payment-data-duplicate'
+  | 'shop-payment-data-invalid'
   | 'shop-dial-code-unknown'
   | 'shop-whatsapp-invalid'
   | 'shop-not-found'
@@ -73,9 +84,10 @@ const copy: Record<ShopValidationCode, string> = {
   'shop-list-too-long': 'Quitá algún ítem: la lista es demasiado larga.',
   'shop-category-unknown': 'Esa categoría ya no está disponible. Recargá la pantalla.',
   'shop-payment-method-unknown': 'Ese medio de pago ya no está disponible. Recargá la pantalla.',
-  'shop-breb-key-required': 'Ingresá tu llave Bre-B.',
-  'shop-breb-key-invalid': 'Revisá la llave: usá entre 3 y 40 caracteres, sin espacios.',
-  'shop-breb-key-unexpected': 'Quitá la llave Bre-B o elegí ese medio de pago.',
+  'shop-payment-data-required': 'Cargá el dato de cada medio de pago que aceptás.',
+  'shop-payment-data-unexpected': 'Quitá el dato de un medio que no elegiste y volvé a intentar.',
+  'shop-payment-data-duplicate': 'Hay un dato repetido. Recargá la pantalla.',
+  'shop-payment-data-invalid': 'Revisá el dato de tus medios de pago.',
   'shop-dial-code-unknown': 'Elegí un indicativo de la lista.',
   'shop-whatsapp-invalid': 'Ingresá un WhatsApp de contacto: entre 7 y 15 dígitos.',
   'shop-not-found': 'No encontramos tu tienda. Recargá la pantalla.',

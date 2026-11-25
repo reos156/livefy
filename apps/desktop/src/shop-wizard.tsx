@@ -15,12 +15,31 @@ const MAX_NAME = 80
 const MAX_DESCRIPTION = 500
 const MAX_CATEGORIES = 10
 const MAX_PAYMENT_METHODS = 4
-const MIN_BRE_B_KEY = 3
-const MAX_BRE_B_KEY = 40
-const BRE_B_KEY = /^[A-Za-z0-9._@-]+$/
+// Per-kind datum rules, mirrored from the mutation: the server stays authoritative and
+// these only spare a round trip and point at the step that blocks.
+const PHONE_SEPARATORS = /[\s.-]/g
+const PHONE_DIGITS = /^[0-9]{7,15}$/
+const KEY_VALUE = /^[A-Za-z0-9._@-]{3,40}$/
+const ACCOUNT_VALUE = /^[\p{L}0-9 .#-]{5,60}$/u
 const WHATSAPP_SEPARATORS = /[\s-]/g
 const WHATSAPP_DIGITS = /^[0-9]{7,15}$/
 const COLOMBIA_DIAL_CODE = '+57'
+
+// One rule per catalogue datum kind, so a new method reuses the rule its `dataKind` names.
+const DATUM_RULES: Record<CatalogPaymentMethod['dataKind'], { valid: (value: string) => boolean; message: string }> = {
+  phone: {
+    valid: value => PHONE_DIGITS.test(value.replace(PHONE_SEPARATORS, '')),
+    message: 'Usá entre 7 y 15 dígitos.',
+  },
+  key: {
+    valid: value => KEY_VALUE.test(value),
+    message: 'Revisá la llave: usá entre 3 y 40 caracteres, sin espacios.',
+  },
+  account: {
+    valid: value => ACCOUNT_VALUE.test(value),
+    message: 'Revisá la cuenta: usá entre 5 y 60 caracteres con letras, números, espacios y ".-#".',
+  },
+}
 
 const STEPS = [
   { number: 1, label: 'Tu tienda' },
@@ -32,7 +51,7 @@ type Step = (typeof STEPS)[number]['number']
 
 const STEP_LEADS: Record<Step, string> = {
   1: 'Cómo te van a encontrar. Elegí lo que mejor describe lo que vendés.',
-  2: 'Elegí los medios que aceptás. Al menos uno.',
+  2: 'Marcá los medios que aceptás y cargá el dato de cada uno. Al menos uno.',
   3: 'Tu WhatsApp de contacto, para coordinar la entrega.',
 }
 
@@ -41,16 +60,24 @@ type Form = {
   description: string
   categorySlugs: string[]
   paymentMethodSlugs: string[]
-  breBKey: string
+  // Keyed by payment-method slug: each accepted method owns exactly one datum.
+  paymentData: Record<string, string>
   dialCode: string
   whatsappNumber: string
 }
 
-type Errors = Partial<Record<keyof Form, string>>
+// A datum verdict belongs to its method, so its key carries the slug next to the step fields.
+type DatumField = `paymentData:${string}`
+type ErrorKey = Exclude<keyof Form, 'paymentData'> | DatumField
+type Errors = Partial<Record<ErrorKey, string>>
 
-const STEP_FIELDS: Record<Step, (keyof Form)[]> = {
+function datumField(slug: string): DatumField {
+  return `paymentData:${slug}`
+}
+
+const STEP_FIELDS: Record<Step, Exclude<keyof Form, 'paymentData'>[]> = {
   1: ['name', 'description', 'categorySlugs'],
-  2: ['paymentMethodSlugs', 'breBKey'],
+  2: ['paymentMethodSlugs'],
   3: ['dialCode', 'whatsappNumber'],
 }
 
@@ -60,20 +87,16 @@ function initialForm(initial: ShopView | null | undefined): Form {
     description: initial?.description ?? '',
     categorySlugs: initial?.categorySlugs ?? [],
     paymentMethodSlugs: initial?.paymentMethodSlugs ?? [],
-    breBKey: initial?.breBKey ?? '',
+    paymentData: Object.fromEntries((initial?.paymentData ?? []).map(entry => [entry.slug, entry.value])),
     dialCode: initial?.whatsapp.dialCode ?? COLOMBIA_DIAL_CODE,
     whatsappNumber: initial?.whatsapp.number ?? '',
   }
 }
 
-// The catalogue marks which method carries a key of its own, so revealing the Bre-B
-// field follows the data the backend serves instead of a hard-coded label.
+// The catalogue declares which datum each method captures, so every selected method
+// reveals its own field instead of a single hard-coded one.
 function selectedMethods(form: Form, paymentMethods: CatalogPaymentMethod[]) {
   return paymentMethods.filter(method => form.paymentMethodSlugs.includes(method.slug))
-}
-
-function needsKey(form: Form, paymentMethods: CatalogPaymentMethod[]) {
-  return selectedMethods(form, paymentMethods).some(method => method.requiresKey)
 }
 
 function validateStore(form: Form): Errors {
@@ -96,12 +119,11 @@ function validatePayments(form: Form, paymentMethods: CatalogPaymentMethod[]): E
   if (form.paymentMethodSlugs.length === 0) errors.paymentMethodSlugs = 'Elegí al menos un medio de pago.'
   else if (form.paymentMethodSlugs.length > MAX_PAYMENT_METHODS) errors.paymentMethodSlugs = 'Quitá alguno: la lista es demasiado larga.'
 
-  if (needsKey(form, paymentMethods)) {
-    const key = form.breBKey.trim()
-    if (key.length === 0) errors.breBKey = 'Ingresá tu llave Bre-B.'
-    else if (key.length < MIN_BRE_B_KEY || key.length > MAX_BRE_B_KEY || !BRE_B_KEY.test(key)) {
-      errors.breBKey = 'Revisá la llave: usá entre 3 y 40 caracteres, sin espacios.'
-    }
+  // Every selected method needs its own datum; its kind decides the rule.
+  for (const method of selectedMethods(form, paymentMethods)) {
+    const value = (form.paymentData[method.slug] ?? '').trim()
+    if (value.length === 0) errors[datumField(method.slug)] = `Ingresá el dato de ${method.label}.`
+    else if (!DATUM_RULES[method.dataKind].valid(value)) errors[datumField(method.slug)] = DATUM_RULES[method.dataKind].message
   }
   return errors
 }
@@ -127,9 +149,12 @@ function toInput(form: Form, paymentMethods: CatalogPaymentMethod[]): WizardInpu
     description: form.description.trim(),
     categorySlugs: form.categorySlugs,
     paymentMethodSlugs: form.paymentMethodSlugs,
-    // Required exactly while the method that carries it is selected, so a deselected
-    // Bre-B never sends a value the backend would reject as unexpected.
-    ...(needsKey(form, paymentMethods) ? { breBKey: form.breBKey.trim() } : {}),
+    // Exactly one datum per selected method and none for an unselected one: the server
+    // rejects a value that outlives the method it belongs to.
+    paymentData: selectedMethods(form, paymentMethods).map(method => ({
+      slug: method.slug,
+      value: (form.paymentData[method.slug] ?? '').trim(),
+    })),
     whatsapp: { dialCode: form.dialCode, number: form.whatsappNumber.replace(WHATSAPP_SEPARATORS, '') },
   }
 }
@@ -171,7 +196,7 @@ export function ShopWizard({ initial, categories, paymentMethods, dialCodes, pen
   const [step, setStep] = useState<Step>(1)
   const [errors, setErrors] = useState<Errors>({})
 
-  function update<K extends keyof Form>(key: K, value: Form[K]) {
+  function update<K extends Exclude<keyof Form, 'paymentData'>>(key: K, value: Form[K]) {
     setForm(current => ({ ...current, [key]: value }))
     // A verdict describes the value that failed. Once the operator edits that value the
     // message is stale, so it goes away instead of accusing a valid entry.
@@ -183,17 +208,30 @@ export function ShopWizard({ initial, categories, paymentMethods, dialCodes, pen
     })
   }
 
+  // Each datum lives and is cleared on its own: correcting Nequi never clears the
+  // verdict of the Bre-B key.
+  function updateDatum(slug: string, value: string) {
+    setForm(current => ({ ...current, paymentData: { ...current.paymentData, [slug]: value } }))
+    setErrors(current => {
+      const field = datumField(slug)
+      if (current[field] === undefined) return current
+      const nextErrors = { ...current }
+      delete nextErrors[field]
+      return nextErrors
+    })
+  }
+
   function toggleInList(key: 'categorySlugs' | 'paymentMethodSlugs', slug: string) {
     setForm(current => ({
       ...current,
       [key]: current[key].includes(slug) ? current[key].filter(item => item !== slug) : [...current[key], slug],
     }))
-    // The key belongs to the payment method, so its verdict is stale as soon as the
-    // selection changes.
+    // The datum belongs to the payment method, so its verdict is stale as soon as that
+    // method's selection changes.
     setErrors(current => {
       const nextErrors = { ...current }
       delete nextErrors[key]
-      if (key === 'paymentMethodSlugs') delete nextErrors.breBKey
+      if (key === 'paymentMethodSlugs') delete nextErrors[datumField(slug)]
       return nextErrors
     })
   }
@@ -202,6 +240,11 @@ export function ShopWizard({ initial, categories, paymentMethods, dialCodes, pen
     setErrors(current => {
       const nextErrors = { ...current }
       for (const field of STEP_FIELDS[step]) delete nextErrors[field]
+      if (step === 2) {
+        for (const key of Object.keys(nextErrors) as ErrorKey[]) {
+          if (key.startsWith('paymentData:')) delete nextErrors[key]
+        }
+      }
       return { ...nextErrors, ...found }
     })
   }
@@ -233,8 +276,6 @@ export function ShopWizard({ initial, categories, paymentMethods, dialCodes, pen
     }
     onSubmit(toInput(form, paymentMethods))
   }
-
-  const revealsKey = needsKey(form, paymentMethods)
 
   return <VisualShell title="Configurá tu tienda">
     <form noValidate onSubmit={submit} className="flex flex-col gap-5">
@@ -298,7 +339,7 @@ export function ShopWizard({ initial, categories, paymentMethods, dialCodes, pen
       {step === 2 && <FieldGroup>
         <FieldSet>
           <FieldLegend>Medios de pago</FieldLegend>
-          <FieldDescription>Tocá los que aceptás.</FieldDescription>
+          <FieldDescription>Marcá los medios que aceptás y cargá el dato de cada uno. Al menos uno.</FieldDescription>
           <Field
             data-invalid={errors.paymentMethodSlugs ? true : undefined}
             aria-invalid={errors.paymentMethodSlugs ? true : undefined}
@@ -306,39 +347,48 @@ export function ShopWizard({ initial, categories, paymentMethods, dialCodes, pen
             <div className="flex flex-col gap-2">
               {paymentMethods.map(method => {
                 const selected = form.paymentMethodSlugs.includes(method.slug)
-                return <Button
+                const field = datumField(method.slug)
+                const datumError = errors[field]
+                const inputId = `payment-datum-${method.slug}`
+                const hintId = `${inputId}-hint`
+                const errorId = `${inputId}-error`
+                // The datum opens inside the method's own card: there is no separate section
+                // and no shared field, so the operator sees which method each value belongs to.
+                return <div
                   key={method.slug}
-                  type="button"
-                  aria-pressed={selected}
-                  variant={selected ? 'default' : 'outline'}
-                  className="h-auto w-full flex-col items-start gap-0.5 py-3 text-left"
-                  onClick={() => toggleInList('paymentMethodSlugs', method.slug)}
+                  data-slot="payment-method"
+                  data-selected={selected || undefined}
+                  className={cn('rounded-xl border', selected ? 'border-primary ring-1 ring-primary' : 'border-border')}
                 >
-                  <span className="font-medium">{method.label}</span>
-                  <span className={cn('text-xs font-normal', selected ? 'text-primary-foreground/80' : 'text-muted-foreground')}>
-                    {method.description}
-                  </span>
-                </Button>
+                  <Button
+                    type="button"
+                    aria-pressed={selected}
+                    variant="ghost"
+                    className="h-auto w-full flex-col items-start gap-0.5 rounded-xl px-4 py-3 text-left"
+                    onClick={() => toggleInList('paymentMethodSlugs', method.slug)}
+                  >
+                    <span className="font-medium">{method.label}</span>
+                    <span className="text-xs font-normal text-muted-foreground">{method.description}</span>
+                  </Button>
+                  {selected && <Field data-invalid={datumError ? true : undefined} className="px-4 pb-4">
+                    <FieldLabel htmlFor={inputId}>{method.dataLabel}</FieldLabel>
+                    <Input
+                      id={inputId}
+                      inputMode={method.dataKind === 'phone' ? 'tel' : undefined}
+                      value={form.paymentData[method.slug] ?? ''}
+                      aria-invalid={datumError ? true : undefined}
+                      aria-describedby={datumError ? `${hintId} ${errorId}` : hintId}
+                      onChange={event => updateDatum(method.slug, event.target.value)}
+                    />
+                    <FieldDescription id={hintId}>{method.dataHint}</FieldDescription>
+                    {datumError && <FieldError id={errorId}>{datumError}</FieldError>}
+                  </Field>}
+                </div>
               })}
             </div>
             {errors.paymentMethodSlugs && <FieldError>{errors.paymentMethodSlugs}</FieldError>}
           </Field>
         </FieldSet>
-
-        {revealsKey && <Field data-invalid={errors.breBKey ? true : undefined}>
-          <FieldLabel htmlFor="bre-b-key">Tu llave Bre-B</FieldLabel>
-          <Input
-            id="bre-b-key"
-            value={form.breBKey}
-            aria-invalid={errors.breBKey ? true : undefined}
-            aria-describedby={errors.breBKey ? 'bre-b-key-hint bre-b-key-error' : 'bre-b-key-hint'}
-            onChange={event => update('breBKey', event.target.value)}
-          />
-          {errors.breBKey && <FieldError id="bre-b-key-error">{errors.breBKey}</FieldError>}
-          <FieldDescription id="bre-b-key-hint">
-            Celular, documento o llave alfanumérica. Se la das a tu cliente para que te pague.
-          </FieldDescription>
-        </Field>}
       </FieldGroup>}
 
       {step === 3 && <FieldGroup>

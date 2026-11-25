@@ -10,9 +10,38 @@ const categories: CatalogCategory[] = [
 ]
 
 const paymentMethods: CatalogPaymentMethod[] = [
-  { slug: 'nequi', label: 'Nequi', description: 'Billetera · te llega al celular o por QR', requiresKey: false },
-  { slug: 'llave-bre-b', label: 'Llave Bre-B', description: 'Transferencia inmediata, 24/7, entre bancos', requiresKey: true },
-  { slug: 'daviplata', label: 'Daviplata', description: 'Billetera · celular', requiresKey: false },
+  {
+    slug: 'nequi',
+    label: 'Nequi',
+    description: 'Billetera · te llega al celular o por QR',
+    dataKind: 'phone',
+    dataLabel: 'Tu Nequi',
+    dataHint: 'El número con el que recibís los pagos.',
+  },
+  {
+    slug: 'llave-bre-b',
+    label: 'Llave Bre-B',
+    description: 'Transferencia inmediata, 24/7, entre bancos',
+    dataKind: 'key',
+    dataLabel: 'Tu llave Bre-B',
+    dataHint: 'Celular, documento o llave alfanumérica.',
+  },
+  {
+    slug: 'daviplata',
+    label: 'Daviplata',
+    description: 'Billetera · celular',
+    dataKind: 'phone',
+    dataLabel: 'Tu Daviplata',
+    dataHint: 'El número con el que recibís los pagos.',
+  },
+  {
+    slug: 'transferencia-ahorros',
+    label: 'Transferencia a cuenta de ahorros',
+    description: 'Bancolombia, Davivienda y otros',
+    dataKind: 'account',
+    dataLabel: 'Tu cuenta',
+    dataHint: 'Banco y número de cuenta.',
+  },
 ]
 
 const dialCodes: CatalogDialCode[] = [
@@ -27,7 +56,7 @@ const shop: ShopView = {
   description: 'Ropa urbana',
   categorySlugs: ['ropa'],
   paymentMethodSlugs: ['nequi'],
-  breBKey: null,
+  paymentData: [{ slug: 'nequi', value: '3005089676' }],
   whatsapp: { dialCode: '+57', number: '3001234567' },
   tiktokBotHandle: '@livefy_tienda_uno',
   whatsappBotNumber: '3001234567',
@@ -102,7 +131,26 @@ describe('shop wizard — step 2 · Cómo te pagan', () => {
     expect(onSubmit).not.toHaveBeenCalled()
   })
 
-  it('does not ask for a Bre-B key while Bre-B is not selected', () => {
+  it('reveals the datum of a selected method and not the one of an unselected method', () => {
+    renderWizard()
+    fillStoreStep()
+    next()
+
+    choosePayment(/nequi/i)
+
+    // Each selected method carries its own datum, labelled and hinted by the catalogue.
+    expect(screen.getByLabelText('Tu Nequi')).toBeTruthy()
+    expect(screen.getByText('El número con el que recibís los pagos.')).toBeTruthy()
+    expect(screen.queryByLabelText('Tu llave Bre-B')).toBeNull()
+    expect(screen.queryByLabelText('Tu cuenta')).toBeNull()
+
+    fireEvent.change(screen.getByLabelText('Tu Nequi'), { target: { value: '3005089676' } })
+    next()
+
+    expect(screen.getByText('Paso 3 de 3')).toBeTruthy()
+  })
+
+  it('blocks step 2 while a selected method has no datum', () => {
     renderWizard()
     fillStoreStep()
     next()
@@ -110,8 +158,8 @@ describe('shop wizard — step 2 · Cómo te pagan', () => {
     choosePayment(/nequi/i)
     next()
 
-    expect(screen.queryByLabelText('Tu llave Bre-B')).toBeNull()
-    expect(screen.getByText('Paso 3 de 3')).toBeTruthy()
+    expect(screen.getByText('Ingresá el dato de Nequi.')).toBeTruthy()
+    expect(screen.getByText('Paso 2 de 3')).toBeTruthy()
   })
 
   it('reveals the Bre-B key and refuses to advance without it', () => {
@@ -123,11 +171,11 @@ describe('shop wizard — step 2 · Cómo te pagan', () => {
     expect(screen.getByLabelText('Tu llave Bre-B')).toBeTruthy()
     next()
 
-    expect(screen.getByText('Ingresá tu llave Bre-B.')).toBeTruthy()
+    expect(screen.getByText('Ingresá el dato de Llave Bre-B.')).toBeTruthy()
     expect(screen.getByText('Paso 2 de 3')).toBeTruthy()
   })
 
-  it('rejects a Bre-B key that is shorter than three characters', () => {
+  it('rejects a Bre-B key shorter than three characters and accepts the boundary', () => {
     renderWizard()
     fillStoreStep()
     next()
@@ -138,6 +186,47 @@ describe('shop wizard — step 2 · Cómo te pagan', () => {
 
     expect(screen.getByText('Revisá la llave: usá entre 3 y 40 caracteres, sin espacios.')).toBeTruthy()
     expect(screen.getByText('Paso 2 de 3')).toBeTruthy()
+
+    fireEvent.change(screen.getByLabelText('Tu llave Bre-B'), { target: { value: 'abc' } })
+    next()
+
+    expect(screen.getByText('Paso 3 de 3')).toBeTruthy()
+  })
+
+  it('rejects a phone datum outside its digit range and accepts the boundary', () => {
+    renderWizard()
+    fillStoreStep()
+    next()
+
+    choosePayment(/nequi/i)
+    fireEvent.change(screen.getByLabelText('Tu Nequi'), { target: { value: '123456' } })
+    next()
+
+    expect(screen.getByText('Usá entre 7 y 15 dígitos.')).toBeTruthy()
+    expect(screen.getByText('Paso 2 de 3')).toBeTruthy()
+
+    fireEvent.change(screen.getByLabelText('Tu Nequi'), { target: { value: '1234567' } })
+    next()
+
+    expect(screen.getByText('Paso 3 de 3')).toBeTruthy()
+  })
+
+  it('rejects an account datum outside its length and accepts the boundary', () => {
+    renderWizard()
+    fillStoreStep()
+    next()
+
+    choosePayment(/transferencia a cuenta de ahorros/i)
+    fireEvent.change(screen.getByLabelText('Tu cuenta'), { target: { value: '1234' } })
+    next()
+
+    expect(screen.getByText('Revisá la cuenta: usá entre 5 y 60 caracteres con letras, números, espacios y ".-#".')).toBeTruthy()
+    expect(screen.getByText('Paso 2 de 3')).toBeTruthy()
+
+    fireEvent.change(screen.getByLabelText('Tu cuenta'), { target: { value: '12345' } })
+    next()
+
+    expect(screen.getByText('Paso 3 de 3')).toBeTruthy()
   })
 })
 
@@ -147,6 +236,7 @@ describe('shop wizard — step 3 · Contacto', () => {
     fillStoreStep()
     next()
     choosePayment(/nequi/i)
+    fireEvent.change(screen.getByLabelText('Tu Nequi'), { target: { value: '3005089676' } })
     next()
 
     fireEvent.click(screen.getByRole('button', { name: 'Guardar tienda' }))
@@ -185,9 +275,39 @@ describe('shop wizard — step 3 · Contacto', () => {
       description: 'Ropa urbana',
       categorySlugs: ['ropa'],
       paymentMethodSlugs: ['llave-bre-b'],
-      breBKey: 'valentina.lopez',
+      paymentData: [{ slug: 'llave-bre-b', value: 'valentina.lopez' }],
       whatsapp: { dialCode: '+54', number: '1140000001' },
     })
+    expect(Object.hasOwn(onSubmit.mock.calls[0][0], 'breBKey')).toBe(false)
+  })
+
+  it('sends a datum for exactly the selected methods', () => {
+    const onSubmit = renderWizard()
+    fillStoreStep()
+    next()
+
+    choosePayment(/nequi/i)
+    choosePayment(/llave bre-b/i)
+    fireEvent.change(screen.getByLabelText('Tu Nequi'), { target: { value: '300 508 9676' } })
+    fireEvent.change(screen.getByLabelText('Tu llave Bre-B'), { target: { value: 'valentina.lopez' } })
+    next()
+
+    fireEvent.change(screen.getByLabelText('Número de WhatsApp'), { target: { value: '3001234567' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar tienda' }))
+
+    expect(onSubmit).toHaveBeenCalledTimes(1)
+    expect(onSubmit).toHaveBeenCalledWith({
+      name: 'Tienda Uno',
+      description: 'Ropa urbana',
+      categorySlugs: ['ropa'],
+      paymentMethodSlugs: ['nequi', 'llave-bre-b'],
+      paymentData: [
+        { slug: 'nequi', value: '300 508 9676' },
+        { slug: 'llave-bre-b', value: 'valentina.lopez' },
+      ],
+      whatsapp: { dialCode: '+57', number: '3001234567' },
+    })
+    expect(Object.hasOwn(onSubmit.mock.calls[0][0], 'breBKey')).toBe(false)
   })
 
   it('clears the verdict as soon as the operator corrects the value', () => {
@@ -232,6 +352,7 @@ describe('shop wizard — progress', () => {
     expect(screen.getByText('1 · Tu tienda').closest('li')?.getAttribute('aria-current')).toBeNull()
 
     choosePayment(/nequi/i)
+    fireEvent.change(screen.getByLabelText('Tu Nequi'), { target: { value: '3005089676' } })
     next()
 
     expect(screen.getByText('Paso 3 de 3')).toBeTruthy()
