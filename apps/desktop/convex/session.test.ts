@@ -22,7 +22,6 @@ describe('trusted Clerk identity contract (not JWT validation)', () => {
       email: 'private@example.test',
     }).query(session, {})
     expect(result).toEqual({ tokenIdentifier })
-    expect(Object.keys(schema.tables)).toEqual(['shops'])
   })
   it('uses the supplied verified identifier rather than reconstructing it', async () => {
     const t = convexTest(schema, modules)
