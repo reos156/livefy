@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Configurá tu tienda — por pasos</title>
+<style>
+  :root {
+    --background: oklch(1.0000 0 0);
+    --foreground: oklch(0.2850 0 0);
+    --card: oklch(1.0000 0 0);
+    --muted: oklch(0.9845 0.0026 106.4477);
+    --muted-foreground: oklch(0.5103 0 0);
+    --border: oklch(0.9269 0.0160 110.5685);
+    --input: oklch(0.9448 0.0134 115.8392);
+    --primary: oklch(0.9347 0.1825 120.5229);
+    --primary-foreground: oklch(0 0 0);
+    --destructive: oklch(0.5771 0.2152 27.3250);
+    --ring: oklch(0.9347 0.1825 120.5229);
+    --radius: 1rem;
+  }
+  html.dark {
+    --background: oklch(0.2679 0.0036 106.6427);
+    --foreground: oklch(0.9576 0.0027 106.4494);
+    --card: oklch(0.2928 0.0018 106.5092);
+    --muted: oklch(0.3300 0.0030 106.5000);
+    --muted-foreground: oklch(0.7200 0.0040 106.4500);
+    --border: oklch(0.3618 0.0101 106.8928);
+    --input: oklch(0.3400 0.0090 106.8000);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--background); color: var(--foreground);
+    font-family: ui-sans-serif, system-ui, sans-serif; font-size: 14px; line-height: 1.5; }
+  :focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; }
+  .app { max-width: 720px; margin: 0 auto; padding: 28px 24px 40px; }
+  .topbar { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
+  .mark { width: 36px; height: 36px; border-radius: 11px; background: var(--primary);
+    color: var(--primary-foreground); display: grid; place-items: center; font-weight: 700; }
+  .topbar .spacer { flex: 1; }
+  .topbar button { background: transparent; border: 1px solid var(--border); color: var(--foreground);
+    border-radius: 9px; height: 34px; padding: 0 14px; font: inherit; font-size: 13px; cursor: pointer; }
+  ol.steps { display: flex; gap: 8px; list-style: none; margin: 0 0 24px; padding: 0; }
+  ol.steps li { flex: 1; }
+  ol.steps .bar { height: 4px; border-radius: 999px; background: var(--border); }
+  ol.steps li[data-state="done"] .bar { background: var(--primary); }
+  ol.steps li[data-state="current"] .bar { background: var(--primary); }
+  ol.steps .label { display: block; margin-top: 8px; font-size: 12px; color: var(--muted-foreground); }
+  ol.steps li[data-state="current"] .label { color: var(--foreground); font-weight: 600; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px 24px; }
+  .card h1 { font-size: 19px; margin: 0; }
+  .card > p.lead { color: var(--muted-foreground); font-size: 13px; margin: 4px 0 20px; }
+  .pay { display: flex; flex-direction: column; gap: 10px; }
+  .pay-item { display: flex; align-items: center; gap: 12px; padding: 14px 16px;
+    border: 1px solid var(--border); border-radius: 12px; cursor: pointer; }
+  .pay-item[aria-pressed="true"] { border-color: var(--primary); box-shadow: inset 0 0 0 1px var(--primary); }
+  .pay-item .box { width: 18px; height: 18px; border-radius: 6px; border: 1.5px solid var(--input);
+    display: grid; place-items: center; flex: none; font-size: 12px; }
+  .pay-item[aria-pressed="true"] .box { background: var(--primary); border-color: var(--primary); color: var(--primary-foreground); }
+  .pay-item .name { font-weight: 600; }
+  .pay-item .meta { color: var(--muted-foreground); font-size: 12px; }
+  .revealed { border-left: 3px solid var(--primary); background: var(--muted); border-radius: 0 10px 10px 0; padding: 14px 16px; }
+  label { font-size: 13px; font-weight: 600; display: block; margin-bottom: 6px; }
+  input[type="text"] { width: 100%; height: 40px; padding: 0 12px; border-radius: 10px;
+    border: 1px solid var(--input); background: transparent; color: var(--foreground); font: inherit; }
+  .hint { font-size: 12px; color: var(--muted-foreground); margin: 6px 0 0; }
+  .error { font-size: 12px; color: var(--destructive); margin: 6px 0 0; }
+  input[aria-invalid="true"] { border-color: var(--destructive); }
+  .foot { display: flex; align-items: center; gap: 12px; margin-top: 22px; }
+  .foot .spacer { flex: 1; }
+  button.btn { height: 40px; padding: 0 18px; border-radius: 10px; font: inherit; font-weight: 600;
+    border: 1px solid transparent; cursor: pointer; background: var(--primary); color: var(--primary-foreground); }
+  button.ghost { background: transparent; border-color: var(--border); color: var(--foreground); font-weight: 500; }
+  .bots { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 18px;
+    border: 1px dashed var(--border); border-radius: var(--radius); padding: 14px 16px; background: var(--muted); }
+  .bots h2 { font-size: 12px; margin: 0 0 2px; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: .04em; }
+  .bots strong { font-size: 13px; }
+  .toggle { position: fixed; top: 12px; right: 12px; font-size: 11px; padding: 6px 10px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--card); color: var(--muted-foreground); cursor: pointer; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<button class="toggle" type="button" onclick="document.documentElement.classList.toggle('dark')">claro / oscuro</button>
+<main class="app">
+  <header class="topbar">
+    <span class="mark" aria-hidden="true">L</span>
+    <div>
+      <p style="margin:0;font-weight:600">Configurá tu tienda</p>
+      <p class="hint" style="margin:0">Paso 2 de 3</p>
+    </div>
+    <span class="spacer"></span>
+    <button type="button">Sign out</button>
+  </header>
+
+  <ol class="steps">
+    <li data-state="done"><span class="bar"></span><span class="label">1 · Tu tienda</span></li>
+    <li data-state="current" aria-current="step"><span class="bar"></span><span class="label">2 · Cómo te pagan</span></li>
+    <li data-state="todo"><span class="bar"></span><span class="label">3 · Tus bots</span></li>
+  </ol>
+
+  <section class="card" aria-labelledby="paso">
+    <h1 id="paso">Cómo te pagan</h1>
+    <p class="lead">Elegí los medios que aceptás. Al menos uno.</p>
+
+    <div class="pay" role="group" aria-labelledby="paso">
+      <div class="pay-item" role="button" tabindex="0" aria-pressed="true">
+        <span class="box" aria-hidden="true">✓</span>
+        <span><span class="name">Nequi</span><br><span class="meta">Billetera · te llega al celular o por QR</span></span>
+      </div>
+
+      <div class="pay-item" role="button" tabindex="0" aria-pressed="true">
+        <span class="box" aria-hidden="true">✓</span>
+        <span><span class="name">Llave Bre-B</span><br><span class="meta">Transferencia inmediata, 24/7, entre bancos</span></span>
+      </div>
+      <div class="revealed">
+        <label for="llave">Tu llave Bre-B</label>
+        <input id="llave" type="text" value="valentina.lopez" aria-invalid="true" aria-describedby="llave-error">
+        <p class="error" id="llave-error">Revisá la llave: no encontramos ese alias.</p>
+        <p class="hint">Celular, documento o llave alfanumérica. Se la das a tu cliente para que te pague.</p>
+      </div>
+
+      <div class="pay-item" role="button" tabindex="0" aria-pressed="false">
+        <span class="box" aria-hidden="true"></span>
+        <span><span class="name">Daviplata</span><br><span class="meta">Billetera · celular</span></span>
+      </div>
+      <div class="pay-item" role="button" tabindex="0" aria-pressed="false">
+        <span class="box" aria-hidden="true"></span>
+        <span><span class="name">Transferencia a cuenta de ahorros</span><br><span class="meta">Bancolombia, Davivienda y otros</span></span>
+      </div>
+    </div>
+
+    <div class="foot">
+      <button class="btn ghost" type="button">Atrás</button>
+      <span class="spacer"></span>
+      <button class="btn" type="button">Continuar</button>
+    </div>
+  </section>
+
+  <section class="bots" aria-label="Datos de tus bots">
+    <div><h2>Bot TikTok</h2><strong>pendiente de asignación</strong></div>
+    <div><h2>WhatsApp bot</h2><strong>pendiente de asignación</strong></div>
+  </section>
+</main>
+</body>
+</html>

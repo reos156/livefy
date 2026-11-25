@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Configurá tu tienda — una sola columna</title>
+<style>
+  :root {
+    --background: oklch(1.0000 0 0);
+    --foreground: oklch(0.2850 0 0);
+    --card: oklch(1.0000 0 0);
+    --muted: oklch(0.9845 0.0026 106.4477);
+    --muted-foreground: oklch(0.5103 0 0);
+    --border: oklch(0.9269 0.0160 110.5685);
+    --input: oklch(0.9448 0.0134 115.8392);
+    --primary: oklch(0.9347 0.1825 120.5229);
+    --primary-foreground: oklch(0 0 0);
+    --destructive: oklch(0.5771 0.2152 27.3250);
+    --ring: oklch(0.9347 0.1825 120.5229);
+    --radius: 1rem;
+  }
+  html.dark {
+    --background: oklch(0.2679 0.0036 106.6427);
+    --foreground: oklch(0.9576 0.0027 106.4494);
+    --card: oklch(0.2928 0.0018 106.5092);
+    --muted: oklch(0.3300 0.0030 106.5000);
+    --muted-foreground: oklch(0.7200 0.0040 106.4500);
+    --border: oklch(0.3618 0.0101 106.8928);
+    --input: oklch(0.3400 0.0090 106.8000);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--background); color: var(--foreground);
+    font-family: ui-sans-serif, system-ui, sans-serif; font-size: 14px; line-height: 1.5; }
+  :focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; }
+  .app { max-width: 620px; margin: 0 auto; padding: 30px 24px 120px; }
+  .topbar { display: flex; align-items: center; gap: 12px; margin-bottom: 22px; }
+  .mark { width: 38px; height: 38px; border-radius: 12px; background: var(--primary); color: var(--primary-foreground);
+    display: grid; place-items: center; font-weight: 700; }
+  .topbar h1 { font-size: 18px; margin: 0; }
+  .topbar p { margin: 0; font-size: 12.5px; color: var(--muted-foreground); }
+  .topbar .spacer { flex: 1; }
+  .topbar button { background: transparent; border: 1px solid var(--border); color: var(--foreground);
+    border-radius: 9px; height: 34px; padding: 0 14px; font: inherit; font-size: 13px; cursor: pointer; }
+  section.block { border-top: 1px solid var(--border); padding: 22px 0; }
+  section.block:first-of-type { border-top: 0; padding-top: 4px; }
+  .block h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted-foreground); margin: 0 0 14px; }
+  label { font-size: 13px; font-weight: 600; display: block; margin-bottom: 6px; }
+  .stack { display: flex; flex-direction: column; gap: 14px; }
+  input[type="text"] { width: 100%; height: 40px; padding: 0 12px; border-radius: 10px;
+    border: 1px solid var(--input); background: var(--card); color: var(--foreground); font: inherit; }
+  .hint { font-size: 12px; color: var(--muted-foreground); margin: 6px 0 0; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { border: 1px solid var(--border); background: var(--card); color: var(--foreground);
+    border-radius: 999px; padding: 7px 13px; font: inherit; font-size: 12.5px; cursor: pointer; }
+  .chip[aria-pressed="true"] { background: var(--primary); border-color: var(--primary); color: var(--primary-foreground); font-weight: 600; }
+  .pay { display: flex; flex-direction: column; gap: 8px; }
+  .pay-item { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--card);
+    border: 1px solid var(--border); border-radius: 12px; cursor: pointer; }
+  .pay-item[aria-pressed="true"] { border-color: var(--primary); box-shadow: inset 0 0 0 1px var(--primary); }
+  .pay-item .box { width: 18px; height: 18px; border-radius: 6px; border: 1.5px solid var(--input);
+    display: grid; place-items: center; flex: none; font-size: 12px; }
+  .pay-item[aria-pressed="true"] .box { background: var(--primary); border-color: var(--primary); color: var(--primary-foreground); }
+  .pay-item .name { font-weight: 600; }
+  .pay-item .meta { display: block; color: var(--muted-foreground); font-size: 12px; }
+  .revealed { border-left: 3px solid var(--primary); background: var(--muted); border-radius: 0 10px 10px 0; padding: 12px 14px; }
+  .phone { display: flex; gap: 8px; }
+  select.phone-code { height: 40px; border-radius: 10px; border: 1px solid var(--input);
+    background: var(--card); color: var(--foreground); font: inherit; padding: 0 8px; }
+  .error { color: var(--destructive); font-size: 12px; margin: 6px 0 0; }
+  input[aria-invalid="true"] { border-color: var(--destructive); }
+  .facts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; background: var(--muted);
+    border: 1px dashed var(--border); border-radius: var(--radius); padding: 14px 16px; }
+  .facts h3 { font-size: 12px; margin: 0 0 2px; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: .04em; }
+  .facts strong { font-size: 13px; }
+  .bar { position: fixed; inset: auto 0 0 0; background: var(--card); border-top: 1px solid var(--border); }
+  .bar div { max-width: 620px; margin: 0 auto; padding: 14px 24px; display: flex; align-items: center; gap: 12px; }
+  .bar .spacer { flex: 1; }
+  button.btn { height: 40px; padding: 0 18px; border-radius: 10px; font: inherit; font-weight: 600;
+    border: 1px solid transparent; cursor: pointer; background: var(--primary); color: var(--primary-foreground); }
+  .toggle { position: fixed; top: 12px; right: 12px; font-size: 11px; padding: 6px 10px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--card); color: var(--muted-foreground); cursor: pointer; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<button class="toggle" type="button" onclick="document.documentElement.classList.toggle('dark')">claro / oscuro</button>
+<main class="app">
+  <header class="topbar">
+    <span class="mark" aria-hidden="true">L</span>
+    <div>
+      <h1>Configurá tu tienda</h1>
+      <p>Todo en una pantalla. Podés editarlo después.</p>
+    </div>
+    <span class="spacer"></span>
+    <button type="button">Sign out</button>
+  </header>
+
+  <section class="block" aria-labelledby="s1">
+    <h2 id="s1">Tu tienda</h2>
+    <div class="stack">
+      <div>
+        <label for="nombre">Nombre de la tienda</label>
+        <input id="nombre" type="text" value="Moda Valentina">
+      </div>
+      <div>
+        <label for="desc">Descripción</label>
+        <input id="desc" type="text" value="Ropa femenina para looks de diario. Envíos a todo el país.">
+      </div>
+      <div>
+        <label id="cat-label">Categorías</label>
+        <div class="chips" role="group" aria-labelledby="cat-label">
+          <button class="chip" type="button" aria-pressed="true">Ropa y accesorios</button>
+          <button class="chip" type="button" aria-pressed="true">Calzado</button>
+          <button class="chip" type="button" aria-pressed="false">Belleza y cuidado personal</button>
+          <button class="chip" type="button" aria-pressed="false">Hogar y cocina</button>
+          <button class="chip" type="button" aria-pressed="false">Mascotas</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" aria-labelledby="s2">
+    <h2 id="s2">Cómo te pagan</h2>
+    <div class="pay" role="group" aria-labelledby="s2">
+      <div class="pay-item" role="button" tabindex="0" aria-pressed="true">
+        <span class="box" aria-hidden="true">✓</span>
+        <span><span class="name">Nequi</span><span class="meta">billetera, celular o QR</span></span>
+      </div>
+      <div class="pay-item" role="button" tabindex="0" aria-pressed="true">
+        <span class="box" aria-hidden="true">✓</span>
+        <span><span class="name">Llave Bre-B</span><span class="meta">transferencia inmediata 24/7</span></span>
+      </div>
+      <div class="revealed">
+        <label for="llave">Tu llave Bre-B</label>
+        <input id="llave" type="text" value="valentina.lopez" aria-invalid="true" aria-describedby="llave-error">
+        <p class="error" id="llave-error">Revisá la llave: no encontramos ese alias.</p>
+      </div>
+      <div class="pay-item" role="button" tabindex="0" aria-pressed="false">
+        <span class="box" aria-hidden="true"></span>
+        <span><span class="name">Daviplata</span><span class="meta">billetera, celular</span></span>
+      </div>
+      <div class="pay-item" role="button" tabindex="0" aria-pressed="false">
+        <span class="box" aria-hidden="true"></span>
+        <span><span class="name">Transferencia a cuenta de ahorros</span><span class="meta">Bancolombia, Davivienda y otros</span></span>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" aria-labelledby="s3">
+    <h2 id="s3">Contacto</h2>
+    <label for="wa">WhatsApp de contacto</label>
+    <div class="phone">
+      <select class="phone-code" id="wa-code" aria-label="Indicativo del país">
+        <option selected>🇨🇴 +57</option>
+        <option>🇲🇽 +52</option>
+        <option>🇦🇷 +54</option>
+        <option>🇵🇪 +51</option>
+        <option>🇨🇱 +56</option>
+        <option>🇪🇨 +593</option>
+        <option>🇺🇸 +1</option>
+        <option>🇪🇸 +34</option>
+      </select>
+      <input id="wa" type="text" value="300 123 4567">
+    </div>
+    <p class="hint">Colombia por defecto. Es obligatorio: por ahí te avisamos.</p>
+  </section>
+
+  <section class="block" aria-labelledby="s4">
+    <h2 id="s4">Tus bots</h2>
+    <div class="facts">
+      <div><h3>Bot TikTok</h3><strong>pendiente de asignación</strong></div>
+      <div><h3>WhatsApp bot</h3><strong>pendiente de asignación</strong></div>
+    </div>
+    <p class="hint">Los asigna la plataforma. No se editan acá.</p>
+  </section>
+</main>
+
+<div class="bar">
+  <div>
+    <p class="hint" style="margin:0">Falta un dato para guardar.</p>
+    <span class="spacer"></span>
+    <button class="btn" type="button">Guardar tienda</button>
+  </div>
+</div>
+</body>
+</html>
