@@ -141,7 +141,7 @@ describe('shop wizard — step 2 · Cómo te pagan', () => {
   })
 })
 
-describe('shop wizard — step 3 · Contacto y bots', () => {
+describe('shop wizard — step 3 · Contacto', () => {
   it('blocks saving without a valid WhatsApp number', () => {
     const onSubmit = renderWizard()
     fillStoreStep()
@@ -190,17 +190,30 @@ describe('shop wizard — step 3 · Contacto y bots', () => {
     })
   })
 
-  it('shows the platform-owned bot identifiers as read-only, pending assignment included', () => {
+  it('clears the verdict as soon as the operator corrects the value', () => {
+    renderWizard({ initial: { ...shop, whatsapp: { dialCode: '+57', number: '' } } })
+    next()
+    next()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar tienda' }))
+    expect(screen.getByText('Ingresá un WhatsApp de contacto: entre 7 y 15 dígitos.')).toBeTruthy()
+
+    // The message describes the value that failed; a corrected number must not keep it.
+    fireEvent.change(screen.getByLabelText('Número de WhatsApp'), { target: { value: '3005089676' } })
+    expect(screen.queryByText('Ingresá un WhatsApp de contacto: entre 7 y 15 dígitos.')).toBeNull()
+    expect(screen.getByLabelText('Número de WhatsApp').getAttribute('aria-invalid')).toBeNull()
+  })
+
+  it('no longer shows the platform-owned bot identifiers on this screen', () => {
     renderWizard({
       initial: { ...shop, tiktokBotHandle: null, whatsappBotNumber: null },
     })
     next()
     next()
 
-    // One value per platform-owned identifier: TikTok's bot and the WhatsApp bot.
-    expect(screen.getAllByText('pendiente de asignación')).toHaveLength(2)
-    expect(screen.queryByRole('textbox', { name: /bot tiktok/i })).toBeNull()
-    expect(screen.queryByRole('textbox', { name: /whatsapp bot/i })).toBeNull()
+    // The bot identifiers left this screen by request; the platform still owns them.
+    expect(screen.queryByText(/bot tiktok/i)).toBeNull()
+    expect(screen.queryByText(/pendiente de asignación/i)).toBeNull()
   })
 })
 
@@ -222,7 +235,7 @@ describe('shop wizard — progress', () => {
     next()
 
     expect(screen.getByText('Paso 3 de 3')).toBeTruthy()
-    expect(screen.getByText('3 · Contacto y bots').closest('li')?.getAttribute('aria-current')).toBe('step')
+    expect(screen.getByText('3 · Contacto').closest('li')?.getAttribute('aria-current')).toBe('step')
   })
 })
 

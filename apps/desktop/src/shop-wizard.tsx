@@ -25,7 +25,7 @@ const COLOMBIA_DIAL_CODE = '+57'
 const STEPS = [
   { number: 1, label: 'Tu tienda' },
   { number: 2, label: 'Cómo te pagan' },
-  { number: 3, label: 'Contacto y bots' },
+  { number: 3, label: 'Contacto' },
 ] as const
 
 type Step = (typeof STEPS)[number]['number']
@@ -33,7 +33,7 @@ type Step = (typeof STEPS)[number]['number']
 const STEP_LEADS: Record<Step, string> = {
   1: 'Cómo te van a encontrar. Elegí lo que mejor describe lo que vendés.',
   2: 'Elegí los medios que aceptás. Al menos uno.',
-  3: 'Tu WhatsApp de contacto y los datos que asigna la plataforma.',
+  3: 'Tu WhatsApp de contacto, para coordinar la entrega.',
 }
 
 type Form = {
@@ -134,25 +134,6 @@ function toInput(form: Form, paymentMethods: CatalogPaymentMethod[]): WizardInpu
   }
 }
 
-// The identifiers belong to the platform, so the screen shows them and offers no
-// control: an operator must never be able to point the shop at another bot.
-function BotIdentifiers({ initial }: { initial?: ShopView | null }) {
-  const bots = [
-    { label: 'Bot TikTok', value: initial?.tiktokBotHandle },
-    { label: 'WhatsApp bot', value: initial?.whatsappBotNumber },
-  ]
-  return <FieldSet>
-    <FieldLegend>Datos de tus bots</FieldLegend>
-    <FieldDescription>Los asigna la plataforma. No se editan acá.</FieldDescription>
-    <dl className="grid grid-cols-2 gap-3">
-      {bots.map(bot => <div key={bot.label} className="flex flex-col gap-0.5">
-        <dt className="text-xs tracking-wide text-muted-foreground uppercase">{bot.label}</dt>
-        <dd className="text-sm">{bot.value ?? 'pendiente de asignación'}</dd>
-      </div>)}
-    </dl>
-  </FieldSet>
-}
-
 function StepProgress({ step }: { step: Step }) {
   return <div className="flex flex-col gap-3">
     {/* Announced on every change: the bars alone say nothing to a screen reader. */}
@@ -192,6 +173,14 @@ export function ShopWizard({ initial, categories, paymentMethods, dialCodes, pen
 
   function update<K extends keyof Form>(key: K, value: Form[K]) {
     setForm(current => ({ ...current, [key]: value }))
+    // A verdict describes the value that failed. Once the operator edits that value the
+    // message is stale, so it goes away instead of accusing a valid entry.
+    setErrors(current => {
+      if (current[key] === undefined) return current
+      const nextErrors = { ...current }
+      delete nextErrors[key]
+      return nextErrors
+    })
   }
 
   function toggleInList(key: 'categorySlugs' | 'paymentMethodSlugs', slug: string) {
@@ -385,7 +374,6 @@ export function ShopWizard({ initial, categories, paymentMethods, dialCodes, pen
           <FieldDescription>Te escriben ahí para coordinar la entrega.</FieldDescription>
           {errors.whatsappNumber && <FieldError>{errors.whatsappNumber}</FieldError>}
         </Field>
-        <BotIdentifiers initial={initial} />
       </FieldGroup>}
 
       <div className="flex items-center gap-2">
