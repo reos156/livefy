@@ -28,6 +28,13 @@ surface in its empty state, not a metrics page:
   validate/reject; close cart or confirm order (`:219`–`:232`).
 - **S9** — Success criterion 3: the panel distinguishes `connected`, `reconnecting`, `offline`,
   `suspended-risk`, `disconnected` and `ended` (`:186`).
+- **S10** — Two apps on one shared frontend: `app/desktop` (Electron, with the isolated viewer) and
+  `app/web` (no viewer). The frontend boundary requires one implementation of screens, routes and state,
+  and the web variant offers "productos y eventos en navegador responsive, sin visor de video" (`:11`).
+- **S11** — "Finalizar live" is an explicit business action that ends the commercial live; closing the app
+  stops only the local runner and revokes its producer session (`:38`, D11).
+- **S12** — D2 routes a signed-in operator with a shop straight to the dashboard, and D3 keeps the wizard
+  for an identity without one (`:444`–`:456`).
 
 An earlier reading of this document stopped at R3's first column and designed a metrics page with a generic
 empty state. That was wrong and the human corrected it, so the directions were rebuilt as the three-column
@@ -54,3 +61,4 @@ panel with each column in its empty state: no live connected, no products, no le
 - **L2** — Human's answers: CTA "Deshabilitado con nota"; scope "Sólo dashboard vacío (recomendado)" after asking whether including lives and leads would invent data — it would not invent rows, but it would decide R4's state machine early.
 - **L3** — Design directions written to `design/dashboard-inicial/` and opened on the canvas; implementation waits for the human's choice.
 - **L4** — Human's correction, verbatim: "creo que no revisaste muy bien la seccion 2. Spec (contrato verificable propuesto) del @docs/livefy-scope-mvp_20260928.md por que claramente dice que el dashboard va dividido en 3 columnas, etc..., no se de donde sacas que lo unico que nos interesa es leads, conversion, ventas". Accepted: the first six artboards are superseded; the panel is the three-column workspace of R3, shown empty.
+- **L5** — The full document was read end to end after the human asked for it, and the previous nine artboards were deleted and redesigned. Three corrections landed: there are two apps (`app/desktop` with the viewer and `app/web` without) over one shared frontend; the post-login routing and the paste-the-URL connect flow were dropped from the design by the human's instruction; and "Finalizar live" stays as an explicit business action in the panel. The new directions differ only in how the viewer coexists with the shared core, because that is the real boundary the document draws.

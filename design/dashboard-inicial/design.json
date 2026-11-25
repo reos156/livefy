@@ -1,68 +1,26 @@
 {
-  "title": "Panel del operador — R2/R3 (tres columnas en estado vacío)",
-  "brief": "Panel de control del operador, en la anatomía de un dashboard shadcn y con las tres columnas que define el scope: Columna 1 Live de TikTok (superficie aislada, login manual que no autentica al ingestor, salud del ingestor y advertencia de brecha), Columna 2 Productos (disponibles, activo, drag & drop, crear), Columna 3 Leads (handle, WhatsApp, estado, ítems, total, última actividad, comprobante y cierre). Arriba, las cinco métricas de R2: lives activos, leads nuevos, pendientes, conversión y ventas estimadas. Como todavía no existe captura de lives ni de leads, cada columna muestra su estado vacío honesto y el CTA 'Conectá tu primer live' queda deshabilitado con nota. El panel distingue connected, reconnecting, offline, suspended-risk, disconnected y ended. No se inventan deltas, series, productos ni leads. Las direcciones 01–06 quedaron superadas: leían R2 como una página de métricas y no como el panel de tres columnas.",
+  "title": "Panel del operador — tres columnas, estado vacío",
+  "brief": "Panel de control del operador de Livefy, con la anatomía de dashboard shadcn y las tres columnas que define el scope: Live de TikTok (superficie aislada, login manual que no autentica al ingestor, salud del ingestor y advertencia de brecha), Productos (disponibles, producto activo, drag & drop, crear) y Leads (handle, WhatsApp, estado, ítems, total, última actividad, comprobante y cierre de carrito). Arriba, las cinco métricas de R2: lives activos, leads nuevos, pendientes, conversión y ventas estimadas. El panel distingue connected, reconnecting, offline, suspended-risk, disconnected y ended, y 'Finalizar live' es una acción de negocio explícita separada de cerrar la app. El producto tiene dos apps — app/desktop con Electron y visor, app/web sin visor — sobre un frontend compartido, así que las direcciones difieren en cómo el visor convive con el resto del panel. Como todavía no existe captura de lives ni de productos ni de leads, cada columna muestra su estado vacío honesto y el CTA 'Conectá tu primer live' queda deshabilitado con nota. No se inventan deltas, series, productos ni leads.",
   "feature": "odd/tasks/initial-dashboard.md",
   "artboards": [
     {
-      "file": "01-metrics-row-empty.html",
-      "title": "Métricas en fila y estado vacío grande",
-      "tradeoff": "Las cinco métricas se leen de un vistazo arriba y el estado vacío domina la página, que es lo que el operador tiene que entender. Depende de ancho: en una ventana angosta las cinco columnas obligan a comprimir las etiquetas, y con datos reales la franja queda chica para crecer.",
+      "file": "01-three-columns-one-window.html",
+      "title": "Tres columnas en una ventana",
+      "tradeoff": "Es literalmente el panel de tres columnas del scope, con el visor compartiendo ventana con productos y leads. La columna de leads queda con ancho justo para seis columnas y la app web tendría que ocultar la primera, dejando un hueco que hay que rediseñar por plataforma.",
       "width": 1280,
       "height": 900
     },
     {
-      "file": "02-summary-and-activity.html",
-      "title": "Resumen a la izquierda, actividad a la derecha",
-      "tradeoff": "Separa el número del relato y deja la columna derecha lista para la actividad futura, sin reacomodar nada cuando lleguen los datos. Gasta la mitad del ancho en cinco filas que hoy dicen cero, y la jerarquía depende de que la columna derecha se llene.",
+      "file": "02-shared-core-viewer-strip.html",
+      "title": "Núcleo compartido y el visor como franja de estado",
+      "tradeoff": "La misma ventana sirve a escritorio y web: arriba vive el estado del live y del ingestor como franja, y el contenido son las dos columnas que ambas apps comparten. Gana espacio para productos y leads y no duplica layout, pero el visor pierde jerarquía y en escritorio obliga a una ventana aparte para ver el live.",
       "width": 1280,
       "height": 900
     },
     {
-      "file": "03-empty-hero-strip.html",
-      "title": "El estado vacío manda, métricas como tira",
-      "tradeoff": "Pone el siguiente paso arriba y a la vista, con las métricas como referencia secundaria: el mejor orden para un producto que todavía no tiene datos. Cuando haya actividad real, el hero deja de tener sentido y hay que decidir qué lo reemplaza.",
-      "width": 1280,
-      "height": 900
-    },
-    {
-      "file": "04-shell-sidebar-kpis.html",
-      "title": "Shell con sidebar fija, KPIs y vacío en el contenido",
-      "tradeoff": "Es la anatomía del kit tal cual: navegación completa siempre visible, cinco KPIs en fila y el estado vacío como área principal. Ocupa 232px de ancho permanente y, con cinco columnas, comprime etiquetas en ventanas angostas.",
-      "width": 1280,
-      "height": 900
-    },
-    {
-      "file": "05-rail-and-live-status.html",
-      "title": "Rail de iconos y panel de estado del live",
-      "tradeoff": "Gana ancho de contenido y pone a la vista los seis estados del live que el scope exige distinguir, junto al resumen de la tienda. Pierde legibilidad de la navegación (iconos solos, con tooltip) y gasta una columna fija en estados que hoy no ocurren.",
-      "width": 1280,
-      "height": 900
-    },
-    {
-      "file": "06-shell-grouped-nav-tabs.html",
-      "title": "Sidebar agrupada y pestañas dentro del contenido",
-      "tradeoff": "Agrupa Operación y Catálogo y adelanta las pestañas de Resumen, Actividad y Seguimiento, que es hacia donde crece el producto. Suma dos niveles de navegación para una pantalla que hoy tiene una sola vista real, y duplica el CTA en la barra superior y en el vacío.",
-      "width": 1280,
-      "height": 900
-    },
-    {
-      "file": "07-panel-three-equal-columns.html",
-      "title": "Panel con sidebar y tres columnas iguales",
-      "tradeoff": "Las tres columnas reciben el mismo ancho, así que ninguna tarea parece más importante y el panel se lee de izquierda a derecha como el scope lo enumera. La tabla de leads queda angosta para seis columnas, y la sidebar come 196px fijos.",
-      "width": 1280,
-      "height": 900
-    },
-    {
-      "file": "08-panel-viewer-first.html",
-      "title": "Panel sin sidebar, el visor manda",
-      "tradeoff": "Gana todo el ancho para el live (1.5fr), que es lo que el operador mira durante la sesión, y la navegación se reduce a un top bar. Menos espacio para la tabla de leads y sin lugar permanente para la salud del ingestor, que queda como una línea.",
-      "width": 1280,
-      "height": 900
-    },
-    {
-      "file": "09-panel-ingestor-health-leads-wide.html",
-      "title": "Panel con salud del ingestor en la barra y leads anchos",
-      "tradeoff": "Pone la salud del ingestor y la brecha siempre visibles en la barra lateral y le da el mayor ancho a leads (1.5fr), que es donde vive la operación con seis columnas. Ajusta el visor del live a menos espacio, que es el costo de priorizar los leads.",
+      "file": "03-viewer-own-window.html",
+      "title": "El visor en su propia ventana",
+      "tradeoff": "Separa físicamente lo no confiable: el visor es una ventana aislada y el panel queda como el núcleo que también corre en web. Coincide con la frontera de seguridad y con el ingestor autónomo; suma manejo de dos ventanas y el operador tiene que ordenarlas en pantalla.",
       "width": 1280,
       "height": 900
     }
