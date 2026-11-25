@@ -1,4 +1,4 @@
-import { ConvexError, v } from 'convex/values'
+import { v } from 'convex/values'
 import { internalMutation } from './_generated/server'
 import type { Doc } from './_generated/dataModel'
 
@@ -66,16 +66,19 @@ function whatsappFromLegacy(personalWhatsapp: string | undefined) {
 }
 
 // Internal and argument-free: the operator never triggers it, and it can be run twice
-// without duplicating or re-dropping anything. `unmapped` counts dropped values (not
-// rows), `skipped` counts rows already in the new shape.
+// without duplicating or re-dropping anything. `unmapped` counts dropped catalogue
+// values (not rows), `droppedWhatsapp` counts legacy numbers too short to keep, so a
+// value is never removed without being reported, and `skipped` counts rows already in
+// the new shape.
 export const migrateShopsToCatalogs = internalMutation({
   args: {},
-  returns: v.object({ migrated: v.number(), skipped: v.number(), unmapped: v.number() }),
+  returns: v.object({ migrated: v.number(), skipped: v.number(), unmapped: v.number(), droppedWhatsapp: v.number() }),
   handler: async ctx => {
     const shops = (await ctx.db.query('shops').collect()) as LegacyShop[]
     let migrated = 0
     let skipped = 0
     let unmapped = 0
+    let droppedWhatsapp = 0
 
     for (const shop of shops) {
       const holdsLegacyFields =
@@ -90,6 +93,8 @@ export const migrateShopsToCatalogs = internalMutation({
       const categories = mapLegacyValues(shop.categories, CATEGORY_MAP)
       const paymentMethods = mapLegacyValues(shop.paymentMethods, PAYMENT_METHOD_MAP)
       unmapped += categories.unmapped + paymentMethods.unmapped
+      const whatsapp = whatsappFromLegacy(shop.personalWhatsapp)
+      if (shop.personalWhatsapp && whatsapp.number === '') droppedWhatsapp += 1
 
       // `replace` writes exactly this shape, which is what removes the old fields and
       // keeps everything the platform owns intact.
@@ -99,7 +104,7 @@ export const migrateShopsToCatalogs = internalMutation({
         description: shop.description,
         categorySlugs: categories.slugs,
         paymentMethodSlugs: paymentMethods.slugs,
-        whatsapp: whatsappFromLegacy(shop.personalWhatsapp),
+        whatsapp,
         ...(shop.tiktokBotHandle === undefined ? {} : { tiktokBotHandle: shop.tiktokBotHandle }),
         ...(shop.whatsappBotNumber === undefined ? {} : { whatsappBotNumber: shop.whatsappBotNumber }),
         wizardCompletedAt: shop.wizardCompletedAt,
@@ -108,6 +113,6 @@ export const migrateShopsToCatalogs = internalMutation({
       migrated += 1
     }
 
-    return { migrated, skipped, unmapped }
+    return { migrated, skipped, unmapped, droppedWhatsapp }
   },
 })

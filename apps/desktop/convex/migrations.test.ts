@@ -60,7 +60,7 @@ describe('migrations.migrateShopsToCatalogs — existing shops move to the catal
     const t = await seededLegacy([{ ...legacyShop }])
     const counts = await t.mutation(migrateShopsToCatalogs, {})
 
-    expect(counts).toEqual({ migrated: 1, skipped: 0, unmapped: 0 })
+    expect(counts).toEqual({ migrated: 1, skipped: 0, unmapped: 0, droppedWhatsapp: 0 })
     const [row] = await shops(t)
     expect(row.categorySlugs).toEqual(['ropa-y-accesorios', 'calzado', 'belleza-y-cuidado-personal'])
     expect(row.paymentMethodSlugs).toEqual(['nequi', 'transferencia-ahorros', 'llave-bre-b'])
@@ -95,7 +95,7 @@ describe('migrations.migrateShopsToCatalogs — existing shops move to the catal
       paymentMethods: ['nequi', 'efectivo', 'tarjeta'],
     }])
 
-    expect(await t.mutation(migrateShopsToCatalogs, {})).toEqual({ migrated: 1, skipped: 0, unmapped: 4 })
+    expect(await t.mutation(migrateShopsToCatalogs, {})).toEqual({ migrated: 1, skipped: 0, unmapped: 4, droppedWhatsapp: 0 })
     const [row] = await shops(t)
     expect(row.categorySlugs).toEqual(['ropa-y-accesorios'])
     expect(row.paymentMethodSlugs).toEqual(['nequi'])
@@ -107,7 +107,7 @@ describe('migrations.migrateShopsToCatalogs — existing shops move to the catal
       { ...legacyShop, personalWhatsapp: undefined },
     ])
 
-    expect(await t.mutation(migrateShopsToCatalogs, {})).toEqual({ migrated: 2, skipped: 0, unmapped: 0 })
+    expect(await t.mutation(migrateShopsToCatalogs, {})).toEqual({ migrated: 2, skipped: 0, unmapped: 0, droppedWhatsapp: 1 })
     const rows = await shops(t)
     expect(rows[0].whatsapp).toEqual({ dialCode: '+57', number: '' })
     expect(rows[1].whatsapp).toEqual({ dialCode: '+57', number: '' })
@@ -118,7 +118,7 @@ describe('migrations.migrateShopsToCatalogs — existing shops move to the catal
     await t.mutation(migrateShopsToCatalogs, {})
     const afterFirst = await shops(t)
 
-    expect(await t.mutation(migrateShopsToCatalogs, {})).toEqual({ migrated: 0, skipped: 1, unmapped: 0 })
+    expect(await t.mutation(migrateShopsToCatalogs, {})).toEqual({ migrated: 0, skipped: 1, unmapped: 0, droppedWhatsapp: 0 })
     expect(await shops(t)).toEqual(afterFirst)
   })
 })

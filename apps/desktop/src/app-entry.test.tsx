@@ -111,9 +111,16 @@ describe('app entry — which screen the operator gets', () => {
 
   it('leads a completed wizard to the exact first-live call to action', () => {
     state.shop = shop
+    state.categories = categories
+    state.paymentMethods = paymentMethods
     render(<AppEntry />)
 
     expect(screen.getByText('Tienda Uno')).toBeTruthy()
+    // The stored view carries slugs; the operator reads labels and never the internals.
+    expect(screen.getByText('Ropa')).toBeTruthy()
+    expect(screen.getByText('Nequi')).toBeTruthy()
+    expect(screen.queryByText('ropa')).toBeNull()
+    expect(screen.queryByText('nequi')).toBeNull()
     expect(screen.getByRole('button', { name: 'Conectá tu primer live' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Guardar tienda' })).toBeNull()
   })

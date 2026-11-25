@@ -5,7 +5,7 @@ import { VisualShell } from './components/visual-shell'
 import { WaitingScreen } from './components/waiting-screen'
 import { ShopWizard } from './shop-wizard'
 import { LogoutButton } from './lib/session'
-import { catalogFunctions, shopErrorMessage, shopFunctions, type CatalogCategory, type ShopView, type WizardInput } from './lib/shop-api'
+import { catalogFunctions, shopErrorMessage, shopFunctions, type CatalogCategory, type CatalogPaymentMethod, type ShopView, type WizardInput } from './lib/shop-api'
 
 // Catalogue slugs are stored on the shop, so the summary resolves them back to the
 // labels the operator chose. An entry the table no longer holds falls back to its slug
@@ -17,7 +17,7 @@ function labelsFor(slugs: string[], catalogue: Array<{ slug: string; label: stri
 // The surface a completed wizard lands on. R2 replaces this summary with the initial
 // dashboard in its own scope; until then it carries the accepted first-live call to
 // action, and the entry stays inert because no live screen exists yet.
-function ShopSummary({ shop, categories, onEdit }: { shop: ShopView; categories: CatalogCategory[]; onEdit: () => void }) {
+function ShopSummary({ shop, categories, paymentMethods, onEdit }: { shop: ShopView; categories: CatalogCategory[]; paymentMethods: CatalogPaymentMethod[]; onEdit: () => void }) {
   const { dialCode, number } = shop.whatsapp
   return <VisualShell title="Tu tienda">
     <div className="flex flex-col gap-4">
@@ -25,7 +25,7 @@ function ShopSummary({ shop, categories, onEdit }: { shop: ShopView; categories:
       <p className="text-muted-foreground">{shop.description}</p>
       <dl className="flex flex-col gap-1 text-sm">
         <div><dt className="inline font-medium">Categorías: </dt><dd className="inline">{labelsFor(shop.categorySlugs, categories)}</dd></div>
-        <div><dt className="inline font-medium">Medios de pago: </dt><dd className="inline">{shop.paymentMethodSlugs.join(', ')}</dd></div>
+        <div><dt className="inline font-medium">Medios de pago: </dt><dd className="inline">{labelsFor(shop.paymentMethodSlugs, paymentMethods)}</dd></div>
         <div><dt className="inline font-medium">WhatsApp de contacto: </dt><dd className="inline">{`${dialCode} ${number}`}</dd></div>
         <div><dt className="inline font-medium">Bot TikTok: </dt><dd className="inline">{shop.tiktokBotHandle ?? 'pendiente de asignación'}</dd></div>
         <div><dt className="inline font-medium">WhatsApp bot: </dt><dd className="inline">{shop.whatsappBotNumber ?? 'pendiente de asignación'}</dd></div>
@@ -82,5 +82,5 @@ export function AppEntry() {
     footer={<LogoutButton />}
     onSubmit={submit}
   />
-  return <ShopSummary shop={shop} categories={categories} onEdit={() => setEditing(true)} />
+  return <ShopSummary shop={shop} categories={categories} paymentMethods={paymentMethods} onEdit={() => setEditing(true)} />
 }
