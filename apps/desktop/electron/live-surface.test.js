@@ -119,6 +119,12 @@ describe('live surface boundary', () => {
     const allowed = { url: 'https://www.tiktok.com/embed/123', preventDefault: vi.fn() }
     contents.emit('will-frame-navigate', allowed)
     expect(allowed.preventDefault).not.toHaveBeenCalled()
+
+    // Electron 41 declares this single details object; a sender that changes shape must
+    // not be read as "no URL", which would let an unknown navigation through.
+    const shapeless = { preventDefault: vi.fn() }
+    contents.emit('will-frame-navigate', shapeless)
+    expect(shapeless.preventDefault).toHaveBeenCalledOnce()
   })
 
   it('hardens the shared partition session only once', () => {

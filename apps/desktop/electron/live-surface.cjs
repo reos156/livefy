@@ -46,9 +46,11 @@ function hardenLiveContents(contents) {
     })
   }
   // `will-navigate` is main-frame only, so an embedded document could still navigate
-  // itself off TikTok. This handler receives a single details object, not `(event, url)`.
+  // itself off TikTok. Electron 41 passes this event one details object
+  // (`WebContentsWillFrameNavigateEventParams`: url, isMainFrame, frame) plus
+  // `preventDefault` — never the `(event, url)` pair. A shape without `url` fails closed.
   contents.on('will-frame-navigate', details => {
-    if (!isAllowedLiveUrl(details.url)) details.preventDefault()
+    if (!isAllowedLiveUrl(details?.url)) details?.preventDefault()
   })
   contents.on('will-attach-webview', event => event.preventDefault())
 }
