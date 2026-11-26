@@ -10,6 +10,7 @@
 
 import type * as catalog from "../catalog.js";
 import type * as catalogSeed from "../catalogSeed.js";
+import type * as dashboard from "../dashboard.js";
 import type * as http from "../http.js";
 import type * as lib_requireUser from "../lib/requireUser.js";
 import type * as migrations from "../migrations.js";
@@ -25,6 +26,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   catalog: typeof catalog;
   catalogSeed: typeof catalogSeed;
+  dashboard: typeof dashboard;
   http: typeof http;
   "lib/requireUser": typeof lib_requireUser;
   migrations: typeof migrations;

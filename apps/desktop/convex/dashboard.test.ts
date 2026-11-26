@@ -8,6 +8,7 @@ import schema from './schema'
 const modules = { ...import.meta.glob('./**/*.ts'), './_generated/schema.ts': () => import('./schema') }
 const getDashboardStats = makeFunctionReference<'query'>('dashboard:getDashboardStats')
 const completeWizard = makeFunctionReference<'mutation'>('shops:completeWizard')
+const seedCatalog = makeFunctionReference<'mutation'>('catalog:seedCatalog')
 
 const ISSUER = 'https://fixture.clerk.accounts.dev'
 const operator = (subject: string) => ({ issuer: ISSUER, subject, tokenIdentifier: `${ISSUER}|${subject}` })
@@ -17,8 +18,10 @@ const second = operator('user_second')
 const wizardInput = {
   name: 'Tienda Uno',
   description: 'Ropa urbana',
-  categories: ['ropa'],
-  paymentMethods: ['transferencia'],
+  categorySlugs: ['ropa-y-accesorios'],
+  paymentMethodSlugs: ['transferencia-ahorros'],
+  paymentData: [{ slug: 'transferencia-ahorros', value: 'Bancolombia 123-456789-00' }],
+  whatsapp: { dialCode: '+57', number: '3001234567' },
 }
 
 describe('dashboard.getDashboardStats — identity-owned dashboard read', () => {
@@ -29,6 +32,7 @@ describe('dashboard.getDashboardStats — identity-owned dashboard read', () => 
 
   it('reports zeroed metrics and no live for a configured shop, writing nothing', async () => {
     const t = convexTest(schema, modules)
+    await t.mutation(seedCatalog, {})
     const caller = t.withIdentity(first)
     const shop = await caller.mutation(completeWizard, wizardInput)
 
@@ -50,6 +54,7 @@ describe('dashboard.getDashboardStats — identity-owned dashboard read', () => 
 
   it('reads the shop of the authenticated identity and refuses a client-supplied identifier', async () => {
     const t = convexTest(schema, modules)
+    await t.mutation(seedCatalog, {})
     const firstShop = await t.withIdentity(first).mutation(completeWizard, wizardInput)
     const secondShop = await t.withIdentity(second).mutation(completeWizard, { ...wizardInput, name: 'Tienda Dos' })
     const caller = t.withIdentity(first)

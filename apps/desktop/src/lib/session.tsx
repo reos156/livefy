@@ -15,6 +15,11 @@ export function SessionContent({ children }: { children: ReactNode }) {
   const { visible, fallback } = useContext(Content)
   return visible ? children : fallback
 }
+// The single logout path the app already owns. Exposed so chrome that is not a Button
+// (a menu item, for instance) uses the same callback instead of a second implementation.
+export function useLogout() {
+  return useContext(Session)
+}
 export function LogoutButton() {
   const logout = useContext(Session)
   return <Button disabled={!logout} onClick={logout}>Sign out</Button>

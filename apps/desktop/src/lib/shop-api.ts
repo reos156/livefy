@@ -103,6 +103,7 @@ export const catalogFunctions = {
   categories: makeFunctionReference<'query', Record<string, never>, CatalogCategory[]>('catalog:categories'),
   paymentMethods: makeFunctionReference<'query', Record<string, never>, CatalogPaymentMethod[]>('catalog:paymentMethods'),
   dialCodes: makeFunctionReference<'query', Record<string, never>, CatalogDialCode[]>('catalog:dialCodes'),
+}
 
 // The empty argument object is the contract: the shop comes from the identity, so the
 // client has no identifier to send (S3).

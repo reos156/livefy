@@ -1,11 +1,28 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useQuery } from 'convex/react'
 import { cn } from 'cn'
+import {
+  BellIcon,
+  ChevronDownIcon,
+  ChevronsLeftIcon,
+  ChevronsRightIcon,
+  LayoutDashboardIcon,
+  LogOutIcon,
+  MoonIcon,
+  PackageIcon,
+  ReceiptIcon,
+  StoreIcon,
+  SunIcon,
+  UserRoundIcon,
+  UsersIcon,
+  type LucideIcon,
+} from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/card'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Table, TableBody, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { LogoutButton } from './lib/session'
+import { LogoutButton, useLogout } from './lib/session'
 import { dashboardFunctions, type DashboardMetrics, type LiveConnection } from './lib/shop-api'
 import { WaitingScreen } from './components/waiting-screen'
 
@@ -23,13 +40,33 @@ const connectionCopy: Record<LiveConnection, string> = {
   ended: 'Finalizado',
 }
 
+// The explanation both disabled controls point at: there is one shop per operator and
+// no notification system, so the controls stay inert instead of implying a feature.
+const SHOP_NOTE = 'Es la única tienda de la cuenta.'
+const NOTIFICATIONS_NOTE = 'Las notificaciones todavía no existen.'
+
+// The project's tokens already answer to `.dark` on the document root, so the toggle owns
+// that single class and reports its state through `aria-pressed`.
+function useThemeToggle() {
+  const [dark, setDark] = useState(() => document.documentElement.classList.contains('dark'))
+  function toggle() {
+    const next = !dark
+    document.documentElement.classList.toggle('dark', next)
+    setDark(next)
+  }
+  return { dark, toggle }
+}
+
 // Sidebar structure, not a control: semantic HTML over the project's own tokens. The
 // unreachable destinations stay visible and honestly disabled (no screen exists yet),
-// and never link anywhere.
-function NavItem({ label, current = false, soon = false, onClick }: {
+// and never link anywhere. Collapsed, the label leaves the DOM so the rail is icon-only
+// and the accessible name comes from `aria-label`, which keeps every item reachable.
+function NavItem({ label, icon: Icon, current = false, soon = false, collapsed = false, onClick }: {
   label: string
+  icon: LucideIcon
   current?: boolean
   soon?: boolean
+  collapsed?: boolean
   onClick?: () => void
 }) {
   return <li>
@@ -37,43 +74,74 @@ function NavItem({ label, current = false, soon = false, onClick }: {
       type="button"
       aria-current={current ? 'page' : undefined}
       aria-disabled={soon ? true : undefined}
+      aria-label={collapsed ? label : undefined}
+      title={collapsed ? label : undefined}
       disabled={soon}
       onClick={onClick}
       className={cn(
         'flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs transition-colors',
+        collapsed && 'justify-center px-0 py-2',
         current ? 'bg-muted font-semibold text-foreground' : 'text-muted-foreground',
         soon ? 'cursor-not-allowed opacity-55' : 'hover:bg-muted hover:text-foreground',
       )}
     >
-      <span>{label}</span>
-      {soon && <span className="ml-auto text-[0.6rem] tracking-[0.04em] uppercase">pronto</span>}
+      <Icon aria-hidden="true" className="size-3.5 shrink-0" />
+      {!collapsed && <span>{label}</span>}
+      {soon && !collapsed && <span className="ml-auto text-[0.6rem] tracking-[0.04em] uppercase">pronto</span>}
     </button>
   </li>
 }
 
-function Sidebar({ onOpenStore }: { onOpenStore: () => void }) {
-  return <aside aria-label="Principal" className="flex flex-col gap-1 border-r border-border bg-card px-2.5 py-3">
-    <div className="flex items-center gap-2 px-2 pb-2">
-      <span className="visual-mark" aria-hidden="true">L</span>
-      <strong className="text-sm font-semibold">Livefy</strong>
+function Sidebar({ collapsed, onToggleCollapsed, onOpenStore }: {
+  collapsed: boolean
+  onToggleCollapsed: () => void
+  onOpenStore: () => void
+}) {
+  return <aside
+    id="panel-sidebar"
+    aria-label="Principal"
+    className={cn('flex flex-col gap-1 border-r border-border bg-card py-3', collapsed ? 'px-1' : 'px-2.5')}
+  >
+    <div className={cn('flex items-center gap-2 pb-2', collapsed ? 'flex-col' : 'px-2')}>
+      {!collapsed && <span className="visual-mark" aria-hidden="true">L</span>}
+      {!collapsed && <strong className="text-sm font-semibold">Livefy</strong>}
+      <Button
+        variant="ghost"
+        size="icon-xs"
+        className={cn(!collapsed && 'ml-auto')}
+        onClick={onToggleCollapsed}
+        aria-expanded={!collapsed}
+        aria-controls="panel-sidebar"
+        aria-label={collapsed ? 'Expandir barra lateral' : 'Contraer barra lateral'}
+        title={collapsed ? 'Expandir barra lateral' : 'Contraer barra lateral'}
+      >
+        {collapsed ? <ChevronsRightIcon aria-hidden="true" /> : <ChevronsLeftIcon aria-hidden="true" />}
+      </Button>
     </div>
     <nav aria-label="Operación" className="flex flex-col gap-1">
-      <p className="px-2 text-[0.625rem] tracking-[0.06em] text-muted-foreground uppercase">Operación</p>
+      {!collapsed && <p className="px-2 text-[0.625rem] tracking-[0.06em] text-muted-foreground uppercase">Operación</p>}
       <ul className="flex flex-col gap-0.5">
-        <NavItem label="Panel" current />
-        <NavItem label="Leads" soon />
-        <NavItem label="Ventas" soon />
+        <NavItem label="Panel" icon={LayoutDashboardIcon} current collapsed={collapsed} />
+        <NavItem label="Leads" icon={UsersIcon} soon collapsed={collapsed} />
+        <NavItem label="Ventas" icon={ReceiptIcon} soon collapsed={collapsed} />
       </ul>
     </nav>
     <nav aria-label="Catálogo" className="flex flex-col gap-1">
-      <p className="px-2 text-[0.625rem] tracking-[0.06em] text-muted-foreground uppercase">Catálogo</p>
+      {!collapsed && <p className="px-2 text-[0.625rem] tracking-[0.06em] text-muted-foreground uppercase">Catálogo</p>}
       <ul className="flex flex-col gap-0.5">
-        <NavItem label="Productos" soon />
-        <NavItem label="Tienda" onClick={onOpenStore} />
+        <NavItem label="Productos" icon={PackageIcon} soon collapsed={collapsed} />
+        <NavItem label="Tienda" icon={StoreIcon} collapsed={collapsed} onClick={onOpenStore} />
       </ul>
     </nav>
     <div className="flex-1" />
-    <div className="p-1"><LogoutButton /></div>
+    {/* The existing sign-out keeps working in both widths; on the rail its label leaves
+        the painted surface and an icon carries it, so the control still fits. */}
+    <div className={cn('p-1', collapsed && 'flex justify-center')}>
+      <div className={collapsed ? 'relative size-7 [&_button]:size-7 [&_button]:gap-0 [&_button]:p-0 [&_button]:text-[0px]' : undefined}>
+        <LogoutButton />
+        {collapsed && <LogOutIcon aria-hidden="true" className="pointer-events-none absolute inset-0 m-auto size-3.5 text-muted-foreground" />}
+      </div>
+    </div>
   </aside>
 }
 
@@ -100,6 +168,46 @@ function KpiRow({ metrics }: { metrics: DashboardMetrics }) {
   return <div className="grid grid-cols-2 gap-2.5 px-4 pt-3.5 lg:grid-cols-5">
     {kpis.map(kpi => <Kpi key={kpi.label} {...kpi} />)}
   </div>
+}
+
+// The top bar's shop identity occupies the slot the dashboard kit reserves for a
+// workspace switcher. One shop per operator today, so it is inert and says why instead
+// of offering a dropdown with a single entry.
+function ShopIdentity({ name }: { name: string }) {
+  return <>
+    <Button
+      variant="ghost"
+      size="sm"
+      className="max-w-48 min-w-0"
+      disabled
+      aria-describedby="shop-switcher-note"
+      title={SHOP_NOTE}
+    >
+      <StoreIcon data-icon="inline-start" aria-hidden="true" />
+      <span className="truncate">{name}</span>
+      <ChevronDownIcon data-icon="inline-end" aria-hidden="true" />
+    </Button>
+    <p id="shop-switcher-note" className="min-w-0 truncate text-xs text-muted-foreground">{SHOP_NOTE}</p>
+  </>
+}
+
+// The kit's account menu, with only the entries that exist. `Panel` closes the menu and
+// stays, `Modo oscuro` runs the same theme toggle as the top bar, and `Log out` is the
+// existing sign-out.
+function UserMenu({ onToggleTheme }: { onToggleTheme: () => void }) {
+  const logout = useLogout()
+  return <DropdownMenu>
+    <DropdownMenuTrigger render={<Button variant="ghost" size="icon" aria-label="Menú de la cuenta" />}>
+      <UserRoundIcon aria-hidden="true" />
+    </DropdownMenuTrigger>
+    <DropdownMenuContent align="end" className="min-w-40">
+      <DropdownMenuGroup>
+        <DropdownMenuItem>Panel</DropdownMenuItem>
+        <DropdownMenuItem onClick={onToggleTheme}>Modo oscuro</DropdownMenuItem>
+        <DropdownMenuItem disabled={!logout} onClick={logout}>Log out</DropdownMenuItem>
+      </DropdownMenuGroup>
+    </DropdownMenuContent>
+  </DropdownMenu>
 }
 
 // One column of the workspace. Each is a labelled region whose card stretches to the
@@ -201,20 +309,29 @@ function LeadsColumn({ count }: { count: number }) {
 
 export function Panel({ onEditStore }: { onEditStore: () => void }) {
   const stats = useQuery(dashboardFunctions.getDashboardStats)
+  // Session-only chrome state: the rail and the theme are remembered while the panel is
+  // mounted, which is all the operator asked for.
+  const [collapsed, setCollapsed] = useState(false)
+  const { dark, toggle: toggleTheme } = useThemeToggle()
   if (stats === undefined) return <WaitingScreen label="Cargando tu panel" />
   const { metrics, liveConnection } = stats
   // S11: ending the commercial live is explicit, and it is only possible while a live
   // is connected. Closing the app stops the local runner, not the live.
   const canEndLive = liveConnection === 'connected'
-  return <div className="grid min-h-svh grid-cols-[13.75rem_1fr] bg-background text-foreground">
-    <Sidebar onOpenStore={onEditStore} />
+  return <div className={cn(
+    'grid min-h-svh bg-background text-foreground',
+    collapsed ? 'grid-cols-[3.5rem_1fr]' : 'grid-cols-[13.75rem_1fr]',
+  )}>
+    <Sidebar
+      collapsed={collapsed}
+      onToggleCollapsed={() => setCollapsed(current => !current)}
+      onOpenStore={onEditStore}
+    />
     <div className="flex min-w-0 flex-col">
       <header className="flex items-center gap-2.5 border-b border-border bg-card px-4 py-2.5">
-        <div className="flex items-center gap-2">
-          <h1 className="text-sm font-semibold text-foreground">Panel</h1>
-          <span aria-hidden="true" className="text-xs text-muted-foreground">·</span>
-          <span className="text-xs text-muted-foreground">{stats.shopName}</span>
-        </div>
+        <h1 className="text-sm font-semibold text-foreground">Panel</h1>
+        <span aria-hidden="true" className="text-xs text-muted-foreground">·</span>
+        <ShopIdentity name={stats.shopName} />
         <span className="flex-1" />
         <Badge variant="outline" className="gap-1.5">
           <span aria-hidden="true" className="size-1.5 rounded-full bg-muted-foreground" />
@@ -222,6 +339,29 @@ export function Panel({ onEditStore }: { onEditStore: () => void }) {
         </Badge>
         <Button variant="outline" onClick={onEditStore}>Editar tienda</Button>
         <Button disabled={!canEndLive} title={canEndLive ? undefined : 'Requiere un live conectado'}>Finalizar live</Button>
+        {/* No notification system exists yet: the bell is inert, with no counter and no dot. */}
+        <Button
+          variant="ghost"
+          size="icon"
+          disabled
+          aria-label="Notificaciones"
+          aria-describedby="notifications-note"
+          title={NOTIFICATIONS_NOTE}
+        >
+          <BellIcon aria-hidden="true" />
+        </Button>
+        <span id="notifications-note" className="sr-only">{NOTIFICATIONS_NOTE}</span>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-pressed={dark}
+          aria-label={dark ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'}
+          title={dark ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'}
+          onClick={toggleTheme}
+        >
+          {dark ? <SunIcon aria-hidden="true" /> : <MoonIcon aria-hidden="true" />}
+        </Button>
+        <UserMenu onToggleTheme={toggleTheme} />
       </header>
       <KpiRow metrics={metrics} />
       <div className="grid flex-1 grid-cols-1 items-start gap-2.5 p-4 lg:grid-cols-[1.35fr_1fr_1.3fr]">

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import type { DashboardStats } from './lib/shop-api'
 
 const state = vi.hoisted(() => ({ stats: undefined as DashboardStats | undefined }))
@@ -18,6 +18,7 @@ const stats: DashboardStats = {
 afterEach(() => {
   cleanup()
   Object.assign(state, { stats: undefined })
+  document.documentElement.classList.remove('dark')
 })
 
 describe('panel — the empty three-column dashboard', () => {
@@ -84,5 +85,81 @@ describe('panel — the empty three-column dashboard', () => {
       expect(item.getAttribute('aria-disabled')).toBeNull()
     }
     expect(screen.getByRole('button', { name: 'Panel' }).getAttribute('aria-current')).toBe('page')
+  })
+})
+
+describe('panel — dashboard chrome', () => {
+  it('collapses the sidebar to an icon rail that keeps every item named, and expands it back', () => {
+    state.stats = stats
+    render(<Panel onEditStore={() => {}} />)
+    const sidebar = screen.getByRole('complementary', { name: 'Principal' })
+
+    // Expanded: the labels and their group headings are visible text.
+    expect(within(sidebar).getByText('Leads')).toBeTruthy()
+    expect(within(sidebar).getByText('Operación')).toBeTruthy()
+
+    fireEvent.click(within(sidebar).getByRole('button', { name: 'Contraer barra lateral' }))
+
+    expect(within(sidebar).queryByText('Leads')).toBeNull()
+    expect(within(sidebar).queryByText('Operación')).toBeNull()
+    for (const name of ['Panel', 'Leads', 'Ventas', 'Productos', 'Tienda']) {
+      expect(within(sidebar).getByRole('button', { name })).toBeTruthy()
+    }
+
+    fireEvent.click(within(sidebar).getByRole('button', { name: 'Expandir barra lateral' }))
+
+    expect(within(sidebar).getByText('Leads')).toBeTruthy()
+    expect(within(sidebar).getByText('Operación')).toBeTruthy()
+  })
+
+  it('shows the shop identity as a disabled control that explains there is only one shop', () => {
+    state.stats = stats
+    render(<Panel onEditStore={() => {}} />)
+
+    const shop = screen.getByRole('button', { name: 'Mundo Kawaii' }) as HTMLButtonElement
+    expect(shop.disabled).toBe(true)
+    const describedBy = shop.getAttribute('aria-describedby')
+    expect(describedBy).toBe('shop-switcher-note')
+    expect(document.getElementById(describedBy as string)?.textContent).toBe('Es la única tienda de la cuenta.')
+  })
+
+  it('flips the document theme from the top bar and announces its own state', () => {
+    state.stats = stats
+    render(<Panel onEditStore={() => {}} />)
+
+    const toggle = screen.getByRole('button', { name: 'Cambiar a tema oscuro' })
+    expect(toggle.getAttribute('aria-pressed')).toBe('false')
+    expect(document.documentElement.classList.contains('dark')).toBe(false)
+
+    fireEvent.click(toggle)
+
+    expect(document.documentElement.classList.contains('dark')).toBe(true)
+    const flipped = screen.getByRole('button', { name: 'Cambiar a tema claro' })
+    expect(flipped.getAttribute('aria-pressed')).toBe('true')
+
+    fireEvent.click(flipped)
+
+    expect(document.documentElement.classList.contains('dark')).toBe(false)
+  })
+
+  it('opens the account menu with exactly the three entries', async () => {
+    state.stats = stats
+    render(<Panel onEditStore={() => {}} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Menú de la cuenta' }))
+    const menu = await screen.findByRole('menu')
+
+    expect(within(menu).getAllByRole('menuitem').map(item => item.textContent)).toEqual(['Panel', 'Modo oscuro', 'Log out'])
+  })
+
+  it('renders the notifications bell disabled because there are no notifications', () => {
+    state.stats = stats
+    render(<Panel onEditStore={() => {}} />)
+
+    const bell = screen.getByRole('button', { name: 'Notificaciones' }) as HTMLButtonElement
+    expect(bell.disabled).toBe(true)
+    const describedBy = bell.getAttribute('aria-describedby')
+    expect(describedBy).toBe('notifications-note')
+    expect(document.getElementById(describedBy as string)?.textContent).toBe('Las notificaciones todavía no existen.')
   })
 })

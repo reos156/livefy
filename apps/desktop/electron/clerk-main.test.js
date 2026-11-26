@@ -39,6 +39,7 @@ function bootstrap({ development = false, platform = 'win32', loadFailure = fals
     removeHandler: vi.fn(name => handlers.delete(name)),
   }
   class BrowserWindow {
+    maximize() {}
     static getAllWindows() { return windows }
     constructor(options) {
       steps.push('window')

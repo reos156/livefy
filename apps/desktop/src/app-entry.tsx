@@ -54,3 +54,4 @@ export function AppEntry() {
   // S12: no shop keeps the operator in the wizard (D3), and a configured shop lands
   // on the dashboard (D2). The retired summary had no other destination.
   return <Panel onEditStore={() => setEditing(true)} />
+}

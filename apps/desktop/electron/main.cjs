@@ -42,12 +42,18 @@ let logoutComplete = false
 const trustedContents = new Set()
 
 function createWindow() {
+  // A 15" laptop at its usual scaling gives the panel roughly 1536x864 CSS pixels, and the
+  // three-column workspace needs the width. The window opens maximized, and these bounds
+  // are the fallback for a compositor that refuses to maximize.
   const window = new BrowserWindow({
-    width: 1000,
-    height: 720,
+    width: 1536,
+    height: 864,
+    minWidth: 1180,
+    minHeight: 700,
     title: 'Livefy',
     webPreferences: { ...webPreferences, preload: path.join(distDir, 'preload.cjs') },
   })
+  window.maximize()
   trustedContents.add(window.webContents)
   window.webContents.on('destroyed', () => trustedContents.delete(window.webContents))
   secureContents(window.webContents, entry)
