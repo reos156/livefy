@@ -265,6 +265,38 @@ una matriz completa estrecha/ancha ni un challenge real. Esta guía no añade
 aceptación actual, no reabre los casos aceptados y no acepta el futuro cliente
 web; sus gates siguen siendo independientes en el [hito H1](../../odd/tasks/mvp-h1-access-windows.md).
 
+## Superficie del live de TikTok
+
+La columna 1 del panel abre TikTok en una superficie adaptable creada por el proceso
+principal (`electron/live-surface.cjs`), nunca por el renderer. El renderer informa un
+rectángulo y muestra el estado; no nombra una URL ni instancia un `<webview>`.
+
+| Aspecto | Contrato |
+| --- | --- |
+| Propiedad | `WebContentsView` creado en `main`; la superficie es hermana del renderer, no hija de su DOM. |
+| Sesión | Partición `persist:tiktok`: sobrevive a reinicios. Borrar el directorio de particiones de `userData` pierde el login guardado en este equipo. |
+| Aislamiento | `sandbox: true`, `contextIsolation: true`, `nodeIntegration: false`, `webviewTag: false`, sin preload. |
+| Navegación | Sólo `https://` en `tiktok.com` y sus subdominios; el resto se cancela. Un login que salga del dominio (por ejemplo OAuth de Google o Apple) queda bloqueado: usar teléfono o email. |
+| Permisos | Ninguno concedido: pedidos y comprobaciones responden `false`. La reproducción de video y audio no los requiere. |
+| Ventanas y descargas | `window.open` en deny y `will-download` cancelado en la sesión de la partición. |
+| Estado | `idle`, `loading`, `ready` o `failed` con motivo; una carga fallida se muestra como error, no como rectángulo vacío. |
+
+La superficie no incorpora eventos: chat, regalos y leads son R4/R6 y todavía no existen.
+Las columnas 2 y 3 conservan su estado vacío real.
+
+### Matriz de aceptación de la vista de live (pendiente)
+
+Requiere ejecución en la app (DevTools de Electron, no el navegador) y la aceptación del
+humano. Ningún caso está aceptado todavía.
+
+| Pantalla/estado | Tema | Ancho × alto CSS | Entorno/método | Resultado |
+| --- | --- | --- | --- | --- |
+| Panel, visor sin abrir | claro / oscuro | registrar en DevTools | Electron dev | pendiente |
+| Panel, cargando | claro / oscuro | registrar en DevTools | Electron dev | pendiente |
+| Panel, live abierto con login guardado | claro / oscuro | registrar en DevTools | Electron dev | pendiente |
+| Panel, carga fallida (sin red) | claro / oscuro | registrar en DevTools | Electron dev | pendiente |
+| Panel, barra lateral colapsada | claro / oscuro | registrar en DevTools | Electron dev | pendiente |
+
 ## Historial H1.1/H1.2 (no describe los proveedores actuales)
 
 La base H1.1/H1.2 combina una ventana Electron aislada, una vista previa de acceso en React y un contrato de autenticación correo/contraseña y sesión activado en Convex DEV. La interfaz de registro/inicio de sesión, la recogida de credenciales en el renderizador y el empaquetado no están implementados. Los controles de acceso siguen deshabilitados; inicializar el proveedor no representa una autenticación correcta.

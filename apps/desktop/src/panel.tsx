@@ -17,10 +17,13 @@ import {
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Spinner } from '@/components/ui/spinner'
 import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/card'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Table, TableBody, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { LogoutButton, useLogout } from './lib/session'
+import { useLiveSurface } from './lib/live-surface'
 import { dashboardFunctions, type DashboardMetrics, type LiveConnection } from './lib/shop-api'
 import { WaitingScreen } from './components/waiting-screen'
 
@@ -212,6 +215,8 @@ function Column({ id, title, aside, children }: { id: string; title: string; asi
 }
 
 function LiveColumn({ connection }: { connection: LiveConnection | null }) {
+  const live = useLiveSurface()
+  const { status } = live
   // No live at all is not a state: the header stays empty rather than claiming that
   // the last one ended, and the legend below still shows the six real states.
   return <Column
@@ -219,15 +224,40 @@ function LiveColumn({ connection }: { connection: LiveConnection | null }) {
     title="Live de TikTok"
     aside={connection ? <Badge variant="outline">{connection}</Badge> : undefined}
   >
-    {/* D-A: live capture does not exist yet, so the call to action stays visible and
-        inert with the note that explains why, instead of pointing at nothing. */}
-    <Button className="self-start" disabled aria-describedby="first-live-note">Conectá tu primer live</Button>
-    <p id="first-live-note" className="text-xs text-muted-foreground">La conexión de lives llega en la próxima etapa.</p>
-    <div className="grid min-h-40 place-items-center rounded-lg border border-dashed border-border bg-muted p-4 text-center">
-      <div>
+    {/* The operator opens the live explicitly. The surface is owned by the main process,
+        so this button asks for it instead of embedding anything in this document. */}
+    <div className="flex flex-wrap items-center gap-2">
+      {live.available
+        ? <>
+          <Button onClick={() => { void live.mount() }} disabled={status.mounted}>Abrir el live de TikTok</Button>
+          {status.mounted && <Button variant="outline" onClick={() => { void live.unmount() }}>Cerrar visor</Button>}
+        </>
+        : <Button disabled aria-describedby="first-live-note">Conectá tu primer live</Button>}
+    </div>
+    <p id="first-live-note" className="text-xs text-muted-foreground">
+      {live.available
+        ? 'El visor abre TikTok en una superficie aislada, con sandbox y sin Node. El login se guarda en este equipo.'
+        : 'La conexión de lives llega en la próxima etapa.'}
+    </p>
+    {status.state === 'failed' && <Alert variant="destructive" role="alert">
+      <AlertDescription>{`TikTok no cargó: ${status.reason}. Revisá la conexión y reintentá.`}</AlertDescription>
+    </Alert>}
+    {status.state === 'loading' && <p role="status" className="flex items-center gap-2 text-xs text-muted-foreground">
+      <Spinner /> Cargando TikTok…
+    </p>}
+    {/* The guest paints over this rectangle. The empty state stays underneath, so the
+        column explains itself before the operator opens a live and never invents data. */}
+    <div
+      ref={live.frame}
+      role="region"
+      aria-label="Superficie del live de TikTok"
+      aria-busy={status.state === 'loading' || undefined}
+      className="grid min-h-40 flex-1 place-items-center rounded-lg border border-dashed border-border bg-muted p-4 text-center"
+    >
+      {status.state !== 'ready' && <div>
         <p className="text-xs font-medium text-foreground">Ningún live conectado</p>
         <p className="text-xs text-muted-foreground">Al conectar, el live se abre en una superficie aislada, sin Node y con sandbox.</p>
-      </div>
+      </div>}
     </div>
     {/* S6: the local ingestor health and its gap. Empty until R3 owns those readings,
         so the screen states the absence instead of inventing a measurement. */}
