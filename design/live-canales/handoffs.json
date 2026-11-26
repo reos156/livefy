@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "chosen": "03-resizable-split.html",
+  "handoffs": {
+    "03-resizable-split.html": {
+      "status": "sent",
+      "queued": false,
+      "sentAt": "2026-11-26T05:57:55.415Z",
+      "startedAt": null,
+      "implementedAt": null,
+      "feature": "odd/tasks/live-view-tiktok-surface.md"
+    }
+  }
+}

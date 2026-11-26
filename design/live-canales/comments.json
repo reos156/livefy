@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "comments": [
+    {
+      "id": "ppzdsg70",
+      "file": "03-resizable-split.html",
+      "selector": "#workspace > section:nth-of-type(1) > div:nth-of-type(1)",
+      "excerpt": "ESTADOS connected reconnecting offline suspended-risk disconnected ended",
+      "comment": "No veo tan necesarios estos estados, se puede eliminar?",
+      "createdAt": "2026-11-26T05:56:39.580Z",
+      "status": "open",
+      "sentAt": "2026-11-26T05:56:39.603Z",
+      "resolvedAt": null
+    }
+  ]
+}

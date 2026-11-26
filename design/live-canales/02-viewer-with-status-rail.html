@@ -1,0 +1,548 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>02 · Visor con riel de estado — Panel del operador de Livefy</title>
+<style>
+  /* Tokens copiados de apps/desktop/src/styles.css (:root y .dark). Nada inventado.
+     Las dos variables --stage-* no son tokens: representan el video que pinta el guest. */
+  :root {
+    color-scheme: light;
+    --background: oklch(1 0 0);
+    --foreground: oklch(0.285 0 0);
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.285 0 0);
+    --primary: oklch(0.9347 0.1825 120.5229);
+    --primary-foreground: oklch(0 0 0);
+    --secondary: oklch(0.9692 0.0121 96.4218);
+    --secondary-foreground: oklch(0.285 0 0);
+    --muted: oklch(0.9845 0.0026 106.4477);
+    --muted-foreground: oklch(0.5103 0 0);
+    --accent: oklch(0.9353 0.1021 109.4248);
+    --accent-foreground: oklch(0.2994 0.0327 118.0959);
+    --destructive: oklch(0.5771 0.2152 27.325);
+    --border: oklch(0.9269 0.016 110.5685);
+    --input: oklch(0.9448 0.0134 115.8392);
+    --ring: oklch(0.9347 0.1825 120.5229);
+    --radius: 1rem;
+    --radius-sm: calc(var(--radius) * 0.6);
+    --radius-md: calc(var(--radius) * 0.8);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) * 1.4);
+    --font-sans: ui-sans-serif, system-ui, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+    --stage-bg: #0c0b12;
+    --stage-fg: #f7f5f2;
+  }
+  html.dark {
+    color-scheme: dark;
+    --background: oklch(0.2679 0.0036 106.6427);
+    --foreground: oklch(0.9576 0.0027 106.4494);
+    --card: oklch(0.2928 0.0018 106.5092);
+    --card-foreground: oklch(0.9818 0.0054 95.0986);
+    --primary: oklch(0.9347 0.1825 120.5229);
+    --primary-foreground: oklch(0.1913 0 0);
+    --secondary: oklch(0.9818 0.0054 95.0986);
+    --secondary-foreground: oklch(0.3085 0.0035 106.6039);
+    --muted: oklch(0.2213 0.0038 106.707);
+    --muted-foreground: oklch(0.7713 0.0169 99.0657);
+    --accent: oklch(0.213 0.0078 95.4245);
+    --accent-foreground: oklch(0.9663 0.008 98.8792);
+    --destructive: oklch(0.6368 0.2078 25.3313);
+    --border: oklch(0.3618 0.0101 106.8928);
+    --input: oklch(0.4336 0.0113 100.2195);
+    --ring: oklch(0.9347 0.1825 120.5229);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  html { font-family: var(--font-sans); }
+  body {
+    margin: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden;
+    background: var(--background); color: var(--foreground); font-size: 14px; line-height: 1.45;
+  }
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+    overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+  }
+  /* Foco visible: contorno --foreground + halo --ring, el patrón que styles.css ya usa. */
+  :focus-visible {
+    outline: 2px solid var(--foreground); outline-offset: 2px;
+    box-shadow: 0 0 0 5px color-mix(in oklch, var(--ring) 55%, transparent);
+  }
+  .skip-link {
+    position: absolute; top: 8px; left: 8px; z-index: 20; padding: 6px 10px;
+    border-radius: var(--radius-lg); background: var(--primary); color: var(--primary-foreground);
+    font-size: 12px; font-weight: 600; text-decoration: none; transform: translateY(-200%);
+  }
+  .skip-link:focus { transform: none; }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    height: 32px; padding: 0 10px; border: 1px solid transparent; border-radius: var(--radius-lg);
+    background: transparent; color: var(--foreground); font: inherit; font-size: 14px;
+    font-weight: 500; line-height: 1; cursor: pointer; white-space: nowrap;
+    transition: background-color 130ms ease, border-color 130ms ease, color 130ms ease;
+  }
+  .btn-sm { height: 28px; font-size: 13px; }
+  .btn-icon { width: 32px; padding: 0; }
+  .btn-icon.btn-sm { width: 28px; }
+  .btn-primary { background: var(--primary); color: var(--primary-foreground); }
+  .btn-primary:hover { background: color-mix(in oklch, var(--primary) 80%, var(--card)); }
+  .btn-outline { border-color: var(--border); background: var(--card); }
+  .btn-outline:hover { background: var(--muted); }
+  .btn-ghost { color: var(--muted-foreground); }
+  .btn-ghost:hover { background: var(--muted); color: var(--foreground); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn svg { flex: 0 0 auto; }
+
+  .shell { flex: 1; min-height: 0; display: grid; grid-template-columns: 220px minmax(0, 1fr); }
+
+  .sidebar {
+    display: flex; flex-direction: column; gap: 2px; min-height: 0; overflow: auto;
+    padding: 12px 10px; border-right: 1px solid var(--border); background: var(--card);
+  }
+  .brand { display: flex; align-items: center; gap: 9px; padding: 2px 4px 12px; }
+  .mark {
+    display: grid; place-items: center; width: 28px; height: 28px; flex: 0 0 auto;
+    border-radius: var(--radius-sm); background: var(--primary); color: var(--primary-foreground);
+    font-size: 13px; font-weight: 700;
+  }
+  .brand strong { font-size: 14px; font-weight: 600; }
+  .brand .btn { margin-left: auto; }
+  .nav-label {
+    margin: 0; padding: 10px 8px 4px; font-size: 11px; font-weight: 500;
+    letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted-foreground);
+  }
+  .nav-list { display: flex; flex-direction: column; gap: 1px; margin: 0; padding: 0; list-style: none; }
+  .nav-item {
+    display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 8px;
+    border: 0; border-radius: var(--radius-lg); background: transparent;
+    color: var(--muted-foreground); font: inherit; font-size: 12px; font-weight: 500;
+    text-align: left; text-decoration: none; cursor: pointer;
+  }
+  .nav-item svg { flex: 0 0 auto; }
+  .nav-item:hover { background: var(--muted); color: var(--foreground); }
+  .nav-item[aria-current="page"] { background: var(--muted); color: var(--foreground); font-weight: 600; }
+  .nav-item.is-soon { cursor: not-allowed; opacity: 0.55; }
+  .nav-item.is-soon:hover { background: transparent; color: var(--muted-foreground); }
+  .soon { margin-left: auto; font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase; }
+  .sidebar .grow { flex: 1; }
+
+  .main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  .topbar {
+    display: flex; align-items: center; gap: 10px; flex: 0 0 auto;
+    padding: 10px 16px; border-bottom: 1px solid var(--border); background: var(--card);
+  }
+  .shop { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 500; }
+  .shop svg { color: var(--muted-foreground); }
+  .spacer { flex: 1; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px; height: 20px; padding: 0 8px;
+    border: 1px solid var(--border); border-radius: calc(var(--radius) * 2.6);
+    font-size: 12px; font-weight: 500; color: var(--foreground); white-space: nowrap;
+  }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: 0 0 auto; }
+
+  .workspace {
+    flex: 1; min-height: 0; display: grid; gap: 10px; padding: 16px;
+    grid-template-columns: 1.35fr 1fr 1.3fr;
+  }
+  .col {
+    display: flex; flex-direction: column; min-width: 0; min-height: 0;
+    border-radius: var(--radius-xl); background: var(--card); color: var(--card-foreground);
+    box-shadow: 0 0 0 1px color-mix(in oklch, var(--foreground) 10%, transparent);
+    overflow: hidden;
+  }
+  .col-head {
+    display: flex; align-items: center; gap: 8px; flex: 0 0 auto;
+    padding: 10px 12px; border-bottom: 1px solid var(--border);
+  }
+  .col-head h2 {
+    margin: 0; font-size: 11px; font-weight: 500; letter-spacing: 0.05em;
+    text-transform: uppercase; color: var(--muted-foreground); white-space: nowrap;
+  }
+  .col-head .push { margin-left: auto; }
+  .col-body {
+    flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px;
+    padding: 10px; overflow: auto;
+  }
+  .row {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 7px 10px; border: 1px solid var(--border); border-radius: var(--radius-md);
+    background: var(--muted); font-size: 12px;
+  }
+  .row strong { font-weight: 600; color: var(--foreground); }
+  .empty {
+    flex: 1; min-height: 120px; display: flex; flex-direction: column; justify-content: center;
+    gap: 3px; padding: 16px; text-align: center; border: 1px dashed var(--border);
+    border-radius: var(--radius-md); background: var(--muted); font-size: 12px;
+    color: var(--muted-foreground);
+  }
+  .empty .empty-title { margin: 0; font-weight: 500; color: var(--foreground); }
+  .empty p { margin: 0; }
+  .note { margin: 0; font-size: 11px; color: var(--muted-foreground); }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  th {
+    padding: 5px 4px; text-align: left; font-size: 10px; font-weight: 600;
+    letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted-foreground);
+    white-space: nowrap; border-bottom: 1px solid var(--border);
+  }
+
+  /* --- Columna Live: encabezado con el canal, visor enmarcado y riel de estado --- */
+  .head-stack { flex-direction: column; align-items: stretch; gap: 7px; padding: 9px 10px 10px; }
+  .head-top { display: flex; align-items: center; gap: 8px; }
+  .head-form { display: flex; align-items: center; gap: 6px; }
+  .field {
+    display: flex; align-items: center; gap: 2px; flex: 1; min-width: 0; height: 32px;
+    padding: 0 10px; border: 1px solid var(--input); border-radius: var(--radius-lg);
+    background: transparent;
+  }
+  .field .at { flex: 0 0 auto; color: var(--muted-foreground); font-family: var(--font-mono); font-size: 13px; }
+  .field input {
+    flex: 1; min-width: 0; height: 100%; padding: 0; border: 0; background: transparent;
+    color: var(--foreground); font: inherit; font-family: var(--font-mono); font-size: 13px;
+  }
+  .field:focus-within {
+    outline: 2px solid var(--foreground); outline-offset: 2px;
+    box-shadow: 0 0 0 5px color-mix(in oklch, var(--ring) 55%, transparent);
+  }
+  .field input:focus, .field input:focus-visible { outline: none; box-shadow: none; }
+
+  .livebody {
+    flex: 1; min-height: 0; display: grid; padding: 8px;
+    grid-template-columns: minmax(0, 1fr) 80px;
+    grid-template-rows: minmax(0, 1fr) auto;
+    gap: 0 8px;
+  }
+
+  /* El visor: marco redondeado; el rectángulo nativo no lleva esquina propia. */
+  .viewer {
+    position: relative; grid-column: 1; grid-row: 1; min-height: 120px; overflow: hidden;
+    display: grid; place-items: center; border-radius: var(--radius-md); background: var(--stage-bg);
+  }
+  .video {
+    position: relative; height: 100%; aspect-ratio: 9 / 16; max-width: 100%; overflow: hidden;
+    background: linear-gradient(165deg, #4a2470, #241634 52%, #0b0b12);
+  }
+  .video svg.scene { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .live-pill {
+    position: absolute; top: 9px; left: 9px; display: inline-flex; align-items: center;
+    gap: 5px; padding: 3px 8px 3px 6px; border-radius: 999px; background: #e11d48;
+    color: #fff; font-size: 9px; font-weight: 700; letter-spacing: 0.08em;
+  }
+  .live-pill .pulse { width: 4px; height: 4px; border-radius: 50%; background: #fff; }
+  .viewer::after {
+    content: ""; position: absolute; inset: auto 0 0 0; height: 84px;
+    background: linear-gradient(to top, rgba(6, 5, 10, 0.7), transparent);
+    pointer-events: none;
+  }
+  .heart { transform-box: fill-box; transform-origin: center; }
+  @media (prefers-reduced-motion: no-preference) {
+    .heart { animation: float 5.5s ease-in-out infinite; }
+    .heart:nth-of-type(2) { animation-delay: 1.6s; animation-duration: 6.8s; }
+    @keyframes float {
+      0%, 100% { transform: translateY(0) scale(1); opacity: 0.75; }
+      50% { transform: translateY(-8px) scale(1.06); opacity: 1; }
+    }
+  }
+
+  .caption {
+    grid-column: 1; grid-row: 2; display: flex; flex-wrap: wrap; gap: 2px 8px;
+    padding: 5px 1px 0; font-size: 11px; color: var(--muted-foreground);
+  }
+
+  /* Riel: los seis estados y la salud del ingestor, sin tapar el rectángulo nativo. */
+  .rail {
+    grid-column: 2; grid-row: 1 / span 2; display: flex; flex-direction: column; gap: 6px;
+    padding: 8px 6px; overflow: hidden; border: 1px solid var(--border);
+    border-radius: var(--radius-md); background: var(--muted);
+  }
+  .rail-label {
+    margin: 0; font-size: 10px; font-weight: 600; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--muted-foreground); text-align: center;
+  }
+  .rail ul { display: flex; flex-direction: column; gap: 3px; margin: 0; padding: 0; list-style: none; }
+  .state {
+    display: flex; align-items: center; justify-content: center; height: 32px;
+    border-radius: var(--radius-sm); color: var(--muted-foreground); cursor: help;
+    transition: background-color 130ms ease, color 130ms ease;
+  }
+  .state:hover { background: color-mix(in oklch, var(--foreground) 8%, transparent); color: var(--foreground); }
+  .state[aria-current="true"] {
+    background: var(--accent); color: var(--accent-foreground);
+    box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--accent-foreground) 22%, transparent);
+  }
+  .readout {
+    margin: 0; min-height: 26px; font-size: 10px; line-height: 1.3; text-align: center;
+    color: var(--foreground); font-weight: 600; overflow-wrap: anywhere;
+  }
+  .rail-health {
+    margin-top: auto; display: flex; flex-direction: column; gap: 6px; padding-top: 7px;
+    border-top: 1px solid var(--border);
+  }
+  .rail-health .k {
+    display: block; font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase;
+    color: var(--muted-foreground); font-weight: 500;
+  }
+  .rail-health .v { display: block; font-size: 11px; font-weight: 600; color: var(--foreground); }
+
+  .board-label {
+    display: flex; align-items: center; gap: 10px; flex: 0 0 auto; height: 28px;
+    padding: 0 16px; overflow: hidden; border-top: 1px solid var(--border);
+    background: var(--muted); color: var(--muted-foreground);
+    font-size: 11px; white-space: nowrap;
+  }
+  .board-label strong { font-weight: 600; color: var(--foreground); }
+  .board-label .size { margin-left: auto; font-family: var(--font-mono); }
+
+  @media (max-width: 1100px) {
+    body { height: auto; overflow: auto; }
+    .shell { grid-template-columns: 64px minmax(0, 1fr); }
+    .brand strong, .nav-label, .nav-item span, .soon { display: none; }
+    .nav-item { justify-content: center; padding: 8px 0; }
+    .topbar { flex-wrap: wrap; }
+    .workspace { grid-template-columns: 1fr; }
+    .col { min-height: 460px; }
+    .livebody { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) auto auto; }
+    .rail {
+      grid-column: 1; grid-row: 3; flex-direction: row; align-items: center;
+      margin-top: 8px; overflow-x: auto;
+    }
+    .rail ul { flex-direction: row; }
+    .rail-health { margin-top: 0; flex-direction: row; gap: 12px; padding-top: 0; padding-left: 8px; border-top: 0; border-left: 1px solid var(--border); }
+    .readout { min-height: 0; }
+    .viewer { min-height: 260px; }
+    .board-label { height: auto; padding: 6px 16px; white-space: normal; }
+  }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+<a class="skip-link" href="#workspace">Saltar al contenido del panel</a>
+<div class="shell">
+  <aside class="sidebar" aria-label="Principal">
+    <div class="brand">
+      <span class="mark" aria-hidden="true">L</span>
+      <strong>Livefy</strong>
+      <button class="btn btn-ghost btn-sm btn-icon" type="button" aria-label="Contraer barra lateral" title="Contraer barra lateral">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4 5 8l4 4"/><path d="M12 4 8 8l4 4"/></svg>
+      </button>
+    </div>
+    <nav aria-label="Operación">
+      <p class="nav-label">Operación</p>
+      <ul class="nav-list">
+        <li><a class="nav-item" href="#workspace" aria-current="page">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>
+          <span>Panel</span></a></li>
+        <li><span class="nav-item is-soon" aria-disabled="true">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="5.5" r="2.4"/><path d="M3.4 13c0-2.4 2-3.8 4.6-3.8s4.6 1.4 4.6 3.8"/></svg>
+          <span>Leads</span><span class="soon">pronto</span></span></li>
+        <li><span class="nav-item is-soon" aria-disabled="true">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 2.5h9v11l-2.2-1.3-2.3 1.3-2.3-1.3-2.2 1.3z"/><path d="M6 6h4M6 9h4"/></svg>
+          <span>Ventas</span><span class="soon">pronto</span></span></li>
+      </ul>
+    </nav>
+    <nav aria-label="Catálogo">
+      <p class="nav-label">Catálogo</p>
+      <ul class="nav-list">
+        <li><span class="nav-item is-soon" aria-disabled="true">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2.2l5 2.6v6.4L8 13.8l-5-2.6V4.8z"/><path d="M3 4.8L8 7.4l5-2.6M8 7.4v6.4"/></svg>
+          <span>Productos</span><span class="soon">pronto</span></span></li>
+        <li><a class="nav-item" href="#workspace">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.6 6.6V13h10.8V6.6"/><path d="M1.8 6.6l1.4-4.1h9.6l1.4 4.1z"/></svg>
+          <span>Tienda</span></a></li>
+      </ul>
+    </nav>
+    <span class="grow"></span>
+    <button class="nav-item" type="button">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 2.5H3.5v11h3"/><path d="M9 5.6 11.4 8 9 10.4M11.4 8H6"/></svg>
+      <span>Sign out</span>
+    </button>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <p class="shop">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.6 6.6V13h10.8V6.6"/><path d="M1.8 6.6l1.4-4.1h9.6l1.4 4.1z"/></svg>
+        Mundo Kawaii
+      </p>
+      <span class="spacer"></span>
+      <span class="chip"><span class="dot" aria-hidden="true"></span>Conectado</span>
+      <button class="btn btn-primary" type="button">Finalizar live</button>
+      <button class="btn btn-ghost btn-icon" type="button" aria-pressed="false" aria-label="Cambiar a tema oscuro" title="Cambiar a tema oscuro" id="theme">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M13 9.6A5.6 5.6 0 0 1 6.4 3a5.6 5.6 0 1 0 6.6 6.6z"/></svg>
+      </button>
+      <button class="btn btn-ghost btn-icon" type="button" aria-label="Menú de la cuenta" title="Menú de la cuenta">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="5.6" r="2.6"/><path d="M3 13.2c0-2.5 2.2-4 5-4s5 1.5 5 4"/></svg>
+      </button>
+    </header>
+
+    <main class="workspace" id="workspace">
+      <h1 class="sr-only">Panel de Mundo Kawaii</h1>
+      <section class="col" aria-labelledby="c1">
+        <header class="col-head head-stack">
+          <div class="head-top">
+            <h2 id="c1">Live de TikTok</h2>
+            <span class="chip push"><span class="dot" aria-hidden="true"></span>connected</span>
+          </div>
+          <div class="head-form">
+            <div class="field" title="Handle sin arroba">
+              <label class="sr-only" for="handle-2">Canal de TikTok (handle, sin arroba)</label>
+              <span class="at" aria-hidden="true">@</span>
+              <input id="handle-2" type="text" value="mundokawaii" autocomplete="off" spellcheck="false">
+            </div>
+            <button class="btn btn-primary" type="button">Abrir el live</button>
+            <button class="btn btn-outline btn-icon" type="button" aria-label="Cerrar visor" title="Cerrar visor">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg>
+            </button>
+          </div>
+        </header>
+
+        <div class="livebody">
+          <div class="viewer" role="img" aria-label="Live de TikTok abierto en la superficie nativa: la creadora muestra un producto frente a la cámara.">
+            <div class="video">
+              <svg class="scene" viewBox="0 0 180 320" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+                <defs>
+                  <linearGradient id="bg2" x1="0" y1="0" x2="0.35" y2="1">
+                    <stop offset="0" stop-color="#5a2b82"/><stop offset="0.5" stop-color="#2a1840"/><stop offset="1" stop-color="#0b0b12"/>
+                  </linearGradient>
+                  <radialGradient id="glow2" cx="0.5" cy="0.3" r="0.6">
+                    <stop offset="0" stop-color="#a855f7" stop-opacity="0.5"/><stop offset="1" stop-color="#a855f7" stop-opacity="0"/>
+                  </radialGradient>
+                  <linearGradient id="rim2" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0" stop-color="#22d3ee" stop-opacity="0"/><stop offset="0.55" stop-color="#22d3ee" stop-opacity="0.8"/><stop offset="1" stop-color="#f472b6" stop-opacity="0"/>
+                  </linearGradient>
+                </defs>
+                <rect width="180" height="320" fill="url(#bg2)"/>
+                <rect width="180" height="320" fill="url(#glow2)"/>
+                <g fill="#0a0810" opacity="0.84">
+                  <circle cx="90" cy="122" r="29"/>
+                  <path d="M90 152c-33 0-53 24-53 56v112h106V208c0-32-20-56-53-56z"/>
+                </g>
+                <path d="M37 208v112" stroke="url(#rim2)" stroke-width="2.4" fill="none"/>
+                <path d="M143 208v112" stroke="url(#rim2)" stroke-width="1.2" fill="none" opacity="0.5"/>
+                <g>
+                  <rect x="64" y="196" width="52" height="62" rx="8" fill="#f6f4f0" opacity="0.92"/>
+                  <rect x="72" y="206" width="36" height="5" rx="2.5" fill="#c9c4bc"/>
+                  <circle cx="90" cy="230" r="10" fill="#d9fb5f" opacity="0.85"/>
+                  <rect x="72" y="246" width="24" height="4" rx="2" fill="#c9c4bc"/>
+                </g>
+                <g fill="#f472b6">
+                  <path class="heart" d="M150 46c3.4-5.4 11-3.8 11 2.2 0 5.2-11 11.6-11 11.6s-11-6.4-11-11.6c0-6 7.6-7.6 11-2.2z" opacity="0.85"/>
+                </g>
+                <g fill="#22d3ee">
+                  <path class="heart" d="M38 82c2.4-3.8 7.8-2.7 7.8 1.6 0 3.7-7.8 8.2-7.8 8.2s-7.8-4.5-7.8-8.2c0-4.3 5.4-5.4 7.8-1.6z" opacity="0.65"/>
+                </g>
+              </svg>
+              <span class="live-pill"><span class="pulse" aria-hidden="true"></span>LIVE</span>
+            </div>
+          </div>
+
+          <p class="caption">
+            <span>Superficie nativa aislada.</span>
+            <span>El login visual no autentica al ingestor.</span>
+          </p>
+
+          <aside class="rail" aria-label="Estados del live y salud del ingestor">
+            <p class="rail-label">Estados</p>
+            <ul>
+              <li><span class="state" tabindex="0" data-label="connected" aria-current="true">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M5.4 8.2 7.2 10l3.5-3.6"/></svg>
+                <span class="sr-only">connected</span></span></li>
+              <li><span class="state" tabindex="0" data-label="reconnecting">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 8a5 5 0 1 1-1.6-3.7"/><path d="M13 2.6V5h-2.4"/></svg>
+                <span class="sr-only">reconnecting</span></span></li>
+              <li><span class="state" tabindex="0" data-label="offline">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 6.4a8 8 0 0 1 11 0"/><path d="M5 9a4.4 4.4 0 0 1 6 0"/><circle cx="8" cy="12" r="0.9" fill="currentColor" stroke="none"/><path d="M2.6 2.6l10.8 10.8"/></svg>
+                <span class="sr-only">offline</span></span></li>
+              <li><span class="state" tabindex="0" data-label="suspended-risk">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2.4 14 13H2z"/><path d="M8 6.6v3.1"/><circle cx="8" cy="11.4" r="0.6" fill="currentColor" stroke="none"/></svg>
+                <span class="sr-only">suspended-risk</span></span></li>
+              <li><span class="state" tabindex="0" data-label="disconnected">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.2 9.8 9.8 6.2"/><path d="M4.6 6.4 3 8a2.4 2.4 0 0 0 3.4 3.4l1-.9"/><path d="M11.4 9.6 13 8a2.4 2.4 0 0 0-3.4-3.4l-1 .9"/></svg>
+                <span class="sr-only">disconnected</span></span></li>
+              <li><span class="state" tabindex="0" data-label="ended">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.6" y="3.6" width="8.8" height="8.8" rx="1.6"/></svg>
+                <span class="sr-only">ended</span></span></li>
+            </ul>
+            <p class="readout" id="readout">connected</p>
+            <div class="rail-health">
+              <p style="margin:0"><span class="k">Ingestor</span><span class="v">sin sesión</span></p>
+              <p style="margin:0"><span class="k">Brecha</span><span class="v">—</span></p>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="col" aria-labelledby="c2">
+        <header class="col-head">
+          <h2 id="c2">Productos</h2>
+          <button class="btn btn-outline btn-sm push" type="button" disabled>Crear</button>
+        </header>
+        <div class="col-body">
+          <div class="row"><span>Producto activo</span><strong>ninguno</strong></div>
+          <div class="empty">
+            <p class="empty-title">Arrastrá un producto acá</p>
+            <p>El activo es el que se ofrece y se notifica según el estado de cada lead.</p>
+          </div>
+          <p class="note">Sin productos cargados. Se persisten en Convex.</p>
+        </div>
+      </section>
+
+      <section class="col" aria-labelledby="c3">
+        <header class="col-head">
+          <h2 id="c3">Leads</h2>
+          <span class="note push">0 en el live</span>
+        </header>
+        <div class="col-body">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Handle</th><th>WhatsApp</th><th>Estado</th><th>Ítems</th><th>Total</th><th>Última</th></tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div class="empty">
+            <p class="empty-title">Sin leads todavía</p>
+            <p>Entran en tiempo real. El comprobante se valida o rechaza en esta columna.</p>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<footer class="board-label">
+  <strong>02 · Visor con riel de estado</strong>
+  <span>El riel libera la altura del video y deja leer cada estado al enfocarlo; la etiqueta aparece en el riel, nunca encima del rectángulo nativo.</span>
+  <span class="size">1536 × 864</span>
+</footer>
+
+<script>
+  const toggle = document.getElementById('theme');
+  toggle.addEventListener('click', () => {
+    const dark = document.documentElement.classList.toggle('dark');
+    toggle.setAttribute('aria-pressed', String(dark));
+    const label = dark ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro';
+    toggle.setAttribute('aria-label', label);
+    toggle.setAttribute('title', label);
+  });
+
+  // Las etiquetas del riel: hover o foco escriben el nombre en la línea del riel.
+  const readout = document.getElementById('readout');
+  const items = [...document.querySelectorAll('.state')];
+  const current = items.find(item => item.getAttribute('aria-current') === 'true');
+  const reset = () => { readout.textContent = current.dataset.label; };
+  items.forEach(item => {
+    const show = () => { readout.textContent = item.dataset.label; };
+    item.addEventListener('mouseenter', show);
+    item.addEventListener('focus', show);
+    item.addEventListener('mouseleave', reset);
+    item.addEventListener('blur', reset);
+  });
+</script>
+</body>
+</html>
