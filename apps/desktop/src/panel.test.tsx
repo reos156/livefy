@@ -112,15 +112,13 @@ describe('panel — dashboard chrome', () => {
     expect(within(sidebar).getByText('Operación')).toBeTruthy()
   })
 
-  it('shows the shop identity as a disabled control that explains there is only one shop', () => {
+  it('states which shop the panel is showing, without offering a switcher', () => {
     state.stats = stats
     render(<Panel onEditStore={() => {}} />)
 
-    const shop = screen.getByRole('button', { name: 'Mundo Kawaii' }) as HTMLButtonElement
-    expect(shop.disabled).toBe(true)
-    const describedBy = shop.getAttribute('aria-describedby')
-    expect(describedBy).toBe('shop-switcher-note')
-    expect(document.getElementById(describedBy as string)?.textContent).toBe('Es la única tienda de la cuenta.')
+    expect(screen.getByText('Mundo Kawaii')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /Mundo Kawaii/ })).toBeNull()
+    expect(screen.queryByText(/única tienda/i)).toBeNull()
   })
 
   it('flips the document theme from the top bar and announces its own state', () => {
@@ -152,14 +150,10 @@ describe('panel — dashboard chrome', () => {
     expect(within(menu).getAllByRole('menuitem').map(item => item.textContent)).toEqual(['Panel', 'Modo oscuro', 'Log out'])
   })
 
-  it('renders the notifications bell disabled because there are no notifications', () => {
+  it('carries no notification control, because nothing can be notified', () => {
     state.stats = stats
     render(<Panel onEditStore={() => {}} />)
 
-    const bell = screen.getByRole('button', { name: 'Notificaciones' }) as HTMLButtonElement
-    expect(bell.disabled).toBe(true)
-    const describedBy = bell.getAttribute('aria-describedby')
-    expect(describedBy).toBe('notifications-note')
-    expect(document.getElementById(describedBy as string)?.textContent).toBe('Las notificaciones todavía no existen.')
+    expect(screen.queryByRole('button', { name: /Notificaciones/ })).toBeNull()
   })
 })

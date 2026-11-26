@@ -2,8 +2,6 @@ import { useState, type ReactNode } from 'react'
 import { useQuery } from 'convex/react'
 import { cn } from 'cn'
 import {
-  BellIcon,
-  ChevronDownIcon,
   ChevronsLeftIcon,
   ChevronsRightIcon,
   LayoutDashboardIcon,
@@ -42,8 +40,6 @@ const connectionCopy: Record<LiveConnection, string> = {
 
 // The explanation both disabled controls point at: there is one shop per operator and
 // no notification system, so the controls stay inert instead of implying a feature.
-const SHOP_NOTE = 'Es la única tienda de la cuenta.'
-const NOTIFICATIONS_NOTE = 'Las notificaciones todavía no existen.'
 
 // The project's tokens already answer to `.dark` on the document root, so the toggle owns
 // that single class and reports its state through `aria-pressed`.
@@ -173,22 +169,13 @@ function KpiRow({ metrics }: { metrics: DashboardMetrics }) {
 // The top bar's shop identity occupies the slot the dashboard kit reserves for a
 // workspace switcher. One shop per operator today, so it is inert and says why instead
 // of offering a dropdown with a single entry.
+// One shop per operator, so this states which shop the panel is showing instead of
+// pretending to switch between several.
 function ShopIdentity({ name }: { name: string }) {
-  return <>
-    <Button
-      variant="ghost"
-      size="sm"
-      className="max-w-48 min-w-0"
-      disabled
-      aria-describedby="shop-switcher-note"
-      title={SHOP_NOTE}
-    >
-      <StoreIcon data-icon="inline-start" aria-hidden="true" />
-      <span className="truncate">{name}</span>
-      <ChevronDownIcon data-icon="inline-end" aria-hidden="true" />
-    </Button>
-    <p id="shop-switcher-note" className="min-w-0 truncate text-xs text-muted-foreground">{SHOP_NOTE}</p>
-  </>
+  return <p className="flex min-w-0 items-center gap-1.5 text-sm font-medium text-foreground">
+    <StoreIcon aria-hidden="true" className="size-4 text-muted-foreground" />
+    <span className="truncate">{name}</span>
+  </p>
 }
 
 // The kit's account menu, with only the entries that exist. `Panel` closes the menu and
@@ -329,28 +316,13 @@ export function Panel({ onEditStore }: { onEditStore: () => void }) {
     />
     <div className="flex min-w-0 flex-col">
       <header className="flex items-center gap-2.5 border-b border-border bg-card px-4 py-2.5">
-        <h1 className="text-sm font-semibold text-foreground">Panel</h1>
-        <span aria-hidden="true" className="text-xs text-muted-foreground">·</span>
         <ShopIdentity name={stats.shopName} />
         <span className="flex-1" />
         <Badge variant="outline" className="gap-1.5">
           <span aria-hidden="true" className="size-1.5 rounded-full bg-muted-foreground" />
           {liveConnection ? connectionCopy[liveConnection] : 'Desconectado'}
         </Badge>
-        <Button variant="outline" onClick={onEditStore}>Editar tienda</Button>
         <Button disabled={!canEndLive} title={canEndLive ? undefined : 'Requiere un live conectado'}>Finalizar live</Button>
-        {/* No notification system exists yet: the bell is inert, with no counter and no dot. */}
-        <Button
-          variant="ghost"
-          size="icon"
-          disabled
-          aria-label="Notificaciones"
-          aria-describedby="notifications-note"
-          title={NOTIFICATIONS_NOTE}
-        >
-          <BellIcon aria-hidden="true" />
-        </Button>
-        <span id="notifications-note" className="sr-only">{NOTIFICATIONS_NOTE}</span>
         <Button
           variant="ghost"
           size="icon"
