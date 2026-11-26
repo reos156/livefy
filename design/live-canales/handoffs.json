@@ -3,12 +3,13 @@
   "chosen": "03-resizable-split.html",
   "handoffs": {
     "03-resizable-split.html": {
-      "status": "sent",
+      "status": "implemented",
       "queued": false,
       "sentAt": "2026-11-26T05:57:55.415Z",
       "startedAt": null,
-      "implementedAt": null,
-      "feature": "odd/tasks/live-view-tiktok-surface.md"
+      "implementedAt": "2026-11-26T06:36:39.973Z",
+      "feature": "odd/tasks/live-view-tiktok-surface.md",
+      "note": "Ya implementado (292ef57, d804f7d, 0af4838) y sin cambios de producción posteriores: el único cambio después del handoff fue el artboard, que ahora coincide. Canal validado en main, visor a columna completa, divisores con mínimos y teclado, sin KPIs ni leyenda. 571 tests, typecheck y build verdes, Windows sincronizado."
     }
   }
 }
