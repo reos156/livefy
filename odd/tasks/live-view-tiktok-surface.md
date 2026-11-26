@@ -118,3 +118,5 @@ report them as missing.
 - **AC6** El cartel "Cargando TikTok…" desaparece cuando la página queda usable; un fallo muestra el motivo y ofrece reintentar.
 - **AC7** `bun run typecheck`, `bun run test` y `bun run build` en verde desde la raíz.
 - **AC8** Espejo de Windows sincronizado y aceptación del humano ejerciendo la pantalla.
+
+L9 (agent, inline): the `will-navigate`/`will-redirect` guard read the deprecated `(event, url)` pair, so it could not tell a subframe from the document and marked the whole surface failed when a subframe left TikTok — a playing live replaced by "TikTok no cargó". It now reads the single details object Electron 41 declares and reports the block only when `isMainFrame !== false`.

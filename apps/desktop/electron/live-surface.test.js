@@ -107,16 +107,16 @@ describe('live surface boundary', () => {
     expect(session.setPermissionCheckHandler.mock.calls[0][0]({}, 'media')).toBe(false)
     expect(contents.setWindowOpenHandler.mock.calls[0][0]({ url: 'https://www.tiktok.com' })).toEqual({ action: 'deny' })
 
-    const blocked = { preventDefault: vi.fn() }
-    contents.emit('will-navigate', blocked, 'https://accounts.google.com/')
+    const blocked = { url: 'https://accounts.google.com/', isMainFrame: true, preventDefault: vi.fn() }
+    contents.emit('will-navigate', blocked)
     expect(blocked.preventDefault).toHaveBeenCalledOnce()
 
-    const allowed = { preventDefault: vi.fn() }
-    contents.emit('will-navigate', allowed, 'https://www.tiktok.com/@someone/live')
+    const allowed = { url: 'https://www.tiktok.com/@someone/live', isMainFrame: true, preventDefault: vi.fn() }
+    contents.emit('will-navigate', allowed)
     expect(allowed.preventDefault).not.toHaveBeenCalled()
 
-    const redirected = { preventDefault: vi.fn() }
-    contents.emit('will-redirect', redirected, 'https://evil.test/')
+    const redirected = { url: 'https://evil.test/', isMainFrame: true, preventDefault: vi.fn() }
+    contents.emit('will-redirect', redirected)
     expect(redirected.preventDefault).toHaveBeenCalledOnce()
 
     const webview = { preventDefault: vi.fn() }
@@ -434,11 +434,23 @@ describe('live surface generations', () => {
   it('reports a blocked document navigation as the failure it is', () => {
     const { surface, guest } = mountedSurface(live.requireLiveChannel('mundokawaii'))
 
-    const blocked = { preventDefault: vi.fn() }
-    guest.emit('will-navigate', blocked, 'https://accounts.google.com/o/oauth2/auth')
+    const blocked = { url: 'https://accounts.google.com/o/oauth2/auth', isMainFrame: true, preventDefault: vi.fn() }
+    guest.emit('will-navigate', blocked)
 
     expect(blocked.preventDefault).toHaveBeenCalledOnce()
     expect(surface.status()).toEqual({ mounted: true, state: 'failed', reason: 'navegación bloqueada' })
+  })
+
+  // A subframe leaving TikTok is as ordinary as a failed subresource: an ad or an embed must
+  // not take a live that is still loading down with it. Only the watched document counts.
+  it('keeps loading when the blocked redirect belongs to a subframe', () => {
+    const { surface, guest } = mountedSurface(live.requireLiveChannel('mundokawaii'))
+
+    const blocked = { url: 'https://evil.test/', isMainFrame: false, preventDefault: vi.fn() }
+    guest.emit('will-redirect', blocked)
+
+    expect(blocked.preventDefault).toHaveBeenCalledOnce()
+    expect(surface.status()).toEqual({ mounted: true, state: 'loading' })
   })
 
   // The surface already loaded, so the same block is just a blocked link: the live stays.

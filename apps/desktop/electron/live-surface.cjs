@@ -47,13 +47,17 @@ function hardenLiveContents(contents, { onBlockedDocument } = {}) {
   contents.setWindowOpenHandler(() => ({ action: 'deny' }))
   // A blocked navigation is not only a denied request: the frame stays on the document it
   // had, so a load that was blocked never becomes the document the surface was waiting for.
-  // `onBlockedDocument` lets the surface count that as the failure it is. Only the document
-  // events report here; a blocked subframe is as ordinary as a failed subresource.
+  // `onBlockedDocument` lets the surface count that as the failure it is. Electron 41 passes
+  // one details object (`WebContentsWillNavigateEventParams` /
+  // `WebContentsWillRedirectEventParams`: url, isMainFrame, frame) plus `preventDefault` —
+  // never the deprecated `(event, url)` pair, which cannot tell a subframe from the document.
   for (const name of ['will-navigate', 'will-redirect']) {
-    contents.on(name, (event, url) => {
-      if (isAllowedLiveUrl(url)) return
-      event.preventDefault()
-      onBlockedDocument?.(url)
+    contents.on(name, details => {
+      if (isAllowedLiveUrl(details?.url)) return
+      details?.preventDefault()
+      // Only the document the operator is watching makes the surface fail: a subframe leaving
+      // TikTok is as ordinary as a failed subresource, and an ad must not take the live down.
+      if (details?.isMainFrame !== false) onBlockedDocument?.(details.url)
     })
   }
   // `will-navigate` is main-frame only, so an embedded document could still navigate
