@@ -357,7 +357,9 @@ export function ShopWizard({ initial, categories, paymentMethods, dialCodes, ste
             data-invalid={errors.paymentMethodSlugs ? true : undefined}
             aria-invalid={errors.paymentMethodSlugs ? true : undefined}
           >
-            <div className="flex flex-col gap-2">
+            {/* One card per method, two per row once the wizard is wide enough and one
+                when it is not: the container query follows the form's own width. */}
+            <div className="grid grid-cols-1 items-start gap-3 @sm/field-group:grid-cols-2">
               {paymentMethods.map(method => {
                 const selected = form.paymentMethodSlugs.includes(method.slug)
                 const field = datumField(method.slug)
@@ -377,13 +379,13 @@ export function ShopWizard({ initial, categories, paymentMethods, dialCodes, ste
                     type="button"
                     aria-pressed={selected}
                     variant="ghost"
-                    className="h-auto w-full flex-col items-start gap-0.5 rounded-xl px-4 py-3 text-left"
+                    className="h-auto w-full flex-col items-start gap-0.5 rounded-xl px-3.5 py-3 text-left"
                     onClick={() => toggleInList('paymentMethodSlugs', method.slug)}
                   >
                     <span className="font-medium">{method.label}</span>
                     <span className="text-xs font-normal text-muted-foreground">{method.description}</span>
                   </Button>
-                  {selected && <Field data-invalid={datumError ? true : undefined} className="px-4 pb-4">
+                  {selected && <Field data-invalid={datumError ? true : undefined} className="px-3.5 pb-3.5">
                     <FieldLabel htmlFor={inputId}>{method.dataLabel}</FieldLabel>
                     <Input
                       id={inputId}
