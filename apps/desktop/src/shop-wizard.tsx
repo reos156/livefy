@@ -146,6 +146,16 @@ function validateStep(step: Step, form: Form, paymentMethods: CatalogPaymentMeth
   return validateContact(form, dialCodes)
 }
 
+const STEP_COMPLETE_HINT = 'Podés editarlo después.'
+
+// The footer sentence is the first rule the step itself reports, so it cannot drift from
+// the validation the advance runs and never asks for something the step does not enforce.
+// A complete step reassures instead of inventing a requirement.
+function stepHint(step: Step, form: Form, paymentMethods: CatalogPaymentMethod[], dialCodes: CatalogDialCode[]): string {
+  const blocking = Object.values(validateStep(step, form, paymentMethods, dialCodes))
+  return blocking[0] ?? STEP_COMPLETE_HINT
+}
+
 function toInput(form: Form, paymentMethods: CatalogPaymentMethod[]): WizardInput {
   return {
     name: form.name.trim(),
@@ -163,35 +173,44 @@ function toInput(form: Form, paymentMethods: CatalogPaymentMethod[]): WizardInpu
 }
 
 function StepProgress({ step }: { step: Step }) {
+  const current = STEPS[step - 1]
   return <div className="flex flex-col gap-3">
-    {/* Announced on every change: the bars alone say nothing to a screen reader. */}
+    {/* Announced on every change: the bar alone says nothing to a screen reader. */}
     <p aria-live="polite" className="text-sm text-muted-foreground">{`Paso ${step} de 3`}</p>
+    {/* One continuous bar whose filled share is the step over three. The value travels as
+        `aria-valuenow`/`aria-valuetext`, so the progress is announced instead of read from
+        the colour, and the label carries the completed/current distinction. */}
+    <div
+      role="progressbar"
+      aria-label={`Paso ${step} de 3 · ${current.label}`}
+      aria-valuetext={`Paso ${step} de 3 · ${current.label}`}
+      aria-valuemin={1}
+      aria-valuemax={STEPS.length}
+      aria-valuenow={step}
+      className="h-1.5 w-full overflow-hidden rounded-full bg-border"
+    >
+      <div aria-hidden="true" className="h-full rounded-full bg-primary" style={{ width: `${(step / STEPS.length) * 100}%` }} />
+    </div>
     <ol aria-label="Pasos de la configuración" className="flex gap-2">
-      {STEPS.map(item => {
-        const state = item.number < step ? 'done' : item.number === step ? 'current' : 'todo'
-        return <li
-          key={item.number}
-          data-state={state}
-          aria-current={state === 'current' ? 'step' : undefined}
-          className="flex flex-1 flex-col gap-2"
-        >
-          <span aria-hidden="true" className={cn('h-1 rounded-full bg-border', state !== 'todo' && 'bg-primary')} />
-          <span className={cn('text-xs text-muted-foreground', state === 'current' && 'font-medium text-foreground')}>
-            {`${item.number} · ${item.label}`}
-          </span>
-        </li>
-      })}
+      {STEPS.map(item => <li
+        key={item.number}
+        aria-current={item.number === step ? 'step' : undefined}
+        className="flex-1 text-xs text-muted-foreground"
+      >{`${item.number} · ${item.label}`}</li>)}
     </ol>
   </div>
 }
 
-export function ShopWizard({ initial, categories, paymentMethods, dialCodes, step: ownedStep, onStepChange, pending = false, error, footer, onSubmit }: {
+export function ShopWizard({ initial, categories, paymentMethods, dialCodes, step: ownedStep, onStepChange, onCancel, pending = false, error, footer, onSubmit }: {
   initial?: ShopView | null
   categories: CatalogCategory[]
   paymentMethods: CatalogPaymentMethod[]
   dialCodes: CatalogDialCode[]
   step?: WizardStep
   onStepChange?: (step: WizardStep) => void
+  // The screen that hosts the wizard owns where cancelling lands; without it the wizard
+  // paints no cancel control, so a first run has nothing to cancel.
+  onCancel?: () => void
   pending?: boolean
   error?: string | null
   footer?: ReactNode
@@ -446,9 +465,15 @@ export function ShopWizard({ initial, categories, paymentMethods, dialCodes, ste
         </Field>
       </FieldGroup>}
 
-      <div className="flex items-center gap-2">
+      {/* Every control of the form lives here, on one row inside the card: back and
+          cancel on the left, what the step still needs in the middle, the primary action
+          on the right. */}
+      <div data-slot="wizard-footer" className="flex flex-wrap items-center gap-2 border-t pt-4">
         {step > 1 && <Button type="button" variant="outline" onClick={back}>Atrás</Button>}
-        <span className="flex-1" />
+        {onCancel && <Button type="button" variant="ghost" onClick={onCancel}>Cancelar</Button>}
+        <p data-slot="wizard-hint" className="min-w-0 flex-1 text-sm text-muted-foreground">
+          {stepHint(step, form, paymentMethods, dialCodes)}
+        </p>
         {/* Distinct keys on purpose. Sharing a position made React reuse the pressed node, so
             the `type=button` the operator clicked became the `type=submit` of the last step
             mid-dispatch; the browser then ran that node's activation behaviour and submitted

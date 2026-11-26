@@ -1,7 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { useMutation, useQuery } from 'convex/react'
 import { Outlet, useNavigate, useSearch } from '@tanstack/react-router'
-import { Button } from '@/components/ui/button'
 import { WaitingScreen } from './components/waiting-screen'
 import { Panel } from './panel'
 import { ShopWizard, type WizardStep } from './shop-wizard'
@@ -50,11 +49,12 @@ function useShopScreen(): ShopScreen | undefined {
 
 // The form itself. It owns the submission — the same create-or-update mutation serves the
 // first completion and every later edit — while the surface that hosts it owns navigation.
-function StoreForm({ screen, initial, step, onStepChange, onSaved, footer }: {
+function StoreForm({ screen, initial, step, onStepChange, onCancel, onSaved, footer }: {
   screen: ShopScreen
   initial: ShopView | null
   step?: WizardStep
   onStepChange?: (step: WizardStep) => void
+  onCancel?: () => void
   onSaved?: () => void
   footer?: ReactNode
 }) {
@@ -78,17 +78,21 @@ function StoreForm({ screen, initial, step, onStepChange, onSaved, footer }: {
     dialCodes={screen.dialCodes}
     step={step}
     onStepChange={onStepChange}
+    onCancel={onCancel}
     pending={pending}
     error={error}
-    footer={footer}
     onSubmit={submit}
+    footer={footer}
   />
 }
 
 export function AppEntry() {
   const screen = useShopScreen()
   if (!screen) return <WaitingScreen label="Cargando tu tienda" />
-  // S12/D3: no shop keeps the operator in the wizard, whatever path they arrived on.
+  // S12/D3: no shop keeps the operator in the wizard, whatever path they arrived on. A
+  // first run has no panel to cancel back to, and the form deliberately carries no
+  // session control — except here, where the panel that owns one does not exist yet and
+  // removing it would leave a brand-new operator with no way to close the session.
   if (screen.shop === null) return <StoreForm screen={screen} initial={null} footer={<LogoutButton />} />
   // S12/D2: a configured shop lands on the routed surface. The choice of panel or form
   // lives in the URL, so a transient remount re-reads it instead of a lost `useState`.
@@ -117,10 +121,7 @@ export function StoreSurface() {
     initial={screen.shop}
     step={paso}
     onStepChange={step => { void navigate({ to: '/app/store', search: { paso: step }, replace: true }) }}
+    onCancel={backToPanel}
     onSaved={backToPanel}
-    footer={<>
-      <Button type="button" variant="outline" onClick={backToPanel}>Cancelar</Button>
-      <LogoutButton />
-    </>}
   />
 }

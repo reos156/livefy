@@ -3,6 +3,31 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { ShopWizard } from './shop-wizard'
 import type { CatalogCategory, CatalogDialCode, CatalogPaymentMethod, ShopView } from './lib/shop-api'
 
+// The session control the operator sees belongs to the surface that hosts the wizard, so
+// "the form paints no sign-out" is only observable through the screen the app renders.
+const screenData = vi.hoisted(() => ({
+  shop: null as unknown,
+  categories: [] as unknown,
+  paymentMethods: [] as unknown,
+  dialCodes: [] as unknown,
+}))
+vi.mock('convex/react', async () => {
+  // The renderer subscribes with real function references; the name inside one is the only
+  // stable key a mock can read.
+  const referenced = (ref: object) => {
+    const [symbol] = Object.getOwnPropertySymbols(ref)
+    return (ref as Record<symbol, string>)[symbol]
+  }
+  const answers: Record<string, () => unknown> = {
+    'shops:current': () => screenData.shop,
+    'catalog:categories': () => screenData.categories,
+    'catalog:paymentMethods': () => screenData.paymentMethods,
+    'catalog:dialCodes': () => screenData.dialCodes,
+  }
+  return { useQuery: (ref: object) => answers[referenced(ref)]?.(), useMutation: () => vi.fn() }
+})
+import { AppEntry } from './app-entry'
+
 const categories: CatalogCategory[] = [
   { slug: 'ropa', label: 'Ropa' },
   { slug: 'calzado', label: 'Calzado' },
@@ -84,13 +109,27 @@ function choosePayment(name: RegExp | string) {
   fireEvent.click(screen.getByRole('button', { name }))
 }
 
+// The footer hint repeats the first rule the step still breaks, so the same sentence can
+// sit next to its control and in the footer. This reads the verdict next to the control
+// it accuses.
+function verdict(control: HTMLElement, message: string) {
+  const field = control.closest('[data-slot="field"]') as HTMLElement
+  return within(field).getByText(message)
+}
+
+// …and this reads the one sentence the footer derives from those same rules.
+function hintText(message: string) {
+  const hint = document.querySelector('[data-slot="wizard-hint"]') as HTMLElement
+  return within(hint).getByText(message)
+}
+
 describe('shop wizard — step 1 · Tu tienda', () => {
   it('blocks advancing until a name, a description and one category are there', () => {
     const onSubmit = renderWizard()
 
     next()
 
-    expect(screen.getByText('Ingresá el nombre de la tienda.')).toBeTruthy()
+    expect(verdict(screen.getByLabelText('Nombre de la tienda'), 'Ingresá el nombre de la tienda.')).toBeTruthy()
     expect(screen.getByText('Ingresá una descripción.')).toBeTruthy()
     expect(screen.getByText('Elegí al menos una categoría.')).toBeTruthy()
     expect(screen.getByText('Paso 1 de 3')).toBeTruthy()
@@ -126,7 +165,7 @@ describe('shop wizard — step 2 · Cómo te pagan', () => {
 
     next()
 
-    expect(screen.getByText('Elegí al menos un medio de pago.')).toBeTruthy()
+    expect(verdict(screen.getByRole('button', { name: /nequi/i }), 'Elegí al menos un medio de pago.')).toBeTruthy()
     expect(screen.getByText('Paso 2 de 3')).toBeTruthy()
     // One instruction, read once: the step lead says it and the group does not repeat it.
     expect(screen.getAllByText('Marcá los medios que aceptás y cargá el dato de cada uno. Al menos uno.')).toHaveLength(1)
@@ -178,7 +217,7 @@ describe('shop wizard — step 2 · Cómo te pagan', () => {
     choosePayment(/nequi/i)
     next()
 
-    expect(screen.getByText('Ingresá el dato de Nequi.')).toBeTruthy()
+    expect(verdict(screen.getByLabelText('Tu Nequi'), 'Ingresá el dato de Nequi.')).toBeTruthy()
     expect(screen.getByText('Paso 2 de 3')).toBeTruthy()
   })
 
@@ -191,7 +230,7 @@ describe('shop wizard — step 2 · Cómo te pagan', () => {
     expect(screen.getByLabelText('Tu llave Bre-B')).toBeTruthy()
     next()
 
-    expect(screen.getByText('Ingresá el dato de Llave Bre-B.')).toBeTruthy()
+    expect(verdict(screen.getByLabelText('Tu llave Bre-B'), 'Ingresá el dato de Llave Bre-B.')).toBeTruthy()
     expect(screen.getByText('Paso 2 de 3')).toBeTruthy()
   })
 
@@ -204,7 +243,7 @@ describe('shop wizard — step 2 · Cómo te pagan', () => {
     fireEvent.change(screen.getByLabelText('Tu llave Bre-B'), { target: { value: 'ab' } })
     next()
 
-    expect(screen.getByText('Revisá la llave: usá entre 3 y 40 caracteres, sin espacios.')).toBeTruthy()
+    expect(verdict(screen.getByLabelText('Tu llave Bre-B'), 'Revisá la llave: usá entre 3 y 40 caracteres, sin espacios.')).toBeTruthy()
     expect(screen.getByText('Paso 2 de 3')).toBeTruthy()
 
     fireEvent.change(screen.getByLabelText('Tu llave Bre-B'), { target: { value: 'abc' } })
@@ -222,7 +261,7 @@ describe('shop wizard — step 2 · Cómo te pagan', () => {
     fireEvent.change(screen.getByLabelText('Tu Nequi'), { target: { value: '123456' } })
     next()
 
-    expect(screen.getByText('Usá entre 7 y 15 dígitos.')).toBeTruthy()
+    expect(verdict(screen.getByLabelText('Tu Nequi'), 'Usá entre 7 y 15 dígitos.')).toBeTruthy()
     expect(screen.getByText('Paso 2 de 3')).toBeTruthy()
 
     fireEvent.change(screen.getByLabelText('Tu Nequi'), { target: { value: '1234567' } })
@@ -240,7 +279,7 @@ describe('shop wizard — step 2 · Cómo te pagan', () => {
     fireEvent.change(screen.getByLabelText('Tu cuenta'), { target: { value: '1234' } })
     next()
 
-    expect(screen.getByText('Revisá la cuenta: usá entre 5 y 60 caracteres con letras, números, espacios y ".-#".')).toBeTruthy()
+    expect(verdict(screen.getByLabelText('Tu cuenta'), 'Revisá la cuenta: usá entre 5 y 60 caracteres con letras, números, espacios y ".-#".')).toBeTruthy()
     expect(screen.getByText('Paso 2 de 3')).toBeTruthy()
 
     fireEvent.change(screen.getByLabelText('Tu cuenta'), { target: { value: '12345' } })
@@ -260,12 +299,12 @@ describe('shop wizard — step 3 · Contacto', () => {
     next()
 
     fireEvent.click(screen.getByRole('button', { name: 'Guardar tienda' }))
-    expect(screen.getByText('Ingresá un WhatsApp de contacto: entre 7 y 15 dígitos.')).toBeTruthy()
+    expect(verdict(screen.getByLabelText('Número de WhatsApp'), 'Ingresá un WhatsApp de contacto: entre 7 y 15 dígitos.')).toBeTruthy()
 
     fireEvent.change(screen.getByLabelText('Número de WhatsApp'), { target: { value: '123' } })
     fireEvent.click(screen.getByRole('button', { name: 'Guardar tienda' }))
 
-    expect(screen.getByText('Ingresá un WhatsApp de contacto: entre 7 y 15 dígitos.')).toBeTruthy()
+    expect(verdict(screen.getByLabelText('Número de WhatsApp'), 'Ingresá un WhatsApp de contacto: entre 7 y 15 dígitos.')).toBeTruthy()
     expect(onSubmit).not.toHaveBeenCalled()
   })
 
@@ -335,9 +374,11 @@ describe('shop wizard — step 3 · Contacto', () => {
     next()
     next()
 
-    // Nothing typed yet: the step opens clean, no verdict and no invalid control.
-    expect(screen.queryByText('Ingresá un WhatsApp de contacto: entre 7 y 15 dígitos.')).toBeNull()
-    expect(screen.getByLabelText('Número de WhatsApp').getAttribute('aria-invalid')).toBeNull()
+    // Nothing typed yet: the step opens without a verdict on the field. The footer hint
+    // still names the requirement, because the step genuinely needs it.
+    const number = screen.getByLabelText('Número de WhatsApp')
+    expect(within(number.closest('[data-slot="field"]') as HTMLElement).queryByText('Ingresá un WhatsApp de contacto: entre 7 y 15 dígitos.')).toBeNull()
+    expect(number.getAttribute('aria-invalid')).toBeNull()
   })
 
   it('clears the verdict as soon as the operator corrects the value', () => {
@@ -346,7 +387,7 @@ describe('shop wizard — step 3 · Contacto', () => {
     next()
 
     fireEvent.click(screen.getByRole('button', { name: 'Guardar tienda' }))
-    expect(screen.getByText('Ingresá un WhatsApp de contacto: entre 7 y 15 dígitos.')).toBeTruthy()
+    expect(verdict(screen.getByLabelText('Número de WhatsApp'), 'Ingresá un WhatsApp de contacto: entre 7 y 15 dígitos.')).toBeTruthy()
 
     // The message describes the value that failed; a corrected number must not keep it.
     fireEvent.change(screen.getByLabelText('Número de WhatsApp'), { target: { value: '3005089676' } })
@@ -420,5 +461,74 @@ describe('shop wizard — footer controls', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
 
     expect(onSubmit).not.toHaveBeenCalled()
+  })
+})
+
+describe('shop wizard — progress bar', () => {
+  it('exposes the current step of one continuous bar, announced and not by colour alone', () => {
+    renderWizard()
+
+    // One bar for the whole wizard: the segments are gone, the value is the step.
+    const bar = screen.getByRole('progressbar')
+    expect(screen.getAllByRole('progressbar')).toHaveLength(1)
+    expect(bar.getAttribute('aria-valuenow')).toBe('1')
+    expect(bar.getAttribute('aria-valuemin')).toBe('1')
+    expect(bar.getAttribute('aria-valuemax')).toBe('3')
+
+    fillStoreStep()
+    next()
+
+    expect(screen.getByRole('progressbar').getAttribute('aria-valuenow')).toBe('2')
+    expect(screen.getByText('Paso 2 de 3')).toBeTruthy()
+  })
+})
+
+describe('shop wizard — footer hint', () => {
+  it('names the requirement the step still misses, from its own rules, and reassures once met', () => {
+    renderWizard()
+
+    // An empty step 1: the hint is the first rule that step enforces.
+    expect(hintText('Ingresá el nombre de la tienda.')).toBeTruthy()
+
+    fillStoreStep()
+    expect(hintText('Podés editarlo después.')).toBeTruthy()
+
+    next()
+
+    // Step 2 without methods says exactly what its own validation reports.
+    expect(hintText('Elegí al menos un medio de pago.')).toBeTruthy()
+
+    choosePayment(/nequi/i)
+    expect(hintText('Ingresá el dato de Nequi.')).toBeTruthy()
+
+    fireEvent.change(screen.getByLabelText('Tu Nequi'), { target: { value: '3005089676' } })
+    expect(hintText('Podés editarlo después.')).toBeTruthy()
+  })
+})
+
+describe('shop wizard — cancel', () => {
+  it('keeps Cancelar inside the card and never lets it submit', () => {
+    const onCancel = vi.fn()
+    const onSubmit = renderWizard({ initial: shop, onCancel })
+
+    const cancel = screen.getByRole('button', { name: 'Cancelar' })
+    expect(cancel.getAttribute('type')).toBe('button')
+    expect(cancel.closest('[data-slot="card"]')).not.toBeNull()
+
+    fireEvent.click(cancel)
+
+    expect(onCancel).toHaveBeenCalledTimes(1)
+    expect(onSubmit).not.toHaveBeenCalled()
+  })
+})
+
+describe('store screen — session control', () => {
+  it('keeps the session control on a first run, where no panel owns one', async () => {
+    // The edit surface drops it because the panel has it; that claim belongs to the routed
+    // test, which owns a router. Here the only observable case is the first run.
+    render(<AppEntry />)
+
+    await screen.findByRole('heading', { name: 'Configurá tu tienda' })
+    expect(screen.getByRole('button', { name: /sign out/i })).toBeTruthy()
   })
 })

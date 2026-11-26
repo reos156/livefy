@@ -175,8 +175,8 @@ it('opens the store form from the panel and returns to it when the edit is saved
   expect(router.state.location.pathname).toBe('/app/store')
   expect((screen.getByLabelText('Nombre de la tienda') as HTMLInputElement).value).toBe('Mundo Kawaii')
   expect(screen.queryByRole('heading', { level: 1, name: 'Panel' })).toBeNull()
-  // The way out of the session stays reachable from the form itself.
-  expect(screen.getByRole('button', { name: 'Sign out' })).toBeTruthy()
+  // The edit form carries no session control: the panel that owns one is a step away.
+  expect(screen.queryByRole('button', { name: 'Sign out' })).toBeNull()
 
   fireEvent.click(screen.getByRole('button', { name: 'Continuar' }))
   expect(await screen.findByText('Paso 2 de 3')).toBeTruthy()
