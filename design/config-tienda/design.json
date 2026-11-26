@@ -1,0 +1,49 @@
+{
+  "title": "Configuración de tienda — rediseño R1.1",
+  "brief": "Pantalla de configuración de tienda para un vendedor colombiano de TikTok LIVE, en una app de escritorio (Electron, ventana ~1280x800). Captura identidad de la tienda, qué vende (categorías selectables), cómo le pagan (Nequi, llave Bre-B con su dato, Daviplata, transferencia a cuenta de ahorros) y un WhatsApp de contacto obligatorio con indicativo y Colombia por defecto. Los identificadores de los bots son de la plataforma y sólo se muestran. Criterio de éxito: el vendedor termina en menos de un minuto, entiende cada bloque y no puede guardar datos incompletos.",
+  "feature": "odd/tasks/config-wizard-redesign.md",
+  "artboards": [
+    {
+      "file": "01-two-column-form.html",
+      "title": "Dos columnas con barra de guardado fija",
+      "tradeoff": "Aprovecha el ancho de la ventana de escritorio y muestra identidad y contacto a la vez, con los pagos a lo ancho; la barra fija mantiene la acción visible sin scroll. Más densa: necesita ventana ancha y tres primitivas nuevas (ToggleGroup para categorías, Select para el indicativo, y el patrón de lista seleccionable para pagos).",
+      "width": 1280,
+      "height": 900
+    },
+    {
+      "file": "02-stepped-wizard.html",
+      "title": "Tres pasos con progreso",
+      "tradeoff": "Una decisión por pantalla y una línea de meta clara; el paso 2 muestra Bre-B abierto con su llave y su error, que es el estado más difícil. Cuesta más clics y tres veces más estados que mantener consistentes, y esconde el resumen hasta el final.",
+      "width": 1280,
+      "height": 900
+    },
+    {
+      "file": "03-single-scroll-cards.html",
+      "title": "Una columna con secciones separadas por reglas",
+      "tradeoff": "Es la más cercana a la pantalla actual y la más simple de construir y de leer en pantallas chicas; los bots aparecen como datos, no como formulario. Desperdicia el ancho del escritorio y obliga a hacer scroll para llegar al botón si la ventana es baja.",
+      "width": 1280,
+      "height": 900
+    },
+    {
+      "file": "04-payment-inline-reveal.html",
+      "title": "Pago: el medio se abre en su lugar",
+      "tradeoff": "Mantiene el patrón que ya existe con Bre-B y no agrega una sección nueva: el dato vive pegado a su medio, así que no hay que emparejar dos listas. La página crece al marcar medios y el orden de lectura se alarga cuando hay cuatro elegidos.",
+      "width": 1280,
+      "height": 900
+    },
+    {
+      "file": "05-picker-plus-data-block.html",
+      "title": "Pago: elegís arriba, cargás abajo",
+      "tradeoff": "Separa qué aceptás de con qué dato cobrás, y deja la carga en una sola columna continua que se lee de arriba abajo. El operador tiene que mover la vista entre la marca y el campo, y la lista de datos cambia de tamaño según lo marcado.",
+      "width": 1280,
+      "height": 900
+    },
+    {
+      "file": "06-payment-cards.html",
+      "title": "Pago: una tarjeta por medio",
+      "tradeoff": "Cada medio es una tarjeta con su casilla y su dato adentro, en dos columnas: se compara de un vistazo y el formulario no se estira tanto. Usa más ancho del necesario para cuatro medios y deja huecos vacíos cuando se marcan pocos.",
+      "width": 1280,
+      "height": 900
+    }
+  ]
+}

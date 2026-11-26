@@ -1,131 +1,84 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import type { ShopView } from './lib/shop-api'
 
-const state = vi.hoisted(() => ({
-  shop: undefined as ShopView | null | undefined,
-  submitted: [] as unknown[],
-  mutationError: null as Error | null,
+// The stored shop and the catalogues the entry screen reads. A `null` shop is a
+// first-run operator, which the screen must still take to the form.
+const data = vi.hoisted(() => ({
+  shop: null as unknown,
+  categories: [] as unknown,
+  paymentMethods: [] as unknown,
+  dialCodes: [] as unknown,
+  mutation: vi.fn(async () => null),
 }))
-
-vi.mock('convex/react', () => ({
-  useQuery: () => state.shop,
-  useMutation: () => async (input: unknown) => {
-    state.submitted.push(input)
-    if (state.mutationError) throw state.mutationError
-    return state.shop
-  },
-}))
+vi.mock('convex/react', async () => {
+  // The renderer subscribes with real function references; the name inside one is the only
+  // stable key a mock can read.
+  const referenced = (ref: object) => {
+    const [symbol] = Object.getOwnPropertySymbols(ref)
+    return (ref as Record<symbol, string>)[symbol]
+  }
+  const answers: Record<string, () => unknown> = {
+    'shops:current': () => data.shop,
+    'catalog:categories': () => data.categories,
+    'catalog:paymentMethods': () => data.paymentMethods,
+    'catalog:dialCodes': () => data.dialCodes,
+  }
+  return { useQuery: (ref: object) => answers[referenced(ref)]?.(), useMutation: () => data.mutation }
+})
 
 import { AppEntry } from './app-entry'
+import type { CatalogCategory, CatalogDialCode, CatalogPaymentMethod } from './lib/shop-api'
 
-const shop: ShopView = {
-  shopId: 'shop_1',
-  name: 'Tienda Uno',
-  description: 'Ropa urbana',
-  categories: ['ropa'],
-  paymentMethods: ['transferencia'],
-  personalWhatsapp: null,
-  tiktokBotHandle: '@livefy_tienda_uno',
-  whatsappBotNumber: '+54 11 4000-0001',
-}
+const categories: CatalogCategory[] = [{ slug: 'ropa', label: 'Ropa' }]
+const paymentMethods: CatalogPaymentMethod[] = [{
+  slug: 'nequi',
+  label: 'Nequi',
+  description: 'Billetera · te llega al celular o por QR',
+  dataKind: 'phone',
+  dataLabel: 'Tu Nequi',
+  dataHint: 'El número con el que recibís los pagos.',
+}]
+const dialCodes: CatalogDialCode[] = [{ iso2: 'CO', label: 'Colombia', dial: '+57' }]
 
 afterEach(() => {
   cleanup()
-  Object.assign(state, { shop: undefined, submitted: [], mutationError: null })
+  vi.clearAllMocks()
+  Object.assign(data, { shop: null, categories: [], paymentMethods: [], dialCodes: [] })
 })
 
-describe('app entry — which screen the operator gets', () => {
-  it('waits without painting a form while the shop query is unresolved', () => {
-    state.shop = undefined
+describe('app entry — first run', () => {
+  it('keeps an operator without a shop on the form instead of the panel', async () => {
+    Object.assign(data, { categories, paymentMethods, dialCodes })
     render(<AppEntry />)
 
-    expect(screen.getByRole('status')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'Guardar tienda' })).toBeNull()
+    expect(await screen.findByRole('heading', { name: 'Configurá tu tienda' })).toBeTruthy()
+    expect(screen.getByText('Paso 1 de 3')).toBeTruthy()
+    expect(screen.queryByRole('heading', { level: 1, name: 'Panel' })).toBeNull()
   })
 
-  it('opens the wizard when the operator has no shop yet', () => {
-    state.shop = null
+  it('still saves the first shop through the create-or-update mutation', async () => {
+    Object.assign(data, { categories, paymentMethods, dialCodes })
     render(<AppEntry />)
 
-    expect(screen.getByRole('button', { name: 'Guardar tienda' })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'Conectá tu primer live' })).toBeNull()
-  })
-
-  it('leads a completed wizard to the exact first-live call to action', () => {
-    state.shop = shop
-    render(<AppEntry />)
-
-    expect(screen.getByText('Tienda Uno')).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Conectá tu primer live' })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'Guardar tienda' })).toBeNull()
-  })
-
-  it('sends the wizard values through the mutation and then shows the call to action', async () => {
-    state.shop = null
-    const { rerender } = render(<AppEntry />)
-
-    fireEvent.click(screen.getByRole('button', { name: 'Agregar categoría' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Agregar medio de pago' }))
-    fireEvent.change(screen.getByLabelText('Nombre de la tienda'), { target: { value: 'Tienda Nueva' } })
-    fireEvent.change(screen.getByLabelText('Descripción'), { target: { value: 'Ropa urbana' } })
-    fireEvent.change(screen.getByLabelText('Categoría 1'), { target: { value: 'ropa' } })
-    fireEvent.change(screen.getByLabelText('Medio de pago 1'), { target: { value: 'transferencia' } })
+    await screen.findByRole('heading', { name: 'Configurá tu tienda' })
+    fireEvent.change(screen.getByLabelText('Nombre de la tienda'), { target: { value: 'Mundo Kawaii' } })
+    fireEvent.change(screen.getByLabelText('Descripción'), { target: { value: 'Accesorios y papelería' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Ropa' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar' }))
+    fireEvent.click(await screen.findByRole('button', { name: /nequi/i }))
+    fireEvent.change(screen.getByLabelText('Tu Nequi'), { target: { value: '300 508 9676' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar' }))
+    fireEvent.change(await screen.findByLabelText('Número de WhatsApp'), { target: { value: '3001234567' } })
     fireEvent.click(screen.getByRole('button', { name: 'Guardar tienda' }))
-    await Promise.resolve()
 
-    expect(state.submitted).toHaveLength(1)
-    expect(state.submitted[0]).toMatchObject({ name: 'Tienda Nueva', categories: ['ropa'], paymentMethods: ['transferencia'] })
-
-    state.shop = { ...shop, name: 'Tienda Nueva' }
-    rerender(<AppEntry />)
-    expect(screen.getByRole('button', { name: 'Conectá tu primer live' })).toBeTruthy()
-  })
-
-  it('reopens the wizard from the summary prefilled with the stored shop and saves an edit', async () => {
-    state.shop = shop
-    const { rerender } = render(<AppEntry />)
-
-    fireEvent.click(screen.getByRole('button', { name: 'Editar datos de la tienda' }))
-
-    expect((screen.getByLabelText('Nombre de la tienda') as HTMLInputElement).value).toBe('Tienda Uno')
-    expect((screen.getByLabelText('Descripción') as HTMLInputElement).value).toBe('Ropa urbana')
-    expect((screen.getByLabelText('Categoría 1') as HTMLInputElement).value).toBe('ropa')
-    expect((screen.getByLabelText('Medio de pago 1') as HTMLInputElement).value).toBe('transferencia')
-
-    fireEvent.change(screen.getByLabelText('Nombre de la tienda'), { target: { value: 'Tienda Renombrada' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar tienda' }))
-    await Promise.resolve()
-
-    expect(state.submitted).toHaveLength(1)
-    expect(state.submitted[0]).toMatchObject({
-      name: 'Tienda Renombrada',
-      description: 'Ropa urbana',
-      categories: ['ropa'],
-      paymentMethods: ['transferencia'],
+    expect(data.mutation).toHaveBeenCalledTimes(1)
+    expect(data.mutation).toHaveBeenCalledWith({
+      name: 'Mundo Kawaii',
+      description: 'Accesorios y papelería',
+      categorySlugs: ['ropa'],
+      paymentMethodSlugs: ['nequi'],
+      paymentData: [{ slug: 'nequi', value: '300 508 9676' }],
+      whatsapp: { dialCode: '+57', number: '3001234567' },
     })
-
-    state.shop = { ...shop, name: 'Tienda Renombrada' }
-    rerender(<AppEntry />)
-    expect(screen.getByRole('button', { name: 'Conectá tu primer live' })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'Guardar tienda' })).toBeNull()
-  })
-
-  it('reports a failed save without dropping back to a blank form', async () => {
-    state.shop = null
-    state.mutationError = new Error('network')
-    render(<AppEntry />)
-
-    fireEvent.click(screen.getByRole('button', { name: 'Agregar categoría' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Agregar medio de pago' }))
-    fireEvent.change(screen.getByLabelText('Nombre de la tienda'), { target: { value: 'Tienda Nueva' } })
-    fireEvent.change(screen.getByLabelText('Descripción'), { target: { value: 'Ropa urbana' } })
-    fireEvent.change(screen.getByLabelText('Categoría 1'), { target: { value: 'ropa' } })
-    fireEvent.change(screen.getByLabelText('Medio de pago 1'), { target: { value: 'transferencia' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar tienda' }))
-    // The failure lands after the mutation settles, not during the click handler.
-    const alert = await screen.findByRole('alert')
-    expect(alert.textContent).toContain('No pudimos guardar la tienda')
-    expect((screen.getByLabelText('Nombre de la tienda') as HTMLInputElement).value).toBe('Tienda Nueva')
   })
 })

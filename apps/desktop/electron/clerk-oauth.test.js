@@ -38,6 +38,7 @@ function bootstrap({ development = false, primary = true, defaultApp = false,
     removeHandler: name => handlers.delete(name),
   }
   class BrowserWindow {
+    maximize() {}
     static getAllWindows() { return windows }
     static fromWebContents(sender) { return windows.find(window => window.webContents === sender) }
     constructor() {

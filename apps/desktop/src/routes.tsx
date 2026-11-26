@@ -1,6 +1,7 @@
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { createRootRoute, createRoute, createRouter, Link, Outlet, useNavigate, type RouterHistory } from '@tanstack/react-router'
-import { AppEntry } from './app-entry'
+import { AppEntry, PanelSurface, StoreSurface } from './app-entry'
+import type { WizardStep } from './shop-wizard'
 import { AccessLanding } from './access'
 import { PrivateAccess } from './private-access'
 
@@ -12,6 +13,13 @@ function PrivateApp() {
   return <PrivateAccess rejected={<><Alert role="status"><AlertDescription>Authentication required</AlertDescription></Alert><Link to="/">Return to access</Link></>}>
     <AppEntry />
   </PrivateAccess>
+}
+// The store form is a child of the panel, and the step it is on travels in the search
+// string. A transient remount therefore re-reads both from the URL: the panel keeps its own
+// path (`/app`) and the form its own (`/app/store?paso=N`), never component memory alone.
+function storeSearch(search: Record<string, unknown>): { paso: WizardStep } {
+  const paso = Number(search.paso)
+  return { paso: paso === 2 || paso === 3 ? paso : 1 }
 }
 // The browser document keeps Clerk's hash routing while in-app routes live in a
 // memory router that always boots at "/". A private deep link therefore only reaches
@@ -29,7 +37,14 @@ export function createAppRouter(history: RouterHistory) {
   const root = createRootRoute({ component: Outlet })
   const access = createRoute({ getParentRoute: () => root, path: '/', component: PublicAccess })
   const app = createRoute({ getParentRoute: () => root, path: '/app', component: PrivateApp })
-  return createRouter({ routeTree: root.addChildren([access, app]), history })
+  const panel = createRoute({ getParentRoute: () => app, path: '/', component: PanelSurface })
+  const store = createRoute({
+    getParentRoute: () => app,
+    path: '/store',
+    component: StoreSurface,
+    validateSearch: storeSearch,
+  })
+  return createRouter({ routeTree: root.addChildren([access, app.addChildren([panel, store])]), history })
 }
 
 declare module '@tanstack/react-router' {

@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "chosen": "06-payment-cards.html",
+  "handoffs": {
+    "02-stepped-wizard.html": {
+      "status": "implemented",
+      "queued": false,
+      "sentAt": "2026-11-25T06:28:18.366Z",
+      "startedAt": "2026-11-25T06:28:36.694Z",
+      "implementedAt": "2026-11-25T14:21:27.777Z",
+      "feature": "odd/tasks/config-wizard-redesign.md",
+      "note": "Implementado en la app: tres pasos con progreso, catálogos desde Convex (10 categorías, 4 medios, 244 indicativos), Bre-B con su llave, WhatsApp obligatorio con +57. Desplegado a DEV y sincronizado a Windows; la aceptación visual es tuya."
+    },
+    "04-payment-inline-reveal.html": {
+      "status": "implemented",
+      "queued": false,
+      "sentAt": "2026-11-25T15:14:07.554Z",
+      "startedAt": "2026-11-25T15:14:45.958Z",
+      "implementedAt": "2026-11-25T15:28:24.924Z",
+      "feature": "odd/tasks/config-wizard-redesign.md",
+      "note": "Implementado: cada medio aceptado abre su propio campo de dato dentro de su tarjeta, con etiqueta y ayuda del catálogo; el payload envía un dato por medio. Desplegado a DEV y sincronizado a Windows."
+    },
+    "06-payment-cards.html": {
+      "status": "implemented",
+      "queued": false,
+      "sentAt": "2026-11-26T03:04:52.114Z",
+      "startedAt": "2026-11-26T03:05:02.129Z",
+      "implementedAt": "2026-11-26T03:09:18.290Z",
+      "feature": "odd/tasks/config-wizard-redesign.md",
+      "note": "Implementado: paso 2 como grilla de dos columnas con una tarjeta por medio, cada una con su casilla y su campo de dato adentro. Build y sync a Windows hechos; la aceptación visual es tuya."
+    }
+  }
+}
