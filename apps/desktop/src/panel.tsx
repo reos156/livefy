@@ -379,7 +379,10 @@ const MIN_TOTAL = COLUMN_MIN[0] + COLUMN_MIN[1] + COLUMN_MIN[2]
 const SEPARATOR_WIDTH = 10
 const KEY_STEP = 16
 const KEY_STEP_LARGE = 48
-const DEFAULT_WIDTHS: Widths = [556, 322, 386]
+// Column 1 no longer opens as the widest: the operator asked for the live column to start
+// with the width Leads had, and to give Leads the width the live had. Both stay inside the
+// minimums and both remain adjustable with the separators.
+const DEFAULT_WIDTHS: Widths = [386, 322, 556]
 const NARROW_QUERY = '(max-width: 1100px)'
 type Widths = [number, number, number]
 

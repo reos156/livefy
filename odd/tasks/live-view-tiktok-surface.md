@@ -128,3 +128,5 @@ L11 (#41, agent): the ingestor line and its note ("El login visual no autentica 
 L12 (#41, agent): `LIVE_ZOOM` is 0.5, not 0.8. Measured against the operator's window (1546 px wide, column 1 at ~410 DIP), 0.8 gave the page ~512 CSS px and the comment rail still clipped; half scale gives ~820, which is what TikTok's desktop live layout needs. The human chose the smaller everything over widening the column or a second window.
 
 L13 (#41, agent): `LIVE_ZOOM` is 0.9. Half scale was rejected as too small; at 0.9 the type and video stay near real size and the comment rail clips again (~456 CSS px of the ~1000 the layout wants). The trade is explicit: the operator keeps readable content and buys the rail back by widening the column, which the dividers already allow.
+
+L14 (#41, agent): the default split is now `[386, 322, 556]` — column 1 and column 3 swapped their opening widths at the operator's request, so the live column starts narrow and Leads starts wide. Both stay above their minimums and the separators still adjust. `LIVE_ZOOM` returned to 0.8, since 0.5 was unreadable and 0.9 did not remove the clipping.
