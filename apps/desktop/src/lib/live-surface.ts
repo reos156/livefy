@@ -71,5 +71,25 @@ export function useLiveSurface() {
     setStatus(await bridge.unmount())
   }, [bridge])
 
-  return { available: Boolean(bridge), status, frame, report, mount, unmount }
+  // The guest is a sibling of this document, not a child of it, so nothing about a renderer
+  // teardown closes it: routing to another screen unmounts the panel without a document
+  // reload, and the surface would stay attached at its old rectangle, playing audio and
+  // swallowing pointer events over the next screen. The effect runs once; this is its
+  // release. It deliberately touches no state, because the component is going away.
+  useEffect(() => {
+    if (!bridge) return
+    return () => {
+      void bridge.unmount().catch(() => {})
+    }
+  }, [bridge])
+
+  // A failed guest is replaced, not repaired: the renderer owns no part of it, so retrying
+  // means releasing it and mounting a fresh one.
+  const restart = useCallback(async () => {
+    if (!bridge) return
+    await unmount()
+    await mount()
+  }, [bridge, mount, unmount])
+
+  return { available: Boolean(bridge), status, frame, report, mount, unmount, restart }
 }

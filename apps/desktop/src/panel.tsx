@@ -17,7 +17,7 @@ import {
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Alert, AlertAction, AlertDescription } from '@/components/ui/alert'
 import { Spinner } from '@/components/ui/spinner'
 import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/card'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -241,12 +241,17 @@ function LiveColumn({ connection }: { connection: LiveConnection | null }) {
     </p>
     {status.state === 'failed' && <Alert variant="destructive" role="alert">
       <AlertDescription>{`TikTok no cargó: ${status.reason}. Revisá la conexión y reintentá.`}</AlertDescription>
+      <AlertAction>
+        <Button variant="outline" size="xs" onClick={() => { void live.restart() }}>Reintentar</Button>
+      </AlertAction>
     </Alert>}
+    {/* One status element: the spinner is decoration next to the sentence, not a second
+        announcement of the same load. */}
     {status.state === 'loading' && <p role="status" className="flex items-center gap-2 text-xs text-muted-foreground">
-      <Spinner /> Cargando TikTok…
+      <Spinner aria-hidden="true" role="presentation" /> Cargando TikTok…
     </p>}
-    {/* The guest paints over this rectangle. The empty state stays underneath, so the
-        column explains itself before the operator opens a live and never invents data. */}
+    {/* The guest paints over this rectangle, so the empty state belongs to `idle` alone:
+        during a load or after a failure it would contradict what the column just said. */}
     <div
       ref={live.frame}
       role="region"
@@ -254,7 +259,7 @@ function LiveColumn({ connection }: { connection: LiveConnection | null }) {
       aria-busy={status.state === 'loading' || undefined}
       className="grid min-h-40 flex-1 place-items-center rounded-lg border border-dashed border-border bg-muted p-4 text-center"
     >
-      {status.state !== 'ready' && <div>
+      {status.state === 'idle' && <div>
         <p className="text-xs font-medium text-foreground">Ningún live conectado</p>
         <p className="text-xs text-muted-foreground">Al conectar, el live se abre en una superficie aislada, sin Node y con sandbox.</p>
       </div>}

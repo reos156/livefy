@@ -45,23 +45,50 @@ function hardenLiveContents(contents) {
       if (!isAllowedLiveUrl(url)) event.preventDefault()
     })
   }
+  // `will-navigate` is main-frame only, so an embedded document could still navigate
+  // itself off TikTok. This handler receives a single details object, not `(event, url)`.
+  contents.on('will-frame-navigate', details => {
+    if (!isAllowedLiveUrl(details.url)) details.preventDefault()
+  })
   contents.on('will-attach-webview', event => event.preventDefault())
 }
 
 function whole(value) {
-  return typeof value === 'number' && Number.isInteger(value) && value >= 0
+  return typeof value === 'number' && Number.isInteger(value)
+}
+
+function length(value) {
+  return whole(value) && value > 0
 }
 
 // Bounds arrive from the renderer, so they are numbers the main process must not trust:
-// halves a compositor could reject, negatives that would throw, or strings from a broken
-// sender. Anything that is not four whole non-negative numbers with a visible area is
-// refused instead of clamped, because a silently moved surface hides the bug.
+// halves a compositor could reject, coordinates of another type, or strings from a broken
+// sender. Anything that is not four whole numbers with a visible area is refused instead
+// of clamped, because a silently moved surface hides the bug. A negative origin is kept:
+// an anchor scrolled past the top or left edge reports one, and the parent clips the view.
 function parseBounds(value) {
   if (!value || typeof value !== 'object') return null
   const { x, y, width, height } = value
-  if (!whole(x) || !whole(y) || !whole(width) || !whole(height)) return null
-  if (width === 0 || height === 0) return null
+  if (!whole(x) || !whole(y)) return null
+  if (!length(width) || !length(height)) return null
   return { x, y, width, height }
+}
+
+// `getBoundingClientRect` speaks CSS pixels and `setBounds` speaks DIPs, so the renderer's
+// rectangle has to be scaled by the window zoom before it is applied. A missing or
+// unusable factor means the default zoom; a shape that is not four numbers is refused
+// rather than rounded into something plausible (rounding would coerce `'300'` to 300).
+function toViewBounds(bounds, zoomFactor) {
+  if (!bounds || typeof bounds !== 'object') return null
+  const { x, y, width, height } = bounds
+  if (![x, y, width, height].every(value => typeof value === 'number' && Number.isFinite(value))) return null
+  const factor = typeof zoomFactor === 'number' && Number.isFinite(zoomFactor) && zoomFactor > 0 ? zoomFactor : 1
+  return {
+    x: Math.round(x * factor),
+    y: Math.round(y * factor),
+    width: Math.round(width * factor),
+    height: Math.round(height * factor),
+  }
 }
 
 function createLiveSurface(WebContentsView) {
@@ -138,5 +165,6 @@ module.exports = {
   isAllowedLiveUrl,
   hardenLiveContents,
   parseBounds,
+  toViewBounds,
   createLiveSurface,
 }

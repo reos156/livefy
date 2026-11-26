@@ -5,7 +5,7 @@ const { createTokenStorage } = require('./clerk-storage.cjs')
 const { rendererHandler } = require('./protocol.cjs')
 const path = require('node:path')
 const { DEV_URL, webPreferences, secureContents } = require('./security.cjs')
-const { createLiveSurface } = require('./live-surface.cjs')
+const { createLiveSurface, toViewBounds } = require('./live-surface.cjs')
 
 const development = !app.isPackaged && process.argv.includes('--livefy-dev')
 // This file is bundled to dist/main.cjs (electron/build-main.mjs); the unbundled
@@ -121,7 +121,9 @@ if (bridge.isPrimaryInstance) app.whenReady().then(() => {
   ipcMain.handle('livefy:live-surface-bounds', (event, ...args) => {
     requireRenderer(event)
     if (args.length !== 1) throw new Error('Denied')
-    return liveSurface.setBounds(args[0])
+    // The renderer measures in CSS pixels; the compositor positions in DIPs. At any zoom
+    // other than 1 the rectangle would drift, so the zoom factor is applied here.
+    return liveSurface.setBounds(toViewBounds(args[0], event.sender.zoomFactor))
   })
   ipcMain.handle('livefy:live-surface-unmount', (event, ...args) => {
     requireRenderer(event)

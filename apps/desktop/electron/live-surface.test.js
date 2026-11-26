@@ -1,9 +1,49 @@
 // @vitest-environment node
+import { EventEmitter } from 'node:events'
 import { describe, expect, it, vi } from 'vitest'
 import live from './live-surface.cjs'
 
 // The surface loads third-party content, so every assertion here is about a boundary:
 // what it may load, what it may ask for, and who decides where it sits.
+
+// Electron hands out real emitters, so the stubs are emitters too: `emit` runs exactly the
+// listeners the production code registered, and `listenerCount` can count them.
+function sessionStub() {
+  const session = new EventEmitter()
+  session.setPermissionRequestHandler = vi.fn()
+  session.setPermissionCheckHandler = vi.fn()
+  return session
+}
+
+function contentsStub(session = sessionStub()) {
+  const contents = new EventEmitter()
+  contents.session = session
+  contents.setWindowOpenHandler = vi.fn()
+  return contents
+}
+
+class Guest extends EventEmitter {
+  constructor() {
+    super()
+    this.session = sessionStub()
+    this.setWindowOpenHandler = vi.fn()
+    this.loadURL = vi.fn(() => Promise.resolve())
+    this.close = vi.fn()
+  }
+}
+
+function viewClass(views) {
+  return class FakeView {
+    constructor(options) {
+      this.options = options
+      this.webContents = new Guest()
+      this.bounds = null
+      views.push(this)
+    }
+    setBounds(next) { this.bounds = next }
+  }
+}
+
 describe('live surface boundary', () => {
   it('isolates the guest in its own persistent partition without Node or preload', () => {
     expect(live.liveWebPreferences).toEqual({
@@ -35,14 +75,8 @@ describe('live surface boundary', () => {
   })
 
   it('denies permissions, popups, downloads, webviews and off-domain navigation', () => {
-    const handlers = {}
-    const session = {
-      handlers: {},
-      setPermissionRequestHandler: vi.fn(),
-      setPermissionCheckHandler: vi.fn(),
-      on(name, fn) { this.handlers[name] = fn },
-    }
-    const contents = { session, on: (name, fn) => { handlers[name] = fn }, setWindowOpenHandler: vi.fn() }
+    const session = sessionStub()
+    const contents = contentsStub(session)
     live.hardenLiveContents(contents)
 
     const callback = vi.fn()
@@ -52,55 +86,84 @@ describe('live surface boundary', () => {
     expect(contents.setWindowOpenHandler.mock.calls[0][0]({ url: 'https://www.tiktok.com' })).toEqual({ action: 'deny' })
 
     const blocked = { preventDefault: vi.fn() }
-    handlers['will-navigate'](blocked, 'https://accounts.google.com/')
+    contents.emit('will-navigate', blocked, 'https://accounts.google.com/')
     expect(blocked.preventDefault).toHaveBeenCalledOnce()
 
     const allowed = { preventDefault: vi.fn() }
-    handlers['will-navigate'](allowed, 'https://www.tiktok.com/@someone/live')
+    contents.emit('will-navigate', allowed, 'https://www.tiktok.com/@someone/live')
     expect(allowed.preventDefault).not.toHaveBeenCalled()
 
+    const redirected = { preventDefault: vi.fn() }
+    contents.emit('will-redirect', redirected, 'https://evil.test/')
+    expect(redirected.preventDefault).toHaveBeenCalledOnce()
+
     const webview = { preventDefault: vi.fn() }
-    handlers['will-attach-webview'](webview)
+    contents.emit('will-attach-webview', webview)
     expect(webview.preventDefault).toHaveBeenCalledOnce()
 
     const download = { preventDefault: vi.fn() }
-    session.handlers['will-download'](download)
+    session.emit('will-download', download)
     expect(download.preventDefault).toHaveBeenCalledOnce()
   })
 
-  it('hardens the shared partition session only once', () => {
-    const session = {
-      handlers: {},
-      setPermissionRequestHandler: vi.fn(),
-      setPermissionCheckHandler: vi.fn(),
-      on(name, fn) { this.handlers[name] = fn },
-    }
-    const make = () => ({ session, on: vi.fn(), setWindowOpenHandler: vi.fn() })
-    live.hardenLiveContents(make())
-    live.hardenLiveContents(make())
-    // A second `will-download` listener would be dead weight, not a second denial.
-    expect(Object.keys(session.handlers)).toEqual(['will-download'])
+  // Electron 41 fires `will-navigate` for the main frame only, so an embedded document
+  // could otherwise navigate itself off TikTok inside the guest.
+  it('guards subframe navigations too', () => {
+    const contents = contentsStub()
+    live.hardenLiveContents(contents)
+
+    const blocked = { url: 'https://accounts.google.com/o/oauth2', preventDefault: vi.fn() }
+    contents.emit('will-frame-navigate', blocked)
+    expect(blocked.preventDefault).toHaveBeenCalledOnce()
+
+    const allowed = { url: 'https://www.tiktok.com/embed/123', preventDefault: vi.fn() }
+    contents.emit('will-frame-navigate', allowed)
+    expect(allowed.preventDefault).not.toHaveBeenCalled()
   })
 
-  it('accepts only whole, non-negative bounds', () => {
+  it('hardens the shared partition session only once', () => {
+    const session = sessionStub()
+    live.hardenLiveContents(contentsStub(session))
+    live.hardenLiveContents(contentsStub(session))
+    // A second `will-download` listener would be dead weight, not a second denial.
+    expect(session.listenerCount('will-download')).toBe(1)
+    const download = { preventDefault: vi.fn() }
+    session.emit('will-download', download)
+    expect(download.preventDefault).toHaveBeenCalledOnce()
+  })
+
+  it('accepts whole bounds, including a rectangle clipped above the viewport', () => {
     expect(live.parseBounds({ x: 10, y: 20, width: 300, height: 200 })).toEqual({ x: 10, y: 20, width: 300, height: 200 })
-    expect(live.parseBounds({ x: -5, y: 0, width: 300, height: 200 })).toBeNull()
+    // An anchor scrolled past the top or left edge reports a negative offset; the view is
+    // clipped by its parent, so the negative origin is legitimate and must not be refused.
+    expect(live.parseBounds({ x: -5, y: -120, width: 300, height: 200 })).toEqual({ x: -5, y: -120, width: 300, height: 200 })
     expect(live.parseBounds({ x: 0, y: 0, width: 0, height: 200 })).toBeNull()
+    expect(live.parseBounds({ x: 0, y: 0, width: 300, height: 0 })).toBeNull()
+    expect(live.parseBounds({ x: 0.5, y: 0, width: 300, height: 200 })).toBeNull()
     expect(live.parseBounds({ x: 0, y: 0, width: 300.5, height: 200 })).toBeNull()
     expect(live.parseBounds({ x: '0', y: 0, width: 300, height: 200 })).toBeNull()
+    expect(live.parseBounds({ x: 0, y: 0, width: '300', height: 200 })).toBeNull()
     expect(live.parseBounds(null)).toBeNull()
+  })
+
+  // `getBoundingClientRect` speaks CSS pixels, `setBounds` speaks DIPs: at any zoom other
+  // than 1 the rectangle drifts unless the factor is applied.
+  it('converts the renderer rectangle from CSS pixels to DIPs', () => {
+    const css = { x: 8, y: 12, width: 640, height: 360 }
+    expect(live.toViewBounds(css, 1)).toEqual({ x: 8, y: 12, width: 640, height: 360 })
+    expect(live.toViewBounds(css, 1.25)).toEqual({ x: 10, y: 15, width: 800, height: 450 })
+    expect(live.toViewBounds({ x: 10, y: 20, width: 300, height: 200 }, 0.9)).toEqual({ x: 9, y: 18, width: 270, height: 180 })
+    expect(live.toViewBounds(css, undefined)).toEqual(css)
+    expect(live.toViewBounds(css, 0)).toEqual(css)
+    expect(live.toViewBounds(css, Number.NaN)).toEqual(css)
+    // Untrusted shapes are refused here rather than rounded into something plausible.
+    expect(live.toViewBounds({ x: '8', y: 12, width: 640, height: 360 }, 1)).toBeNull()
+    expect(live.toViewBounds(null, 1)).toBeNull()
   })
 
   it('mounts into the window, positions the view and unmounts it', () => {
     const views = []
-    class FakeView {
-      constructor(options) { this.options = options; this.bounds = null; this.closed = false; views.push(this)
-        this.webContents = { on: vi.fn(), setWindowOpenHandler: vi.fn(), loadURL: vi.fn(() => Promise.resolve()), close: vi.fn(() => { this.closed = true }), session: sessionStub() } }
-      setBounds(next) { this.bounds = next }
-    }
-    function sessionStub() {
-      return { setPermissionRequestHandler: vi.fn(), setPermissionCheckHandler: vi.fn(), on: vi.fn() }
-    }
+    const FakeView = viewClass(views)
     const window = { contentView: { addChildView: vi.fn(), removeChildView: vi.fn() } }
     const surface = live.createLiveSurface(FakeView)
 
@@ -119,32 +182,27 @@ describe('live surface boundary', () => {
 
     surface.setBounds({ x: 8, y: 9, width: 640, height: 360 })
     expect(view.bounds).toEqual({ x: 8, y: 9, width: 640, height: 360 })
-    surface.setBounds({ x: -1, y: 0, width: 640, height: 360 })
-    expect(view.bounds).toEqual({ x: 8, y: 9, width: 640, height: 360 })
+    surface.setBounds({ x: -12, y: -34, width: 640, height: 360 })
+    expect(view.bounds).toEqual({ x: -12, y: -34, width: 640, height: 360 })
+    // An unusable rectangle leaves the last good one in place instead of half-applying.
+    surface.setBounds({ x: 0, y: 0, width: 640, height: 0 })
+    expect(view.bounds).toEqual({ x: -12, y: -34, width: 640, height: 360 })
 
     surface.unmount(window)
     expect(window.contentView.removeChildView).toHaveBeenCalledWith(view)
-    expect(view.closed).toBe(true)
+    expect(view.webContents.close).toHaveBeenCalledOnce()
     expect(surface.status()).toEqual({ mounted: false, state: 'idle' })
   })
 
   it('reports a failed load honestly instead of an empty column', () => {
     const seen = []
-    class FakeView {
-      constructor() {
-        this.webContents = { handlers: {}, setWindowOpenHandler: vi.fn(), loadURL: vi.fn(() => Promise.resolve()),
-          session: { setPermissionRequestHandler: vi.fn(), setPermissionCheckHandler: vi.fn(), on: vi.fn() },
-          on(name, fn) { this.handlers[name] = fn }, close: vi.fn() }
-      }
-      setBounds() {}
-    }
-    const surface = live.createLiveSurface(FakeView)
+    const surface = live.createLiveSurface(viewClass([]))
     surface.subscribe(status => seen.push(status))
     surface.mount({ contentView: { addChildView: vi.fn(), removeChildView: vi.fn() } })
     const guest = surface.view().webContents
-    guest.handlers['did-finish-load']()
+    guest.emit('did-finish-load')
     expect(surface.status().state).toBe('ready')
-    guest.handlers['did-fail-load']({}, -105, 'NAME_NOT_RESOLVED', 'https://www.tiktok.com/', true)
+    guest.emit('did-fail-load', {}, -105, 'NAME_NOT_RESOLVED', 'https://www.tiktok.com/', true)
     expect(surface.status()).toEqual({ mounted: true, state: 'failed', reason: 'NAME_NOT_RESOLVED' })
     expect(seen.at(-1)).toEqual({ mounted: true, state: 'failed', reason: 'NAME_NOT_RESOLVED' })
   })

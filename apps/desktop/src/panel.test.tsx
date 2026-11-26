@@ -182,8 +182,8 @@ describe('panel — the live surface', () => {
     const bridge = bridgeStub()
     window.livefyLive = bridge.api
     state.stats = stats
-    render(<Panel onEditStore={() => {}} />)
-    return bridge
+    const view = render(<Panel onEditStore={() => {}} />)
+    return { ...bridge, view }
   }
 
   it('offers the live only where the native surface exists', () => {
@@ -229,6 +229,65 @@ describe('panel — the live surface', () => {
     const alert = screen.getByRole('alert')
     expect(alert.textContent).toContain('NAME_NOT_RESOLVED')
     expect(screen.getByRole('region', { name: 'Superficie del live de TikTok' })).toBeTruthy()
+    // A failure is not an empty column: the empty state would contradict the alert.
+    expect(screen.queryByText('Ningún live conectado')).toBeNull()
+  })
+
+  // The copy says "reintentá"; without a control that sentence asks for something the
+  // operator cannot do. The retry releases the failed guest and mounts a fresh one.
+  it('offers a retry that recreates the surface after a failure', async () => {
+    const bridge = renderWithSurface()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir el live de TikTok' }))
+    await act(async () => {})
+    act(() => bridge.emit({ mounted: true, state: 'failed', reason: 'NAME_NOT_RESOLVED' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }))
+    await act(async () => {})
+
+    expect(bridge.calls.filter(call => call !== 'bounds')).toEqual(['mount', 'unmount', 'mount'])
+    // The retry re-attaches, so the explicit close is still there afterwards.
+    expect(screen.getByRole('button', { name: 'Cerrar visor' })).toBeTruthy()
+  })
+
+  it('states the empty column only before the operator asks for the live', async () => {
+    renderWithSurface()
+
+    expect(screen.getByText('Ningún live conectado')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir el live de TikTok' }))
+    await act(async () => {})
+
+    expect(screen.getByText('Cargando TikTok…')).toBeTruthy()
+    expect(screen.queryByText('Ningún live conectado')).toBeNull()
+  })
+
+  it('announces loading through exactly one status element', async () => {
+    renderWithSurface()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir el live de TikTok' }))
+    await act(async () => {})
+
+    const statuses = screen.getAllByRole('status')
+    expect(statuses).toHaveLength(1)
+    expect(statuses[0].textContent).toContain('Cargando TikTok…')
+    // The spinner is decoration next to the sentence, not a second announcement.
+    expect(statuses[0].querySelector('svg')?.getAttribute('aria-hidden')).toBe('true')
+  })
+
+  // Client-side routing swaps the panel out without reloading the document, so nothing
+  // else would ever detach the guest: it would keep playing and swallowing pointer events
+  // over the next screen at its old rectangle, with no visible control to close it.
+  it('releases the surface when the panel unmounts', async () => {
+    const bridge = renderWithSurface()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir el live de TikTok' }))
+    await act(async () => {})
+    act(() => bridge.emit({ mounted: true, state: 'ready' }))
+
+    bridge.view.unmount()
+    await act(async () => {})
+
+    expect(bridge.api.unmount).toHaveBeenCalledOnce()
   })
 
   it('closes the surface when the operator asks', async () => {
