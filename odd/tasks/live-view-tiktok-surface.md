@@ -124,3 +124,5 @@ L9 (agent, inline): the `will-navigate`/`will-redirect` guard read the deprecate
 L10 (#41, agent): the first column's header is one row again — the field's label is assistive-only, so the operator sees title, field and actions together — and the isolation/login sentence is gone. The guest now renders at `LIVE_ZOOM = 0.8` because TikTok clipped its comment rail at the column's width; the human chose the fixed 80 % over a visible zoom control, accepting smaller video and type.
 
 L11 (#41, agent): the ingestor line and its note ("El login visual no autentica al ingestor. Cerrar la app detiene sólo la captura local, no el live comercial.") left the first column. With no ingestor behind them they measured nothing; the scope's S6 health reading has no UI surface until R6 exists.
+
+L12 (#41, agent): `LIVE_ZOOM` is 0.5, not 0.8. Measured against the operator's window (1546 px wide, column 1 at ~410 DIP), 0.8 gave the page ~512 CSS px and the comment rail still clipped; half scale gives ~820, which is what TikTok's desktop live layout needs. The human chose the smaller everything over widening the column or a second window.

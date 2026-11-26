@@ -204,9 +204,10 @@ describe('live surface boundary', () => {
     expect(window.contentView.addChildView).toHaveBeenCalledWith(view)
     expect(view.options.webPreferences).toEqual(live.liveWebPreferences)
     expect(view.webContents.loadURL).toHaveBeenCalledWith('https://www.tiktok.com/@mundokawaii/live')
-    // The rail TikTok clips at the column's width fits once the page renders at 80 %.
-    expect(live.LIVE_ZOOM).toBe(0.8)
-    expect(view.webContents.setZoomFactor).toHaveBeenCalledWith(0.8)
+    // At half scale the column's rectangle gives TikTok the ~820 CSS px its live layout needs
+    // for the comment rail; at 0.8 the rail still clipped.
+    expect(live.LIVE_ZOOM).toBe(0.5)
+    expect(view.webContents.setZoomFactor).toHaveBeenCalledWith(0.5)
     expect(surface.status()).toEqual({ mounted: true, state: 'loading' })
 
     // Mounting twice must reuse the single surface instead of stacking views.
