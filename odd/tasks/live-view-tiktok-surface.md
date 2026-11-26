@@ -1,0 +1,138 @@
+# Live view: TikTok surface and 3-column shell
+
+Issue: reos156/livefy#39 · Branch: `feat/live-view` · Base: `https-origin/main` @ `53dd449`
+
+## Specs
+
+S1 — La vista `/app/live` es alcanzable desde el sidebar del panel y queda marcada como activa.
+
+S2 — La columna 1 muestra TikTok en la partición `persist:tiktok`; el login manual persiste al cerrar y reabrir la app; el video y el audio se reproducen.
+
+S3 — La superficie corre con `sandbox: true`, `contextIsolation: true`, `nodeIntegration: false`, sin preload privilegiado, y `webviewTag: false` sigue igual, con `will-attach-webview` bloqueado.
+
+S4 — La navegación fuera de `tiktok.com` y sus CDN se bloquea, `window.open` se deniega, las descargas se bloquean y los permisos no justificados se deniegan; cada permiso permitido queda nombrado y justificado.
+
+S5 — `apps/desktop/electron/csp-policy.cjs` no cambia: ni `frame-src` ni `connect-src` admiten el origen de TikTok.
+
+S6 — Las columnas 2 y 3 declaran el estado vacío real, sin ceros ni métricas inventadas.
+
+S7 — `bun run typecheck`, `bun run build` y `bun run test` en verde desde la raíz, incluyendo los tests nuevos.
+
+S8 — El espejo de Windows queda sincronizado y el humano ejercita y acepta la pantalla.
+
+S9 — No se relajan CSP, `sandbox`, `contextIsolation`, navegación ni permisos; el renderer de producto no importa Electron ni Node.
+
+S10 — No se integra el contenedor `prototypes/tiktok-live-browser` (Docker + noVNC); no hay tablas `lives` ni `leads`, ni lectura de eventos, ni WhatsApp, ni ingestor.
+
+S11 — El renderer nombra un canal, nunca una URL: `livefy:live-surface-mount` recibe exactamente un argumento, el handle. `main` valida un patrón estricto (letras, dígitos, punto y guion bajo, 2–24 caracteres, al menos una letra o dígito), construye `https://www.tiktok.com/@<handle>/live` y lo comprueba contra la allowlist antes de cargar; un handle inválido se rechaza con error y nunca se carga.
+
+S12 — La columna 1 tiene un campo etiquetado para el handle (el `@` es adorno, no se teclea). El botón de abrir está deshabilitado mientras el campo está vacío o el handle es inválido (`aria-describedby` apunta al motivo visible). El último handle tecleado sobrevive mientras el panel sigue montado.
+
+S13 — El visor ocupa el alto restante de la columna (`flex-1`, sin scroll interno y con un piso de alto) y el rectángulo sigue a la columna en el colapso de la barra lateral, el resize de la ventana y el cambio de ancho de columna.
+
+S14 — Reparto ajustable: dos separadores visibles y arrastrables con `role="separator"`, `aria-orientation="vertical"`, `aria-valuenow/valuemin/valuemax/valuetext`, puntero y teclado (flechas 16 px, `Shift`+flecha 48 px), mínimos de 340 px (live) y 240 px (productos); una sola columna con los separadores ausentes bajo el ancho del artboard (1100 CSS px). Los anchos son estado de sesión, no persistido, y ningún resize deja el visor sin alto ni el espacio con desbordamiento horizontal.
+
+S15 — El panel no pinta la fila de cinco KPI ni la leyenda de seis estados. La consulta de dashboard y su contrato `metrics` no cambian; el estado de conexión sigue legible en el badge de la barra superior mediante `connectionCopy`. La línea del ingestor y la nota «El login visual no autentica al ingestor» se conservan.
+
+S16 — Una carga deja de estar «Cargando» cuando el documento está listo (`dom-ready`), `did-finish-load` es el mismo final y un fallo conserva su motivo por encima del documento de error que Chromium pinta después.
+
+## Tasks
+
+| ID | Task | Specs | Route | Commit |
+|---|---|---|---|---|
+| T1 | Design directions for the live view shell | S1, S6 | dropped — the 3-column shell already exists in `panel.tsx` | — |
+| T2 | TikTok surface in main: `WebContentsView` on `persist:tiktok` + hardening policy | S2, S3, S4, S5, S9 | inline | af932f8 |
+| T3 | IPC allowlist: mount, unmount, bounds, state — with argument validation | S1, S3 | inline | af932f8 |
+| T4 | Live surface mounted in the first column of the panel, honest empty states | S1, S6 | inline | b51921f |
+| T5 | Tests: surface hardening policy and guest wiring | S3, S4, S5, S7 | inline | af932f8 |
+| T6 | Tests: first column with and without the native surface | S6, S7 | inline | b51921f |
+| T7 | Docs: acceptance matrix and partition persistence note | S7 | inline | b51921f |
+| T8 | Checks, Windows mirror sync, human acceptance | S7, S8 | inline | — (pending) |
+| T9 | #40: handle en `main` — patrón estricto, construcción de URL y rechazo con error | S11 | inline | — (pending) |
+| T10 | #40: campo de canal en la columna 1, botón deshabilitado con motivo | S12 | inline | — (pending) |
+| T11 | #40: visor al alto restante de la columna | S13 | inline | — (pending) |
+| T12 | #40: reparto ajustable con dos separadores accesibles | S14 | inline | — (pending) |
+| T13 | #40: panel sin fila de KPI ni leyenda de estados | S15 | inline | — (pending) |
+| T14 | #40: fin de la carga en `dom-ready` y fallo que conserva su motivo | S16 | inline | — (pending) |
+| T15 | #40: tests de todo lo anterior, README y espejo de Windows | S12–S16, S7, S8 | inline | — (pending) |
+
+## Log
+
+L1 (user): "Decime por cuál arrancamos y lo primero que hago es el issue, para que lo aprobues antes de que escriba una"
+
+L2 (user): "usa el prototipo de tiktok que ya esta probado y funcional, seria adaptarlo a la app"
+
+L3 (user): "el prototipo al que me referia era a este \proyectos\livefy\code\worktrees\mvp\prototypes\electron-spike"
+
+L4 (user): "aceptado el issue #39, implementalo"
+
+L5 (decision, agent): the spike's `<webview partition="persist:tiktok">` is not transferable as markup: the app freezes `webPreferences` with `webviewTag: false` and cancels `will-attach-webview`, and the scope forbids relaxing sandbox/CSP/navigation. The surface becomes a `WebContentsView` owned by the main process; the spike contributes what it proved (TikTok loads and manual login persists in Electron's Chromium), not its markup.
+## Delivery notes
+
+**Deviation — no `/app/live` route.** S1 named a route and a sidebar entry, written before
+the code was read. The panel (`src/panel.tsx`) already *is* the three-column live workspace:
+`LiveColumn`, `ProductsColumn` and `LeadsColumn` with the visual contract from the README.
+Adding a second route that renders the same screen would duplicate it, so the surface opens
+in the existing first column and the sidebar's `Panel` entry stays current. A separate route
+becomes meaningful only when the live workspace stops being the panel body.
+
+**Deviation — no design directions.** T1 was planned because the issue assumed a new screen.
+The screen exists with an accepted visual contract (`.dark`, semantic tokens, installed
+primitives), and the change fills a rectangle without restyling anything. Running the design
+round would have proposed a second look nobody asked for. Reversible: if the operator wants
+a different live layout, it is a new issue with its own directions.
+
+**Design directions for the #40 adjustment.** `design/live-canales/` holds three
+alternatives for the panel without the KPI row and with a full-height viewer plus the channel
+field: `01-channel-bar-full-height.html`, `02-viewer-with-status-rail.html`,
+`03-resizable-split.html`. None is handed off yet; the human picks one. The earlier "no design
+directions" note above still describes #39 only.
+
+**Slice boundary.** Two commits, `af932f8` (main-process boundary, IPC, hardening, its tests,
+feature document — 438 authored lines) and `b51921f` (renderer hook, panel, panel tests,
+README — 240 authored lines). The boundary commit is the high-risk one and can be reviewed
+alone.
+
+**Known limits, recorded rather than hidden.** Third-party OAuth (Google/Apple) navigates off
+`tiktok.com` and is therefore blocked by the navigation allowlist; manual login has to use
+phone or email. The surface carries no event ingestion, so columns 2 and 3 stay empty.
+Nothing here has been exercised in the packaged Windows app yet.
+
+L6 (#40, design, agent): `design/live-canales/` for the panel adjustment — 01-channel-bar-full-height.html, 02-viewer-with-status-rail.html, 03-resizable-split.html. No artboard handed off yet; all three are alternatives until the human picks one.
+
+L7 (#40, decision, human + agent): the chosen artboard is `design/live-canales/03-resizable-split.html` (resizable split); `01-channel-bar-full-height.html` and `02-viewer-with-status-rail.html` stay as the alternatives. The canvas comment on the artboard was applied: the six-state chip list leaves column 1 ("No veo tan necesarios estos estados, se puede eliminar?") and the connection state stays readable in the top bar badge through `connectionCopy`. New tasks T9–T15 (specs S11–S16) carry the adjustment: the renderer names a handle instead of a URL, the viewer fills the column, the three columns are redistributed with two accessible separators, the KPI row and the legend are gone, and a finished document ends the loading caption. Implemented in `apps/desktop` (`electron/live-surface.cjs`, `electron/main.cjs`, `electron/preload.cjs`, `src/lib/live-surface.ts`, `src/panel.tsx`, `src/vite-env.d.ts`, their tests and the README); nothing committed, built or mirrored yet.
+
+L8 (#40, fix, agent + independent verifier): two blockers reproduced against the committed surface. B1 — `fitWidths` clamped each track to 1 px instead of to its column minimum, so after a resize the tracks stopped summing to the measured width with every column at or above `COLUMN_MIN`: Products fell to 232 against its declared 240, separator 1 reported `aria-valuenow=401` outside its own `340…393`, and the keys shrank or under-stepped instead of moving the promised 16/48 px. The fit now shrinks only the slack above the three minimums (rounding lands on the column with the most room, so it can never push one under), and below `MIN_TOTAL` — the sum of the minimums plus both rails — the workspace stacks: the split has no honest shape there, and the stacked layout is the one the artboard already uses rather than a row that scrolls sideways (S14). B2 — `unmount()` published `{mounted:false,state:'idle'}` and the abandoned `loadURL(...).catch` then published `failed` over it, disabling "Abrir el live" and turning "Cerrar visor" into a no-op. Every mount is now a generation and nothing from a retired one can publish. The state machine also stops getting stuck: `loading` has exactly two exits (usable document, failure), `did-start-loading` has no transition at all (it used to erase the failure flag and put the caption back over a live), and a document navigation the allowlist blocked while loading is the failure it is. Two advisories fixed along the way: the allowlist gate in `mount` now runs before the reuse early return, and `src/vite-env.d.ts` ends in a newline.
+
+
+## #40 acceptance
+
+Verbatim from issue reos156/livefy#40 ("Criterios de aceptación"), so a verifier does not
+report them as missing.
+
+- **AC1** Escribir un canal válido habilita "Abrir el live"; vacío o inválido lo mantiene deshabilitado con el motivo visible.
+- **AC2** Abrir carga el live del canal escrito; la superficie muestra video y audio y permite el login manual.
+- **AC3** Ningún camino del renderer permite que main cargue una URL arbitraria: sólo el handle validado, y el resultado sigue pasando la allowlist de TikTok.
+- **AC4** La superficie ocupa toda la altura de la columna, sin scroll interno, y sigue alineada al colapsar la barra lateral y al redimensionar la ventana.
+- **AC5** El panel no muestra la fila de KPIs; las tres columnas siguen y ninguna métrica aparece inventada.
+- **AC6** El cartel "Cargando TikTok…" desaparece cuando la página queda usable; un fallo muestra el motivo y ofrece reintentar.
+- **AC7** `bun run typecheck`, `bun run test` y `bun run build` en verde desde la raíz.
+- **AC8** Espejo de Windows sincronizado y aceptación del humano ejerciendo la pantalla.
+
+L9 (agent, inline): the `will-navigate`/`will-redirect` guard read the deprecated `(event, url)` pair, so it could not tell a subframe from the document and marked the whole surface failed when a subframe left TikTok — a playing live replaced by "TikTok no cargó". It now reads the single details object Electron 41 declares and reports the block only when `isMainFrame !== false`.
+
+L10 (#41, agent): the first column's header is one row again — the field's label is assistive-only, so the operator sees title, field and actions together — and the isolation/login sentence is gone. The guest now renders at `LIVE_ZOOM = 0.8` because TikTok clipped its comment rail at the column's width; the human chose the fixed 80 % over a visible zoom control, accepting smaller video and type.
+
+L11 (#41, agent): the ingestor line and its note ("El login visual no autentica al ingestor. Cerrar la app detiene sólo la captura local, no el live comercial.") left the first column. With no ingestor behind them they measured nothing; the scope's S6 health reading has no UI surface until R6 exists.
+
+L12 (#41, agent): `LIVE_ZOOM` is 0.5, not 0.8. Measured against the operator's window (1546 px wide, column 1 at ~410 DIP), 0.8 gave the page ~512 CSS px and the comment rail still clipped; half scale gives ~820, which is what TikTok's desktop live layout needs. The human chose the smaller everything over widening the column or a second window.
+
+L13 (#41, agent): `LIVE_ZOOM` is 0.9. Half scale was rejected as too small; at 0.9 the type and video stay near real size and the comment rail clips again (~456 CSS px of the ~1000 the layout wants). The trade is explicit: the operator keeps readable content and buys the rail back by widening the column, which the dividers already allow.
+
+L14 (#41, agent): the default split is now `[386, 322, 556]` — column 1 and column 3 swapped their opening widths at the operator's request, so the live column starts narrow and Leads starts wide. Both stay above their minimums and the separators still adjust. `LIVE_ZOOM` returned to 0.8, since 0.5 was unreadable and 0.9 did not remove the clipping.
+
+L15 (#41, human): the opening split is `[400, 320, 544]`, set by the operator rather than derived. `fitWidths` keeps those proportions in the slack, so a window wider or narrower than his opens proportionally.
+
+L16 (#41, human acceptance): the operator confirmed in the Windows dev app that the manual TikTok login works from the desktop app and that commenting inside the live works. The column split 400/320/544 was accepted as it opens. Not reported, therefore still pending: live audio, the failed-load path with no network, the keyboard focus on a separator, the 340 px clamp, the single-column layout, and the collapsed sidebar. Recorded in the README matrix rather than claimed as a full pass.
+
+L17 (#41, human acceptance): live audio works, and the comment rail is not a defect — with the guest at 0.8 and the column's width, the operator reads the chat through the page scroll and accepted it as is. Together with L16 this closes the acceptance for the live view in the Windows dev app; the remaining matrix rows (failed load without network, separator keyboard focus, 340 px clamp, single-column layout, collapsed sidebar) stay pending and were never claimed.

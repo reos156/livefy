@@ -174,7 +174,7 @@ it('opens the store form from the panel and returns to it when the edit is saved
   // The form owns a path of its own, and it opens prefilled with the stored shop.
   expect(router.state.location.pathname).toBe('/app/store')
   expect((screen.getByLabelText('Nombre de la tienda') as HTMLInputElement).value).toBe('Mundo Kawaii')
-  expect(screen.queryByText('Lives activos')).toBeNull()
+  expect(screen.queryByRole('heading', { level: 2, name: 'Live de TikTok' })).toBeNull()
   // The edit form carries no session control: the panel that owns one is a step away.
   expect(screen.queryByRole('button', { name: 'Sign out' })).toBeNull()
 
@@ -185,8 +185,9 @@ it('opens the store form from the panel and returns to it when the edit is saved
 
   fireEvent.click(screen.getByRole('button', { name: 'Guardar tienda' }))
 
-  // Finishing the edit lands on the panel again, at its own path.
-  expect(await screen.findByText('Lives activos')).toBeTruthy()
+  // Finishing the edit lands on the panel again, at its own path. The panel is probed by
+  // its own column heading: the KPI row it used to carry is not painted any more.
+  expect(await screen.findByRole('heading', { level: 2, name: 'Live de TikTok' })).toBeTruthy()
   expect(router.state.location.pathname).toBe('/app')
   expect(data.mutation).toHaveBeenCalledTimes(1)
 
@@ -197,7 +198,7 @@ it('opens the store form from the panel and returns to it when the edit is saved
 
   // Leaving the form without saving also returns to the panel.
   fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
-  expect(await screen.findByText('Lives activos')).toBeTruthy()
+  expect(await screen.findByRole('heading', { level: 2, name: 'Live de TikTok' })).toBeTruthy()
   expect(router.state.location.pathname).toBe('/app')
   expect(data.mutation).toHaveBeenCalledTimes(1)
 })
@@ -225,7 +226,7 @@ it('keeps the store form on step 3 when the operator advances from step 2', asyn
 
   // Still the form, on its own path and its third step; the panel did not take over.
   expect(screen.getByLabelText('Número de WhatsApp')).toBeTruthy()
-  expect(screen.queryByText('Lives activos')).toBeNull()
+  expect(screen.queryByRole('heading', { level: 2, name: 'Live de TikTok' })).toBeNull()
   expect(router.state.location.href).toBe('/app/store?paso=3')
   // Advancing never saves: the save is what returns the operator to the panel.
   expect(data.mutation).not.toHaveBeenCalled()
@@ -255,7 +256,7 @@ it('keeps the store form and its step through a transient backend refresh', asyn
   // Nothing was saved, so whatever the form lost, it lost to the remount.
   expect(data.mutation).not.toHaveBeenCalled()
   // The refresh is transient: the surface and the step it was on survive it.
-  expect(screen.queryByText('Lives activos')).toBeNull()
+  expect(screen.queryByRole('heading', { level: 2, name: 'Live de TikTok' })).toBeNull()
   expect(await screen.findByText('Paso 2 de 3')).toBeTruthy()
   expect(router.state.location.pathname).toBe('/app/store')
   expect(data.mutation).not.toHaveBeenCalled()

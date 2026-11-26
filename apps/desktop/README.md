@@ -265,6 +265,60 @@ una matriz completa estrecha/ancha ni un challenge real. Esta guía no añade
 aceptación actual, no reabre los casos aceptados y no acepta el futuro cliente
 web; sus gates siguen siendo independientes en el [hito H1](../../odd/tasks/mvp-h1-access-windows.md).
 
+## Superficie del live de TikTok
+
+La columna 1 del panel abre TikTok en una superficie adaptable creada por el proceso
+principal (`electron/live-surface.cjs`), nunca por el renderer. El renderer informa un
+rectángulo, un canal y muestra el estado; no nombra una URL ni instancia un `<webview>`.
+
+| Aspecto | Contrato |
+| --- | --- |
+| Propiedad | `WebContentsView` creado en `main`; la superficie es hermana del renderer, no hija de su DOM. |
+| Canal | El renderer envía **sólo el handle** por `livefy:live-surface-mount`. `main` valida el patrón estricto (letras, dígitos, punto y guion bajo, 2–24 caracteres, al menos una letra o dígito), construye `https://www.tiktok.com/@<handle>/live` y lo comprueba contra la allowlist antes de cargar. Un handle inválido se rechaza con error y nunca se carga. |
+| Sesión | Partición `persist:tiktok`: sobrevive a reinicios. Borrar el directorio de particiones de `userData` pierde el login guardado en este equipo. |
+| Aislamiento | `sandbox: true`, `contextIsolation: true`, `nodeIntegration: false`, `webviewTag: false`, sin preload. |
+| Navegación | Sólo `https://` en `tiktok.com` y sus subdominios; el resto se cancela. Un login que salga del dominio (por ejemplo OAuth de Google o Apple) queda bloqueado: usar teléfono o email. |
+| Permisos | Ninguno concedido: pedidos y comprobaciones responden `false`. La reproducción de video y audio no los requiere. |
+| Ventanas y descargas | `window.open` en deny y `will-download` cancelado en la sesión de la partición. |
+| Estado | `idle`, `loading`, `ready` o `failed` con motivo; una carga fallida se muestra como error, no como rectángulo vacío. `ready` llega en `dom-ready` (y en `did-finish-load`, que es el mismo final); un fallo conserva su motivo. |
+| Escala | El guest renderiza al 80 % (`LIVE_ZOOM` en `electron/live-surface.cjs`). El riel de comentarios de TikTok pide ~1000 CSS px y sigue cortado en columnas angostas: ensanchar la columna es la palanca que lo devuelve. Bajar más el zoom fue rechazado por ilegible (0,5) y probado sin convencer (0,9). |
+
+El reparto de las tres columnas es estado de sesión: dos separadores arrastrables y, por
+teclado, flechas de 16 px y `Shift`+flecha de 48 px, con mínimos de 340 px (live) y 240 px
+(productos). Los anchos no se persisten y, bajo el ancho del artboard (1100 CSS px), el
+layout pasa a una columna y los separadores no se renderizan.
+
+La superficie no incorpora eventos: chat, regalos y leads son R4/R6 y todavía no existen.
+Las columnas 2 y 3 conservan su estado vacío real. La fila de cinco KPI dejó de pintarse
+(el contrato `metrics` de la consulta de dashboard no cambió) y la leyenda de seis estados
+salió de la columna: el estado de conexión se lee en el badge de la barra superior.
+
+### Matriz de aceptación de la vista de live (pendiente)
+
+Requiere ejecución en la app (DevTools de Electron, no el navegador) y la aceptación del
+humano. Ningún caso está aceptado todavía.
+
+| Pantalla/estado | Tema | Ancho × alto CSS | Entorno/método | Resultado |
+| --- | --- | --- | --- | --- |
+| Panel, visor sin abrir | claro / oscuro | registrar en DevTools | Electron dev | pendiente |
+| Panel, canal vacío (botón «Abrir el live» deshabilitado, motivo en `aria-describedby`) | claro / oscuro | registrar en DevTools | Electron dev | pendiente |
+| Panel, cargando | claro / oscuro | registrar en DevTools | Electron dev | pendiente |
+| Panel, live abierto con login guardado | claro / oscuro | ventana Electron en Windows dev | Electron dev | aceptado 2026-11-26 (humano, Windows dev: login de TikTok desde la app y comentarios dentro del live) |
+| Panel, live abierto con el visor a todo el alto de la columna | claro / oscuro | ventana Electron en Windows dev | Electron dev | aceptado 2026-11-26 (humano, Windows dev: login de TikTok desde la app y comentarios dentro del live) |
+| Panel, carga fallida (sin red) | claro / oscuro | registrar en DevTools | Electron dev | pendiente |
+| Panel, foco de teclado en un separador (flechas y `Shift`+flecha) | claro / oscuro | registrar en DevTools | Electron dev | pendiente |
+| Panel, reparto arrastrado hasta el mínimo de la columna live (340 px) | claro / oscuro | registrar en DevTools | Electron dev | pendiente |
+| Panel, layout de una columna bajo 1100 CSS px, sin separadores | claro / oscuro | registrar en DevTools | Electron dev | pendiente |
+| Panel, barra lateral colapsada | claro / oscuro | registrar en DevTools | Electron dev | pendiente |
+
+Reparto de columnas: **aceptado 2026-11-26** por el humano con los valores de apertura
+400 / 320 / 544 px. Siguen ajustables con los divisores y con el teclado.
+
+Riel de comentarios de TikTok: **aceptado 2026-11-26**. Con el zoom del guest en 0,8 y el
+ancho de la columna, el operador lee el chat completo usando el scroll de la página; no se
+trata como defecto. Se probaron 0,5 (ilegible) y 0,9 (sin mejora) antes de este valor.
+Audio del live: **aceptado 2026-11-26** por el mismo operador en la app de Windows.
+
 ## Historial H1.1/H1.2 (no describe los proveedores actuales)
 
 La base H1.1/H1.2 combina una ventana Electron aislada, una vista previa de acceso en React y un contrato de autenticación correo/contraseña y sesión activado en Convex DEV. La interfaz de registro/inicio de sesión, la recogida de credenciales en el renderizador y el empaquetado no están implementados. Los controles de acceso siguen deshabilitados; inicializar el proveedor no representa una autenticación correcta.

@@ -12,7 +12,7 @@
     "build": "vite build && node electron/build-preload.mjs && node electron/build-main.mjs",
     "dist:win": "bun run build && electron-builder --win",
     "dist:win:unpacked": "bun run build && electron-builder --win dir",
-    "typecheck": "tsc --noEmit && node --check electron/main.cjs && node --check electron/security.cjs",
+    "typecheck": "tsc --noEmit && node --check electron/main.cjs && node --check electron/security.cjs && node --check electron/live-surface.cjs",
     "test": "vitest run"
   },
   "devDependencies": {

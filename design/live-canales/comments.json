@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "comments": [
+    {
+      "id": "ppzdsg70",
+      "file": "03-resizable-split.html",
+      "selector": "#workspace > section:nth-of-type(1) > div:nth-of-type(1)",
+      "excerpt": "ESTADOS connected reconnecting offline suspended-risk disconnected ended",
+      "comment": "No veo tan necesarios estos estados, se puede eliminar?",
+      "createdAt": "2026-11-26T05:56:39.580Z",
+      "status": "resolved",
+      "sentAt": "2026-11-26T05:56:39.603Z",
+      "resolvedAt": "2026-11-26T06:12:06.173Z",
+      "resolution": "Los seis estados salieron del artboard (y de la pantalla): el visor gana ese alto y el estado sigue en el badge de la barra superior."
+    }
+  ]
+}

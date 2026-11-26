@@ -1,0 +1,28 @@
+{
+  "title": "Panel del operador — visor a columna completa y canal",
+  "brief": "Ajuste al panel del operador: la primera columna pide el canal de TikTok (handle, sin @) antes de abrir el live y sólo entonces habilita «Abrir el live», y el visor de TikTok ocupa toda la altura de la columna en lugar de compartirla con los seis chips de estado y la línea del ingestor. Las tres direcciones mantienen la misma pantalla ya acordada —sidebar, barra superior y columnas Live de TikTok, Productos y Leads— y cambian sólo la estructura de esa columna: canal en una barra compacta con el visor a sangre y los estados en una franja al pie; visor enmarcado a altura completa con un riel vertical de estados y salud del ingestor; o tres columnas con divisores arrastrables, canal en la cabecera, estados en un segmentado y visor al resto. Se muestran con contenido real (Mundo Kawaii, @mundokawaii, live abierto) para que la altura ganada se vea; el área de TikTok se dibuja con SVG y CSS porque el rectángulo nativo no admite imagen externa ni chrome propio encima.",
+  "feature": "odd/tasks/live-view-tiktok-surface.md",
+  "artboards": [
+    {
+      "file": "01-channel-bar-full-height.html",
+      "title": "Canal arriba, visor a sangre",
+      "tradeoff": "Compra altura para el video; los seis estados quedan en una franja que se lee peor que un control.",
+      "width": 1536,
+      "height": 864
+    },
+    {
+      "file": "02-viewer-with-status-rail.html",
+      "title": "Visor con riel de estado",
+      "tradeoff": "El riel libera la altura del video y deja leer cada estado al enfocarlo; la etiqueta aparece en el riel, nunca encima del rectángulo nativo.",
+      "width": 1536,
+      "height": 864
+    },
+    {
+      "file": "03-resizable-split.html",
+      "title": "Reparto ajustable",
+      "tradeoff": "El operador decide cuánto pesa cada columna; a cambio, el alto del visor depende de un ancho que puede volver a encoger.",
+      "width": 1536,
+      "height": 864
+    }
+  ]
+}

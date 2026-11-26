@@ -1,0 +1,576 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>03 · Reparto ajustable — Panel del operador de Livefy</title>
+<style>
+  /* Tokens copiados de apps/desktop/src/styles.css (:root y .dark). Nada inventado.
+     Las dos variables --stage-* no son tokens: representan el video que pinta el guest. */
+  :root {
+    color-scheme: light;
+    --background: oklch(1 0 0);
+    --foreground: oklch(0.285 0 0);
+    --card: oklch(1 0 0);
+    --card-foreground: oklch(0.285 0 0);
+    --primary: oklch(0.9347 0.1825 120.5229);
+    --primary-foreground: oklch(0 0 0);
+    --secondary: oklch(0.9692 0.0121 96.4218);
+    --secondary-foreground: oklch(0.285 0 0);
+    --muted: oklch(0.9845 0.0026 106.4477);
+    --muted-foreground: oklch(0.5103 0 0);
+    --accent: oklch(0.9353 0.1021 109.4248);
+    --accent-foreground: oklch(0.2994 0.0327 118.0959);
+    --destructive: oklch(0.5771 0.2152 27.325);
+    --border: oklch(0.9269 0.016 110.5685);
+    --input: oklch(0.9448 0.0134 115.8392);
+    --ring: oklch(0.9347 0.1825 120.5229);
+    --radius: 1rem;
+    --radius-sm: calc(var(--radius) * 0.6);
+    --radius-md: calc(var(--radius) * 0.8);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) * 1.4);
+    --font-sans: ui-sans-serif, system-ui, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+    --stage-bg: #0c0b12;
+    --stage-fg: #f7f5f2;
+  }
+  html.dark {
+    color-scheme: dark;
+    --background: oklch(0.2679 0.0036 106.6427);
+    --foreground: oklch(0.9576 0.0027 106.4494);
+    --card: oklch(0.2928 0.0018 106.5092);
+    --card-foreground: oklch(0.9818 0.0054 95.0986);
+    --primary: oklch(0.9347 0.1825 120.5229);
+    --primary-foreground: oklch(0.1913 0 0);
+    --secondary: oklch(0.9818 0.0054 95.0986);
+    --secondary-foreground: oklch(0.3085 0.0035 106.6039);
+    --muted: oklch(0.2213 0.0038 106.707);
+    --muted-foreground: oklch(0.7713 0.0169 99.0657);
+    --accent: oklch(0.213 0.0078 95.4245);
+    --accent-foreground: oklch(0.9663 0.008 98.8792);
+    --destructive: oklch(0.6368 0.2078 25.3313);
+    --border: oklch(0.3618 0.0101 106.8928);
+    --input: oklch(0.4336 0.0113 100.2195);
+    --ring: oklch(0.9347 0.1825 120.5229);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  html { font-family: var(--font-sans); }
+  body {
+    margin: 0; height: 100vh; display: flex; flex-direction: column; overflow: hidden;
+    background: var(--background); color: var(--foreground); font-size: 14px; line-height: 1.45;
+  }
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+    overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+  }
+  :focus-visible {
+    outline: 2px solid var(--foreground); outline-offset: 2px;
+    box-shadow: 0 0 0 5px color-mix(in oklch, var(--ring) 55%, transparent);
+  }
+  .skip-link {
+    position: absolute; top: 8px; left: 8px; z-index: 20; padding: 6px 10px;
+    border-radius: var(--radius-lg); background: var(--primary); color: var(--primary-foreground);
+    font-size: 12px; font-weight: 600; text-decoration: none; transform: translateY(-200%);
+  }
+  .skip-link:focus { transform: none; }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    height: 32px; padding: 0 10px; border: 1px solid transparent; border-radius: var(--radius-lg);
+    background: transparent; color: var(--foreground); font: inherit; font-size: 14px;
+    font-weight: 500; line-height: 1; cursor: pointer; white-space: nowrap;
+    transition: background-color 130ms ease, border-color 130ms ease, color 130ms ease;
+  }
+  .btn-sm { height: 28px; font-size: 13px; }
+  .btn-icon { width: 32px; padding: 0; }
+  .btn-icon.btn-sm { width: 28px; }
+  .btn-primary { background: var(--primary); color: var(--primary-foreground); }
+  .btn-primary:hover { background: color-mix(in oklch, var(--primary) 80%, var(--card)); }
+  .btn-outline { border-color: var(--border); background: var(--card); }
+  .btn-outline:hover { background: var(--muted); }
+  .btn-ghost { color: var(--muted-foreground); }
+  .btn-ghost:hover { background: var(--muted); color: var(--foreground); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn svg { flex: 0 0 auto; }
+
+  .shell { flex: 1; min-height: 0; display: grid; grid-template-columns: 220px minmax(0, 1fr); }
+
+  .sidebar {
+    display: flex; flex-direction: column; gap: 2px; min-height: 0; overflow: auto;
+    padding: 12px 10px; border-right: 1px solid var(--border); background: var(--card);
+  }
+  .brand { display: flex; align-items: center; gap: 9px; padding: 2px 4px 12px; }
+  .mark {
+    display: grid; place-items: center; width: 28px; height: 28px; flex: 0 0 auto;
+    border-radius: var(--radius-sm); background: var(--primary); color: var(--primary-foreground);
+    font-size: 13px; font-weight: 700;
+  }
+  .brand strong { font-size: 14px; font-weight: 600; }
+  .brand .btn { margin-left: auto; }
+  .nav-label {
+    margin: 0; padding: 10px 8px 4px; font-size: 11px; font-weight: 500;
+    letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted-foreground);
+  }
+  .nav-list { display: flex; flex-direction: column; gap: 1px; margin: 0; padding: 0; list-style: none; }
+  .nav-item {
+    display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 8px;
+    border: 0; border-radius: var(--radius-lg); background: transparent;
+    color: var(--muted-foreground); font: inherit; font-size: 12px; font-weight: 500;
+    text-align: left; text-decoration: none; cursor: pointer;
+  }
+  .nav-item svg { flex: 0 0 auto; }
+  .nav-item:hover { background: var(--muted); color: var(--foreground); }
+  .nav-item[aria-current="page"] { background: var(--muted); color: var(--foreground); font-weight: 600; }
+  .nav-item.is-soon { cursor: not-allowed; opacity: 0.55; }
+  .nav-item.is-soon:hover { background: transparent; color: var(--muted-foreground); }
+  .soon { margin-left: auto; font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase; }
+  .sidebar .grow { flex: 1; }
+
+  .main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  .topbar {
+    display: flex; align-items: center; gap: 10px; flex: 0 0 auto;
+    padding: 10px 16px; border-bottom: 1px solid var(--border); background: var(--card);
+  }
+  .shop { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 500; }
+  .shop svg { color: var(--muted-foreground); }
+  .spacer { flex: 1; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px; height: 20px; padding: 0 8px;
+    border: 1px solid var(--border); border-radius: calc(var(--radius) * 2.6);
+    font-size: 12px; font-weight: 500; color: var(--foreground); white-space: nowrap;
+  }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: 0 0 auto; }
+
+  /* Tres columnas con dos divisores arrastrables. JS fija los anchos en píxeles. */
+  .workspace {
+    flex: 1; min-height: 0; display: grid; align-items: stretch; gap: 0; padding: 16px;
+    grid-template-columns: 1.35fr 10px 1fr 10px 1.3fr;
+  }
+  .col {
+    display: flex; flex-direction: column; min-width: 0; min-height: 0;
+    border-radius: var(--radius-xl); background: var(--card); color: var(--card-foreground);
+    box-shadow: 0 0 0 1px color-mix(in oklch, var(--foreground) 10%, transparent);
+    overflow: hidden;
+  }
+  .col-head {
+    display: flex; align-items: center; gap: 7px; flex: 0 0 auto;
+    padding: 6px 8px; border-bottom: 1px solid var(--border);
+  }
+  .col-head h2 {
+    margin: 0; font-size: 11px; font-weight: 500; letter-spacing: 0.05em;
+    text-transform: uppercase; color: var(--muted-foreground); white-space: nowrap;
+  }
+  .col-head .push { margin-left: auto; }
+  .col-body {
+    flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px;
+    padding: 10px; overflow: auto;
+  }
+  .row {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 7px 10px; border: 1px solid var(--border); border-radius: var(--radius-md);
+    background: var(--muted); font-size: 12px;
+  }
+  .row strong { font-weight: 600; color: var(--foreground); }
+  .empty {
+    flex: 1; min-height: 120px; display: flex; flex-direction: column; justify-content: center;
+    gap: 3px; padding: 16px; text-align: center; border: 1px dashed var(--border);
+    border-radius: var(--radius-md); background: var(--muted); font-size: 12px;
+    color: var(--muted-foreground);
+  }
+  .empty .empty-title { margin: 0; font-weight: 500; color: var(--foreground); }
+  .empty p { margin: 0; }
+  .note { margin: 0; font-size: 11px; color: var(--muted-foreground); }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  th {
+    padding: 5px 4px; text-align: left; font-size: 10px; font-weight: 600;
+    letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted-foreground);
+    white-space: nowrap; border-bottom: 1px solid var(--border);
+  }
+
+  /* Divisor: 10px de carril con una línea y un agarre visible. */
+  .sep {
+    position: relative; display: flex; align-items: center; justify-content: center;
+    min-height: 0; cursor: col-resize; touch-action: none; color: var(--muted-foreground);
+  }
+  .sep::before {
+    content: ""; position: absolute; top: 4px; bottom: 4px; left: 50%; width: 1px;
+    transform: translateX(-50%);
+    background: color-mix(in oklch, var(--foreground) 16%, transparent);
+    transition: background-color 130ms ease;
+  }
+  .sep:hover::before, .sep:focus-visible::before { background: color-mix(in oklch, var(--foreground) 45%, transparent); }
+  .sep:hover { background: color-mix(in oklch, var(--foreground) 4%, transparent); }
+  .grip {
+    position: relative; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 3px; width: 18px; height: 44px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--card);
+    box-shadow: 0 1px 2px color-mix(in oklch, var(--foreground) 12%, transparent);
+    transition: border-color 130ms ease, background-color 130ms ease;
+  }
+  .sep:hover .grip { border-color: color-mix(in oklch, var(--foreground) 30%, transparent); background: var(--muted); }
+  .sep:focus-visible { outline: 2px solid var(--foreground); outline-offset: -1px; box-shadow: none; }
+  .sep:focus-visible .grip { border-color: var(--foreground); }
+  .grip i { width: 2px; height: 2px; border-radius: 50%; background: currentColor; }
+  body.dragging { user-select: none; cursor: col-resize; }
+
+  /* --- Columna Live: canal en la cabecera, leyenda segmentada, visor al resto --- */
+  .field {
+    display: flex; align-items: center; gap: 2px; flex: 1; min-width: 0; height: 32px;
+    padding: 0 10px; border: 1px solid var(--input); border-radius: var(--radius-lg);
+    background: transparent;
+  }
+  .field .at { flex: 0 0 auto; color: var(--muted-foreground); font-family: var(--font-mono); font-size: 13px; }
+  .field input {
+    flex: 1; min-width: 0; height: 100%; padding: 0; border: 0; background: transparent;
+    color: var(--foreground); font: inherit; font-family: var(--font-mono); font-size: 13px;
+  }
+  .field:focus-within {
+    outline: 2px solid var(--foreground); outline-offset: 2px;
+    box-shadow: 0 0 0 5px color-mix(in oklch, var(--ring) 55%, transparent);
+  }
+  .field input:focus, .field input:focus-visible { outline: none; box-shadow: none; }
+
+  .livewrap { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 0; padding: 8px 8px 6px; }
+  .viewer {
+    position: relative; flex: 1; min-height: 130px; overflow: hidden;
+    display: grid; place-items: center; border-radius: var(--radius-md); background: var(--stage-bg);
+  }
+  .video {
+    position: relative; height: 100%; aspect-ratio: 9 / 16; max-width: 100%; overflow: hidden;
+    background: linear-gradient(165deg, #4a2470, #241634 52%, #0b0b12);
+  }
+  .video svg.scene { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .live-pill {
+    position: absolute; top: 10px; left: 10px; display: inline-flex; align-items: center;
+    gap: 5px; padding: 3px 8px 3px 6px; border-radius: 999px; background: #e11d48;
+    color: #fff; font-size: 10px; font-weight: 700; letter-spacing: 0.08em;
+  }
+  .live-pill .pulse { width: 5px; height: 5px; border-radius: 50%; background: #fff; }
+  .viewer::after {
+    content: ""; position: absolute; inset: auto 0 0 0; height: 96px;
+    background: linear-gradient(to top, rgba(6, 5, 10, 0.72), transparent);
+    pointer-events: none;
+  }
+  .chat {
+    position: absolute; left: 10px; bottom: 10px; right: 10px; display: flex;
+    flex-direction: column; gap: 5px; pointer-events: none; z-index: 1;
+  }
+  .bubble {
+    height: 17px; width: min(176px, 52%); border-radius: 9px;
+    background: rgba(255, 255, 255, 0.18); border: 1px solid rgba(255, 255, 255, 0.16);
+  }
+  .bubble:nth-child(2) { width: min(132px, 40%); }
+  .bubble:nth-child(3) { width: min(154px, 46%); }
+  .heart { transform-box: fill-box; transform-origin: center; }
+  @media (prefers-reduced-motion: no-preference) {
+    .heart { animation: float 5.5s ease-in-out infinite; }
+    .heart:nth-of-type(2) { animation-delay: 1.6s; animation-duration: 6.8s; }
+    @keyframes float {
+      0%, 100% { transform: translateY(0) scale(1); opacity: 0.75; }
+      50% { transform: translateY(-9px) scale(1.06); opacity: 1; }
+    }
+  }
+
+  .meta-strip {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 2px 10px;
+    flex: 0 0 auto; padding: 5px 2px 0; font-size: 11px; color: var(--muted-foreground);
+  }
+  .meta-strip strong { font-weight: 600; color: var(--foreground); }
+
+  .board-label {
+    display: flex; align-items: center; gap: 10px; flex: 0 0 auto; height: 28px;
+    padding: 0 16px; overflow: hidden; border-top: 1px solid var(--border);
+    background: var(--muted); color: var(--muted-foreground);
+    font-size: 11px; white-space: nowrap;
+  }
+  .board-label strong { font-weight: 600; color: var(--foreground); }
+  .board-label .size { margin-left: auto; font-family: var(--font-mono); }
+
+  @media (max-width: 1100px) {
+    body { height: auto; overflow: auto; }
+    .shell { grid-template-columns: 64px minmax(0, 1fr); }
+    .brand strong, .nav-label, .nav-item span, .soon { display: none; }
+    .nav-item { justify-content: center; padding: 8px 0; }
+    .topbar { flex-wrap: wrap; }
+    .workspace { grid-template-columns: 1fr !important; gap: 10px; }
+    .sep { display: none; }
+    .col { min-height: 440px; }
+    .viewer { min-height: 280px; }
+    .board-label { height: auto; padding: 6px 16px; white-space: normal; }
+  }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+<a class="skip-link" href="#workspace">Saltar al contenido del panel</a>
+<div class="shell">
+  <aside class="sidebar" aria-label="Principal">
+    <div class="brand">
+      <span class="mark" aria-hidden="true">L</span>
+      <strong>Livefy</strong>
+      <button class="btn btn-ghost btn-sm btn-icon" type="button" aria-label="Contraer barra lateral" title="Contraer barra lateral">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4 5 8l4 4"/><path d="M12 4 8 8l4 4"/></svg>
+      </button>
+    </div>
+    <nav aria-label="Operación">
+      <p class="nav-label">Operación</p>
+      <ul class="nav-list">
+        <li><a class="nav-item" href="#workspace" aria-current="page">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>
+          <span>Panel</span></a></li>
+        <li><span class="nav-item is-soon" aria-disabled="true">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="5.5" r="2.4"/><path d="M3.4 13c0-2.4 2-3.8 4.6-3.8s4.6 1.4 4.6 3.8"/></svg>
+          <span>Leads</span><span class="soon">pronto</span></span></li>
+        <li><span class="nav-item is-soon" aria-disabled="true">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 2.5h9v11l-2.2-1.3-2.3 1.3-2.3-1.3-2.2 1.3z"/><path d="M6 6h4M6 9h4"/></svg>
+          <span>Ventas</span><span class="soon">pronto</span></span></li>
+      </ul>
+    </nav>
+    <nav aria-label="Catálogo">
+      <p class="nav-label">Catálogo</p>
+      <ul class="nav-list">
+        <li><span class="nav-item is-soon" aria-disabled="true">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2.2l5 2.6v6.4L8 13.8l-5-2.6V4.8z"/><path d="M3 4.8L8 7.4l5-2.6M8 7.4v6.4"/></svg>
+          <span>Productos</span><span class="soon">pronto</span></span></li>
+        <li><a class="nav-item" href="#workspace">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.6 6.6V13h10.8V6.6"/><path d="M1.8 6.6l1.4-4.1h9.6l1.4 4.1z"/></svg>
+          <span>Tienda</span></a></li>
+      </ul>
+    </nav>
+    <span class="grow"></span>
+    <button class="nav-item" type="button">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 2.5H3.5v11h3"/><path d="M9 5.6 11.4 8 9 10.4M11.4 8H6"/></svg>
+      <span>Sign out</span>
+    </button>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <p class="shop">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.6 6.6V13h10.8V6.6"/><path d="M1.8 6.6l1.4-4.1h9.6l1.4 4.1z"/></svg>
+        Mundo Kawaii
+      </p>
+      <span class="spacer"></span>
+      <span class="chip"><span class="dot" aria-hidden="true"></span>Conectado</span>
+      <button class="btn btn-primary" type="button">Finalizar live</button>
+      <button class="btn btn-ghost btn-icon" type="button" aria-pressed="false" aria-label="Cambiar a tema oscuro" title="Cambiar a tema oscuro" id="theme">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M13 9.6A5.6 5.6 0 0 1 6.4 3a5.6 5.6 0 1 0 6.6 6.6z"/></svg>
+      </button>
+      <button class="btn btn-ghost btn-icon" type="button" aria-label="Menú de la cuenta" title="Menú de la cuenta">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="5.6" r="2.6"/><path d="M3 13.2c0-2.5 2.2-4 5-4s5 1.5 5 4"/></svg>
+      </button>
+    </header>
+
+    <main class="workspace" id="workspace">
+      <h1 class="sr-only">Panel de Mundo Kawaii</h1>
+      <section class="col" aria-labelledby="c1">
+        <header class="col-head">
+          <h2 id="c1">Live de TikTok</h2>
+          <div class="field" title="Handle sin arroba">
+            <label class="sr-only" for="handle-3">Canal de TikTok (handle, sin arroba)</label>
+            <span class="at" aria-hidden="true">@</span>
+            <input id="handle-3" type="text" value="mundokawaii" autocomplete="off" spellcheck="false">
+          </div>
+          <button class="btn btn-primary" type="button">Abrir el live</button>
+          <button class="btn btn-ghost btn-icon" type="button" aria-label="Cerrar visor" title="Cerrar visor">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg>
+          </button>
+        </header>
+
+        <div class="livewrap">
+          <div class="viewer" role="img" aria-label="Live de TikTok abierto en la superficie nativa: la creadora muestra un producto frente a la cámara.">
+            <div class="video">
+              <svg class="scene" viewBox="0 0 180 320" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+                <defs>
+                  <linearGradient id="bg3" x1="0" y1="0" x2="0.35" y2="1">
+                    <stop offset="0" stop-color="#5a2b82"/><stop offset="0.5" stop-color="#2a1840"/><stop offset="1" stop-color="#0b0b12"/>
+                  </linearGradient>
+                  <radialGradient id="glow3" cx="0.5" cy="0.3" r="0.6">
+                    <stop offset="0" stop-color="#a855f7" stop-opacity="0.5"/><stop offset="1" stop-color="#a855f7" stop-opacity="0"/>
+                  </radialGradient>
+                  <linearGradient id="rim3" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0" stop-color="#22d3ee" stop-opacity="0"/><stop offset="0.55" stop-color="#22d3ee" stop-opacity="0.8"/><stop offset="1" stop-color="#f472b6" stop-opacity="0"/>
+                  </linearGradient>
+                </defs>
+                <rect width="180" height="320" fill="url(#bg3)"/>
+                <rect width="180" height="320" fill="url(#glow3)"/>
+                <g fill="#0a0810" opacity="0.84">
+                  <circle cx="90" cy="122" r="29"/>
+                  <path d="M90 152c-33 0-53 24-53 56v112h106V208c0-32-20-56-53-56z"/>
+                </g>
+                <path d="M37 208v112" stroke="url(#rim3)" stroke-width="2.4" fill="none"/>
+                <path d="M143 208v112" stroke="url(#rim3)" stroke-width="1.2" fill="none" opacity="0.5"/>
+                <g>
+                  <rect x="64" y="196" width="52" height="62" rx="8" fill="#f6f4f0" opacity="0.92"/>
+                  <rect x="72" y="206" width="36" height="5" rx="2.5" fill="#c9c4bc"/>
+                  <circle cx="90" cy="230" r="10" fill="#d9fb5f" opacity="0.85"/>
+                  <rect x="72" y="246" width="24" height="4" rx="2" fill="#c9c4bc"/>
+                </g>
+                <g fill="#f472b6">
+                  <path class="heart" d="M150 46c3.4-5.4 11-3.8 11 2.2 0 5.2-11 11.6-11 11.6s-11-6.4-11-11.6c0-6 7.6-7.6 11-2.2z" opacity="0.85"/>
+                </g>
+                <g fill="#22d3ee">
+                  <path class="heart" d="M38 82c2.4-3.8 7.8-2.7 7.8 1.6 0 3.7-7.8 8.2-7.8 8.2s-7.8-4.5-7.8-8.2c0-4.3 5.4-5.4 7.8-1.6z" opacity="0.65"/>
+                </g>
+              </svg>
+              <span class="live-pill"><span class="pulse" aria-hidden="true"></span>LIVE</span>
+            </div>
+            <div class="chat" aria-hidden="true">
+              <span class="bubble"></span><span class="bubble"></span><span class="bubble"></span>
+            </div>
+          </div>
+
+          <p class="meta-strip">
+            <span>Ingestor: <strong>sin sesión</strong></span>
+            <span>Brecha: <strong>—</strong></span>
+            <span>Superficie nativa aislada.</span>
+            <span>El login visual no autentica al ingestor.</span>
+          </p>
+        </div>
+      </section>
+
+      <div class="sep" role="separator" tabindex="0" aria-orientation="vertical"
+           aria-label="Ancho de la columna Live de TikTok" aria-valuemin="340" aria-valuemax="900"
+           aria-valuenow="556" title="Arrastrá o usá las flechas para ajustar el ancho">
+        <span class="grip" aria-hidden="true"><i></i><i></i><i></i></span>
+      </div>
+
+      <section class="col" aria-labelledby="c2">
+        <header class="col-head">
+          <h2 id="c2">Productos</h2>
+          <button class="btn btn-outline btn-sm push" type="button" disabled>Crear</button>
+        </header>
+        <div class="col-body">
+          <div class="row"><span>Producto activo</span><strong>ninguno</strong></div>
+          <div class="empty">
+            <p class="empty-title">Arrastrá un producto acá</p>
+            <p>El activo es el que se ofrece y se notifica según el estado de cada lead.</p>
+          </div>
+          <p class="note">Sin productos cargados. Se persisten en Convex.</p>
+        </div>
+      </section>
+
+      <div class="sep" role="separator" tabindex="0" aria-orientation="vertical"
+           aria-label="Ancho de la columna Productos" aria-valuemin="240" aria-valuemax="700"
+           aria-valuenow="322" title="Arrastrá o usá las flechas para ajustar el ancho">
+        <span class="grip" aria-hidden="true"><i></i><i></i><i></i></span>
+      </div>
+
+      <section class="col" aria-labelledby="c3">
+        <header class="col-head">
+          <h2 id="c3">Leads</h2>
+          <span class="note push">0 en el live</span>
+        </header>
+        <div class="col-body">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Handle</th><th>WhatsApp</th><th>Estado</th><th>Ítems</th><th>Total</th><th>Última</th></tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div class="empty">
+            <p class="empty-title">Sin leads todavía</p>
+            <p>Entran en tiempo real. El comprobante se valida o rechaza en esta columna.</p>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<footer class="board-label">
+  <strong>03 · Reparto ajustable</strong>
+  <span>El operador decide cuánto pesa cada columna; a cambio, el alto del visor depende de un ancho que puede volver a encoger.</span>
+  <span class="size">1536 × 864</span>
+</footer>
+
+<script>
+  const toggle = document.getElementById('theme');
+  toggle.addEventListener('click', () => {
+    const dark = document.documentElement.classList.toggle('dark');
+    toggle.setAttribute('aria-pressed', String(dark));
+    const label = dark ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro';
+    toggle.setAttribute('aria-label', label);
+    toggle.setAttribute('title', label);
+  });
+
+  // Reparto ajustable: anchos en píxeles, mínimo por columna, total constante.
+  const grid = document.getElementById('workspace');
+  const seps = [...grid.querySelectorAll('.sep')];
+  const MIN = [340, 240, 260];
+  const BASE = [556, 322, 386];
+  let widths = BASE.slice();
+
+  const pad = () => {
+    const cs = getComputedStyle(grid);
+    return parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+  };
+  const available = () => Math.max(0, grid.clientWidth - pad());
+  const gripWidth = () => 10 * seps.length;
+
+  function apply() {
+    grid.style.gridTemplateColumns = widths.map(w => w + 'px').join(' 10px ');
+    seps.forEach((sep, i) => {
+      const others = MIN.reduce((total, min, j) => (j === i ? total : total + min), 0);
+      const max = available() - gripWidth() - others;
+      sep.setAttribute('aria-valuenow', String(Math.round(widths[i])));
+      sep.setAttribute('aria-valuetext', Math.round(widths[i]) + ' píxeles');
+      sep.setAttribute('aria-valuemax', String(Math.max(MIN[i], Math.round(max))));
+    });
+  }
+
+  function fit() {
+    const target = available() - gripWidth();
+    if (target <= 0) return;
+    const total = widths.reduce((a, b) => a + b, 0);
+    if (total !== target) widths = widths.map(w => Math.max(1, Math.round(w * target / total)));
+    apply();
+  }
+
+  // El par comparte un total fijo: ninguno baja de su mínimo y el reparto no desborda.
+  function setPair(i, a, b) {
+    const total = a + b;
+    const next = Math.min(Math.max(a, MIN[i]), total - MIN[i + 1]);
+    widths[i] = Math.round(next);
+    widths[i + 1] = Math.round(total - next);
+    apply();
+  }
+
+  seps.forEach((sep, i) => {
+    let drag = null;
+    sep.addEventListener('pointerdown', event => {
+      drag = { x: event.clientX, a: widths[i], b: widths[i + 1] };
+      sep.setPointerCapture(event.pointerId);
+      document.body.classList.add('dragging');
+      event.preventDefault();
+    });
+    sep.addEventListener('pointermove', event => {
+      if (!drag) return;
+      const dx = event.clientX - drag.x;
+      setPair(i, drag.a + dx, drag.b - dx);
+    });
+    const stop = () => {
+      if (!drag) return;
+      drag = null;
+      document.body.classList.remove('dragging');
+    };
+    sep.addEventListener('pointerup', stop);
+    sep.addEventListener('pointercancel', stop);
+    sep.addEventListener('keydown', event => {
+      const step = event.shiftKey ? 48 : 16;
+      if (event.key === 'ArrowLeft') { setPair(i, widths[i] - step, widths[i + 1] + step); event.preventDefault(); }
+      if (event.key === 'ArrowRight') { setPair(i, widths[i] + step, widths[i + 1] - step); event.preventDefault(); }
+    });
+  });
+
+  fit();
+  window.addEventListener('resize', () => { widths = BASE.slice(); fit(); });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
+</script>
+</body>
+</html>

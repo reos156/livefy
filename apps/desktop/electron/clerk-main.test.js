@@ -40,6 +40,9 @@ function bootstrap({ development = false, platform = 'win32', loadFailure = fals
   }
   class BrowserWindow {
     maximize() {}
+    // Real windows emit lifecycle events; the double records them so a `closed` handler
+    // registered by the bootstrap does not crash the mock.
+    on(name, callback) { this.listeners[name] = callback }
     static getAllWindows() { return windows }
     constructor(options) {
       steps.push('window')
