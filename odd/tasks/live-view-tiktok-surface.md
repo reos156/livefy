@@ -130,3 +130,5 @@ L12 (#41, agent): `LIVE_ZOOM` is 0.5, not 0.8. Measured against the operator's w
 L13 (#41, agent): `LIVE_ZOOM` is 0.9. Half scale was rejected as too small; at 0.9 the type and video stay near real size and the comment rail clips again (~456 CSS px of the ~1000 the layout wants). The trade is explicit: the operator keeps readable content and buys the rail back by widening the column, which the dividers already allow.
 
 L14 (#41, agent): the default split is now `[386, 322, 556]` — column 1 and column 3 swapped their opening widths at the operator's request, so the live column starts narrow and Leads starts wide. Both stay above their minimums and the separators still adjust. `LIVE_ZOOM` returned to 0.8, since 0.5 was unreadable and 0.9 did not remove the clipping.
+
+L15 (#41, human): the opening split is `[400, 320, 544]`, set by the operator rather than derived. `fitWidths` keeps those proportions in the slack, so a window wider or narrower than his opens proportionally.
