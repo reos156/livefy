@@ -698,3 +698,53 @@ describe('panel — the split keeps its own numbers', () => {
     expect(tracks(workspace, 1400)).toEqual(first)
   })
 })
+
+// The first column's header is one row: title, channel field and actions. The label is only
+// for assistive technology, and the isolation sentence the operator asked to remove is gone.
+describe('panel — the live column header', () => {
+  function renderPanel() {
+    vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} })
+    window.livefyLive = {
+      status: vi.fn(async (): Promise<LiveSurfaceStatus> => ({ mounted: false, state: 'idle' })),
+      mount: vi.fn(async (): Promise<LiveSurfaceStatus> => ({ mounted: true, state: 'loading' })),
+      setBounds: vi.fn(async () => true),
+      unmount: vi.fn(async (): Promise<LiveSurfaceStatus> => ({ mounted: false, state: 'idle' })),
+      onStatus: () => () => {},
+    }
+    state.stats = stats
+    render(<Panel onEditStore={() => {}} />)
+  }
+
+  it('keeps the title, the channel field and the actions in one header row', () => {
+    renderPanel()
+
+    const field = screen.getByLabelText('Canal de TikTok')
+    const header = field.closest('[data-slot="card-header"]')
+    expect(header).toBeTruthy()
+    expect(within(header as HTMLElement).getByRole('heading', { level: 2, name: 'Live de TikTok' })).toBeTruthy()
+    expect(within(header as HTMLElement).getByRole('button', { name: 'Abrir el live' })).toBeTruthy()
+  })
+
+  it('labels the channel field for assistive technology without spending a visible line', () => {
+    renderPanel()
+
+    const label = screen.getByText('Canal de TikTok')
+    expect(label.tagName).toBe('LABEL')
+    expect(label.className).toContain('sr-only')
+  })
+
+  it('no longer explains the isolation or the saved login above the viewer', () => {
+    renderPanel()
+
+    expect(screen.queryByText(/superficie aislada, sin Node y con sandbox\. El login se guarda/)).toBeNull()
+  })
+
+  it('still states why the open button is inert while the channel is empty', () => {
+    renderPanel()
+
+    const button = screen.getByRole('button', { name: 'Abrir el live' }) as HTMLButtonElement
+    expect(button.disabled).toBe(true)
+    const describedBy = button.getAttribute('aria-describedby') as string
+    expect(document.getElementById(describedBy)?.textContent).toContain('Escribí el handle del canal')
+  })
+})

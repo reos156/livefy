@@ -21,8 +21,8 @@ import { Button } from '@/components/ui/button'
 import { Alert, AlertAction, AlertDescription } from '@/components/ui/alert'
 import { Spinner } from '@/components/ui/spinner'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
-import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Table, TableBody, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -207,7 +207,6 @@ function Column({ id, title, aside, header, children }: {
 // operator reads. The renderer never builds or names a URL.
 const CHANNEL_PATTERN = /^(?=.*[A-Za-z0-9])[A-Za-z0-9._]{2,24}$/
 const CHANNEL_REASON_ID = 'live-channel-reason'
-const CHANNEL_READY = 'El visor abre TikTok en una superficie aislada, sin Node y con sandbox. El login se guarda en este equipo.'
 
 function channelProblem(raw: string): string | null {
   const value = raw.trim()
@@ -231,6 +230,9 @@ function LiveColumn() {
   // The field is the only way in, so the button stays inert until what it would open is a
   // channel main will accept.
   const canOpen = live.available && !problem && !status.mounted && !opening
+  // The explanation only exists while there is one to give, so the field and the button
+  // never point at an element that was not rendered.
+  const reasonId = problem ? CHANNEL_REASON_ID : undefined
 
   async function open() {
     if (!canOpen) return
@@ -245,25 +247,26 @@ function LiveColumn() {
 
   // The field lives in the header: it is what the column is about, and keeping it out of
   // the body leaves the body's whole remainder to the viewer.
+  // One row: the column title already names the area, so the field's label is for assistive
+  // technology only and never takes a line of its own at any column width.
   const channelField = <>
-    <Field className="min-w-0 gap-1">
-      <FieldLabel htmlFor="live-channel">Canal de TikTok</FieldLabel>
-      <div className="flex items-center gap-1.5">
-        {/* The arroba is a fixed part of the address, never something the operator types. */}
-        <span aria-hidden="true" className="text-muted-foreground">@</span>
-        <Input
-          id="live-channel"
-          value={channel}
-          onChange={event => setChannel(event.target.value)}
-          placeholder="handle"
-          autoComplete="off"
-          spellCheck={false}
-          aria-describedby={CHANNEL_REASON_ID}
-          aria-invalid={problem && handle ? true : undefined}
-        />
-      </div>
-    </Field>
-    <Button onClick={() => { void open() }} disabled={!canOpen} aria-describedby={CHANNEL_REASON_ID}>Abrir el live</Button>
+    <Label htmlFor="live-channel" className="sr-only">Canal de TikTok</Label>
+    <div className="flex min-w-0 flex-1 items-center gap-1.5">
+      {/* The arroba is a fixed part of the address, never something the operator types. */}
+      <span aria-hidden="true" className="text-muted-foreground">@</span>
+      <Input
+        id="live-channel"
+        className="min-w-0 flex-1"
+        value={channel}
+        onChange={event => setChannel(event.target.value)}
+        placeholder="handle"
+        autoComplete="off"
+        spellCheck={false}
+        aria-describedby={reasonId}
+        aria-invalid={problem && handle ? true : undefined}
+      />
+    </div>
+    <Button onClick={() => { void open() }} disabled={!canOpen} aria-describedby={reasonId}>Abrir el live</Button>
     {status.mounted && <Button
       variant="outline"
       size="icon-sm"
@@ -287,7 +290,7 @@ function LiveColumn() {
     {/* The reason the button is inert is visible text and the button points at it, so the
         explanation is not carried by an attribute alone. */}
     {live.available
-      ? <p id={CHANNEL_REASON_ID} className="text-xs text-muted-foreground">{problem ?? CHANNEL_READY}</p>
+      ? problem && <p id={CHANNEL_REASON_ID} className="text-xs text-muted-foreground">{problem}</p>
       : <p id="first-live-note" className="text-xs text-muted-foreground">La conexión de lives llega en la próxima etapa.</p>}
     {status.state === 'failed' && <Alert variant="destructive" role="alert">
       <AlertDescription>{`TikTok no cargó: ${status.reason}. Revisá la conexión y reintentá.`}</AlertDescription>

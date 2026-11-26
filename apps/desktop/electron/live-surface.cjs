@@ -6,6 +6,10 @@ const LIVE_PARTITION = 'persist:tiktok'
 // The renderer names a channel, never a URL: the host is fixed here and the handle only
 // ever reaches the path, so no channel can move the guest to another origin.
 const LIVE_ORIGIN = 'https://www.tiktok.com'
+// TikTok keeps a right rail (viewers, comments, the compose box) at a width the column does
+// not reach at the operator's window size, so the page clipped it. Rendering at 80 % gives the
+// page a wider CSS viewport for the same rectangle; the cost is smaller video and type.
+const LIVE_ZOOM = 0.8
 // TikTok handles: letters, digits, dot and underscore, 2–24 characters, and at least one
 // letter or digit so `..` or `__` cannot pass as a channel.
 const LIVE_HANDLE = /^(?=.*[A-Za-z0-9])[A-Za-z0-9._]{2,24}$/
@@ -216,8 +220,10 @@ function createLiveSurface(WebContentsView) {
       })
       attachListeners(view.webContents, token)
       window.contentView.addChildView(view)
-      // Position before loading, so the first paint never lands at the window origin.
+      // Position and scale before loading, so neither the first paint nor the layout the page
+      // measures on arrival lands at the wrong size.
       if (bounds) view.setBounds(bounds)
+      view.webContents.setZoomFactor(LIVE_ZOOM)
       publish({ mounted: true, state: 'loading' })
       // The rejection belongs to this generation: if the operator closed the surface first,
       // `fail` finds a retired token and publishes nothing over the `idle` it already sent.
@@ -258,6 +264,7 @@ function createLiveSurface(WebContentsView) {
 
 module.exports = {
   LIVE_PARTITION,
+  LIVE_ZOOM,
   LIVE_ORIGIN,
   liveWebPreferences,
   parseLiveHandle,

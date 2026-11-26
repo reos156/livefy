@@ -120,3 +120,5 @@ report them as missing.
 - **AC8** Espejo de Windows sincronizado y aceptación del humano ejerciendo la pantalla.
 
 L9 (agent, inline): the `will-navigate`/`will-redirect` guard read the deprecated `(event, url)` pair, so it could not tell a subframe from the document and marked the whole surface failed when a subframe left TikTok — a playing live replaced by "TikTok no cargó". It now reads the single details object Electron 41 declares and reports the block only when `isMainFrame !== false`.
+
+L10 (#41, agent): the first column's header is one row again — the field's label is assistive-only, so the operator sees title, field and actions together — and the isolation/login sentence is gone. The guest now renders at `LIVE_ZOOM = 0.8` because TikTok clipped its comment rail at the column's width; the human chose the fixed 80 % over a visible zoom control, accepting smaller video and type.
