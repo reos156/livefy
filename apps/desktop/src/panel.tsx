@@ -126,9 +126,9 @@ function LiveColumn({ connection }: { connection: LiveConnection | null }) {
   >
     {/* D-A: live capture does not exist yet, so the call to action stays visible and
         inert with the note that explains why, instead of pointing at nothing. */}
-    <Button disabled aria-describedby="first-live-note">Conectá tu primer live</Button>
+    <Button className="self-start" disabled aria-describedby="first-live-note">Conectá tu primer live</Button>
     <p id="first-live-note" className="text-xs text-muted-foreground">La conexión de lives llega en la próxima etapa.</p>
-    <div className="grid flex-1 place-items-center rounded-lg border border-dashed border-border bg-muted p-4 text-center">
+    <div className="grid min-h-40 place-items-center rounded-lg border border-dashed border-border bg-muted p-4 text-center">
       <div>
         <p className="text-xs font-medium text-foreground">Ningún live conectado</p>
         <p className="text-xs text-muted-foreground">Al conectar, el live se abre en una superficie aislada, sin Node y con sandbox.</p>
@@ -164,7 +164,7 @@ function ProductsColumn() {
       <span>Producto activo</span>
       <strong className="font-semibold text-foreground">ninguno</strong>
     </div>
-    <div className="flex flex-1 flex-col justify-center rounded-lg border border-dashed border-border bg-muted p-4 text-center">
+    <div className="flex min-h-40 flex-col justify-center rounded-lg border border-dashed border-border bg-muted p-4 text-center">
       <p className="text-xs font-medium text-foreground">Arrastrá un producto acá</p>
       <p className="text-xs text-muted-foreground">El activo es el que se ofrece y se notifica según el estado de cada lead.</p>
     </div>
@@ -174,7 +174,7 @@ function ProductsColumn() {
 
 // S8 names the six columns the lead table will carry. With no leads there is no row,
 // so the header is the whole honest content: no placeholder rows.
-const LEAD_COLUMNS = ['Handle', 'WhatsApp', 'Estado', 'Ítems', 'Total', 'Última act.']
+const LEAD_COLUMNS = ['Handle', 'WhatsApp', 'Estado', 'Ítems', 'Total', 'Última']
 
 function LeadsColumn({ count }: { count: number }) {
   return <Column
@@ -182,15 +182,17 @@ function LeadsColumn({ count }: { count: number }) {
     title="Leads"
     aside={<span className="text-xs text-muted-foreground">{`${count} en el live`}</span>}
   >
-    <Table>
-      <TableHeader>
-        <TableRow>
-          {LEAD_COLUMNS.map(column => <TableHead key={column} className="px-1">{column}</TableHead>)}
-        </TableRow>
-      </TableHeader>
-      <TableBody />
-    </Table>
-    <div className="flex flex-1 flex-col justify-center rounded-lg border border-dashed border-border bg-muted p-4 text-center">
+    <div className="overflow-x-auto">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            {LEAD_COLUMNS.map(column => <TableHead key={column} className="px-1 text-[0.65rem] whitespace-nowrap">{column}</TableHead>)}
+          </TableRow>
+        </TableHeader>
+        <TableBody />
+      </Table>
+    </div>
+    <div className="flex min-h-40 flex-col justify-center rounded-lg border border-dashed border-border bg-muted p-4 text-center">
       <p className="text-xs font-medium text-foreground">Sin leads todavía</p>
       <p className="text-xs text-muted-foreground">Entran en tiempo real. El comprobante se valida o rechaza en esta columna.</p>
     </div>
@@ -222,7 +224,7 @@ export function Panel({ onEditStore }: { onEditStore: () => void }) {
         <Button disabled={!canEndLive} title={canEndLive ? undefined : 'Requiere un live conectado'}>Finalizar live</Button>
       </header>
       <KpiRow metrics={metrics} />
-      <div className="grid flex-1 grid-cols-1 gap-2.5 p-4 lg:grid-cols-[1.35fr_1fr_1.3fr]">
+      <div className="grid flex-1 grid-cols-1 items-start gap-2.5 p-4 lg:grid-cols-[1.35fr_1fr_1.3fr]">
         <LiveColumn connection={liveConnection} />
         <ProductsColumn />
         <LeadsColumn count={stats.lives.length} />
