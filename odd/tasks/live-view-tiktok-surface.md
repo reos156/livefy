@@ -132,3 +132,5 @@ L13 (#41, agent): `LIVE_ZOOM` is 0.9. Half scale was rejected as too small; at 0
 L14 (#41, agent): the default split is now `[386, 322, 556]` — column 1 and column 3 swapped their opening widths at the operator's request, so the live column starts narrow and Leads starts wide. Both stay above their minimums and the separators still adjust. `LIVE_ZOOM` returned to 0.8, since 0.5 was unreadable and 0.9 did not remove the clipping.
 
 L15 (#41, human): the opening split is `[400, 320, 544]`, set by the operator rather than derived. `fitWidths` keeps those proportions in the slack, so a window wider or narrower than his opens proportionally.
+
+L16 (#41, human acceptance): the operator confirmed in the Windows dev app that the manual TikTok login works from the desktop app and that commenting inside the live works. The column split 400/320/544 was accepted as it opens. Not reported, therefore still pending: live audio, the failed-load path with no network, the keyboard focus on a separator, the 340 px clamp, the single-column layout, and the collapsed sidebar. Recorded in the README matrix rather than claimed as a full pass.

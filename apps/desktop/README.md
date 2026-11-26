@@ -303,13 +303,21 @@ humano. Ningún caso está aceptado todavía.
 | Panel, visor sin abrir | claro / oscuro | registrar en DevTools | Electron dev | pendiente |
 | Panel, canal vacío (botón «Abrir el live» deshabilitado, motivo en `aria-describedby`) | claro / oscuro | registrar en DevTools | Electron dev | pendiente |
 | Panel, cargando | claro / oscuro | registrar en DevTools | Electron dev | pendiente |
-| Panel, live abierto con login guardado | claro / oscuro | registrar en DevTools | Electron dev | pendiente |
-| Panel, live abierto con el visor a todo el alto de la columna | claro / oscuro | registrar en DevTools | Electron dev | pendiente |
+| Panel, live abierto con login guardado | claro / oscuro | ventana Electron en Windows dev | Electron dev | aceptado 2026-11-26 (humano, Windows dev: login de TikTok desde la app y comentarios dentro del live) |
+| Panel, live abierto con el visor a todo el alto de la columna | claro / oscuro | ventana Electron en Windows dev | Electron dev | aceptado 2026-11-26 (humano, Windows dev: login de TikTok desde la app y comentarios dentro del live) |
 | Panel, carga fallida (sin red) | claro / oscuro | registrar en DevTools | Electron dev | pendiente |
 | Panel, foco de teclado en un separador (flechas y `Shift`+flecha) | claro / oscuro | registrar en DevTools | Electron dev | pendiente |
 | Panel, reparto arrastrado hasta el mínimo de la columna live (340 px) | claro / oscuro | registrar en DevTools | Electron dev | pendiente |
 | Panel, layout de una columna bajo 1100 CSS px, sin separadores | claro / oscuro | registrar en DevTools | Electron dev | pendiente |
 | Panel, barra lateral colapsada | claro / oscuro | registrar en DevTools | Electron dev | pendiente |
+
+Reparto de columnas: **aceptado 2026-11-26** por el humano con los valores de apertura
+400 / 320 / 544 px. Siguen ajustables con los divisores y con el teclado.
+
+Límite registrado, no aceptado como defecto: con el zoom del guest en 0,8 el riel de
+comentarios de TikTok se corta en una columna de ~400 px. Se probó a 0,5 (ilegible) y 0,9
+(sin mejora) y el operador eligió este valor; ensanchar la columna es la palanca conocida.
+Audio del live: **no reportado** en esta aceptación, sigue pendiente.
 
 ## Historial H1.1/H1.2 (no describe los proveedores actuales)
 
