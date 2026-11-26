@@ -7,11 +7,13 @@ vi.mock('convex/react', () => ({ useQuery: () => state.stats }))
 
 import { Panel } from './panel'
 
+// Non-zero metrics on purpose: if the KPI row came back, the values would show up and the
+// "no KPI row" assertions below would fail instead of passing by coincidence.
 const stats: DashboardStats = {
   shopId: 'shop_1',
   shopName: 'Mundo Kawaii',
   liveConnection: null,
-  metrics: { activeLives: 0, newLeads: 0, pendingLeads: 0, conversionRate: 0, estimatedSales: 0 },
+  metrics: { activeLives: 3, newLeads: 12, pendingLeads: 4, conversionRate: 0.42, estimatedSales: 1250000 },
   lives: [],
 }
 
@@ -23,25 +25,89 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
+// jsdom has no layout, so the panel decides its breakpoint from `matchMedia`; the harness
+// for it is a stub, and the assertions below are about the composition it produces.
+function stubMatchMedia(matches: boolean) {
+  vi.stubGlobal('matchMedia', (media: string) => ({
+    matches,
+    media,
+    onchange: null,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    addListener: () => {},
+    removeListener: () => {},
+    dispatchEvent: () => false,
+  }))
+}
+
+function bridgeStub(mountFails = false) {
+  const calls: string[] = []
+  let emit: ((status: LiveSurfaceStatus) => void) | undefined
+  const api = {
+    status: vi.fn(async (): Promise<LiveSurfaceStatus> => ({ mounted: false, state: 'idle' })),
+    mount: vi.fn(async (handle: string): Promise<LiveSurfaceStatus> => {
+      calls.push('mount')
+      if (mountFails) throw new Error('Denied')
+      return { mounted: true, state: 'loading' }
+    }),
+    setBounds: vi.fn(async () => { calls.push('bounds'); return true }),
+    unmount: vi.fn(async (): Promise<LiveSurfaceStatus> => { calls.push('unmount'); return { mounted: false, state: 'idle' } }),
+    onStatus: (listener: (status: LiveSurfaceStatus) => void) => { emit = listener; return () => { emit = undefined } },
+  }
+  return { api, calls, emit: (status: LiveSurfaceStatus) => emit?.(status) }
+}
+
+function renderWithSurface(mountFails = false) {
+  vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} })
+  const bridge = bridgeStub(mountFails)
+  window.livefyLive = bridge.api
+  state.stats = stats
+  const view = render(<Panel onEditStore={() => {}} />)
+  return { ...bridge, view }
+}
+
+function channelInput(): HTMLInputElement {
+  return screen.getByLabelText('Canal de TikTok') as HTMLInputElement
+}
+
+function typeChannel(value: string) {
+  fireEvent.change(channelInput(), { target: { value } })
+}
+
+function openLiveButton(): HTMLButtonElement {
+  return screen.getByRole('button', { name: 'Abrir el live' }) as HTMLButtonElement
+}
+
+function describedText(control: HTMLElement): string {
+  const id = control.getAttribute('aria-describedby')
+  expect(id).toBeTruthy()
+  return document.getElementById(id as string)?.textContent ?? ''
+}
+
 describe('panel — the empty three-column dashboard', () => {
   it('waits on the dashboard query without painting the panel', () => {
     state.stats = undefined
     render(<Panel onEditStore={() => {}} />)
 
     expect(screen.getByRole('status')).toBeTruthy()
-    expect(screen.queryByText('Lives activos')).toBeNull()
+    expect(screen.queryByText('Mundo Kawaii')).toBeNull()
+    expect(screen.queryByRole('heading', { level: 2, name: 'Live de TikTok' })).toBeNull()
   })
 
-  it('shows the five metrics at zero with their no-data footer', () => {
+  // S15: the five metrics stay in the dashboard contract and are no longer painted.
+  it('renders no KPI row, even with metrics in the contract', () => {
     state.stats = stats
     render(<Panel onEditStore={() => {}} />)
 
     for (const label of ['Lives activos', 'Leads nuevos', 'Pendientes', 'Conversión', 'Ventas estimadas']) {
-      expect(screen.getByText(label)).toBeTruthy()
+      expect(screen.queryByText(label)).toBeNull()
     }
-    expect(screen.getAllByText('Sin datos todavía')).toHaveLength(5)
-    expect(screen.getByText('0 %')).toBeTruthy()
-    expect(screen.getByText('$0')).toBeTruthy()
+    expect(screen.queryByText('Sin datos todavía')).toBeNull()
+    expect(screen.queryByText('0 %')).toBeNull()
+    expect(screen.queryByText('42 %')).toBeNull()
+    // The query result is still the contract the panel reads; only its rendering is gone.
+    expect(state.stats?.metrics.activeLives).toBe(3)
+    expect(screen.getByRole('heading', { level: 2, name: 'Live de TikTok' })).toBeTruthy()
   })
 
   it('names the three columns of the workspace', () => {
@@ -59,9 +125,7 @@ describe('panel — the empty three-column dashboard', () => {
 
     const cta = screen.getByRole('button', { name: 'Conectá tu primer live' }) as HTMLButtonElement
     expect(cta.disabled).toBe(true)
-    const describedBy = cta.getAttribute('aria-describedby')
-    expect(describedBy).toBeTruthy()
-    expect(document.getElementById(describedBy as string)?.textContent).toContain('La conexión de lives llega en la próxima etapa.')
+    expect(describedText(cta)).toContain('La conexión de lives llega en la próxima etapa.')
   })
 
   it('keeps the live-ending action disabled while no live is connected', () => {
@@ -158,32 +222,85 @@ describe('panel — dashboard chrome', () => {
 
     expect(screen.queryByRole('button', { name: /Notificaciones/ })).toBeNull()
   })
+
+  // The six-state chip list left the column on the human's request; the state stays
+  // readable in the top bar badge, which is the only place it is announced now.
+  it('drops the six-state legend and keeps the connection state in the top bar', () => {
+    state.stats = { ...stats, liveConnection: 'connected' }
+    render(<Panel onEditStore={() => {}} />)
+
+    expect(screen.queryByRole('list', { name: 'Estados del live' })).toBeNull()
+    for (const state of ['connected', 'reconnecting', 'offline', 'suspended-risk', 'disconnected', 'ended']) {
+      expect(screen.queryByText(state)).toBeNull()
+    }
+    expect(screen.getByText('Conectado')).toBeTruthy()
+    // The ingestor line and its note stay, which is what the column still owes the operator.
+    expect(screen.getByText(/Ingestor:/)).toBeTruthy()
+    expect(screen.getByText(/El login visual no autentica al ingestor/)).toBeTruthy()
+  })
+})
+
+describe('panel — the channel field', () => {
+  it('labels the handle field, keeps the arroba out of the input and shows it as an adornment', () => {
+    renderWithSurface()
+
+    expect(channelInput().value).toBe('')
+    expect(channelInput().getAttribute('aria-describedby')).toBeTruthy()
+    expect(screen.getByText('@').getAttribute('aria-hidden')).toBe('true')
+  })
+
+  it('disables the open button while the field is empty and says what is missing', () => {
+    renderWithSurface()
+
+    const button = openLiveButton()
+    expect(button.disabled).toBe(true)
+    expect(describedText(button)).toContain('Escribí el handle')
+  })
+
+  it('disables the open button while the handle is invalid and states the rule', () => {
+    renderWithSurface()
+
+    for (const invalid of ['a', 'a'.repeat(25), '@mundokawaii', 'mundo kawaii', 'mundo-kawaii']) {
+      typeChannel(invalid)
+      expect(openLiveButton().disabled).toBe(true)
+      expect(describedText(openLiveButton())).toContain('entre 2 y 24 caracteres')
+    }
+  })
+
+  it('enables the open button for a valid handle and sends only the handle to main', async () => {
+    const bridge = renderWithSurface()
+
+    typeChannel('  mundokawaii  ')
+    expect(openLiveButton().disabled).toBe(false)
+    fireEvent.click(openLiveButton())
+    await act(async () => {})
+
+    expect(bridge.api.mount).toHaveBeenCalledWith('mundokawaii')
+  })
+
+  it('keeps the last handle typed while the panel stays mounted', async () => {
+    const bridge = renderWithSurface()
+
+    typeChannel('mundokawaii')
+    fireEvent.click(openLiveButton())
+    await act(async () => {})
+    act(() => bridge.emit({ mounted: true, state: 'ready' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar visor' }))
+    await act(async () => {})
+
+    expect(channelInput().value).toBe('mundokawaii')
+    expect(openLiveButton().disabled).toBe(false)
+  })
 })
 
 // The live surface is a rectangle the main process fills with third-party content. These
 // assertions are about the renderer's only two jobs: ask for it, and say what is happening
 // without pretending the content is part of this document.
 describe('panel — the live surface', () => {
-  function bridgeStub() {
-    const calls: string[] = []
-    let emit: ((status: LiveSurfaceStatus) => void) | undefined
-    const api = {
-      status: vi.fn(async (): Promise<LiveSurfaceStatus> => ({ mounted: false, state: 'idle' })),
-      mount: vi.fn(async (): Promise<LiveSurfaceStatus> => { calls.push('mount'); return { mounted: true, state: 'loading' } }),
-      setBounds: vi.fn(async () => { calls.push('bounds'); return true }),
-      unmount: vi.fn(async (): Promise<LiveSurfaceStatus> => { calls.push('unmount'); return { mounted: false, state: 'idle' } }),
-      onStatus: (listener: (status: LiveSurfaceStatus) => void) => { emit = listener; return () => { emit = undefined } },
-    }
-    return { api, calls, emit: (status: LiveSurfaceStatus) => emit?.(status) }
-  }
-
-  function renderWithSurface() {
-    vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} })
-    const bridge = bridgeStub()
-    window.livefyLive = bridge.api
-    state.stats = stats
-    const view = render(<Panel onEditStore={() => {}} />)
-    return { ...bridge, view }
+  async function orderLive() {
+    typeChannel('mundokawaii')
+    fireEvent.click(openLiveButton())
+    await act(async () => {})
   }
 
   it('offers the live only where the native surface exists', () => {
@@ -192,25 +309,26 @@ describe('panel — the live surface', () => {
 
     const cta = screen.getByRole('button', { name: 'Conectá tu primer live' }) as HTMLButtonElement
     expect(cta.disabled).toBe(true)
-    expect(screen.queryByRole('button', { name: 'Abrir el live de TikTok' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Abrir el live' })).toBeNull()
   })
 
   it('asks main to mount, after reporting where the rectangle sits', async () => {
     const bridge = renderWithSurface()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Abrir el live de TikTok' }))
+    await orderLive()
 
-    await act(async () => {})
     expect(bridge.api.mount).toHaveBeenCalledOnce()
     expect(bridge.api.setBounds).toHaveBeenCalled()
     // Position before the guest exists, or the first paint lands at the window origin.
     expect(bridge.calls.indexOf('bounds')).toBeLessThan(bridge.calls.indexOf('mount'))
   })
 
-  it('announces loading and then leaves the rectangle to the native view', async () => {
+  // S16: `ready` is what the document reaching `dom-ready` publishes, so the caption must
+  // end there and not wait for a second event that may never arrive.
+  it('ends the loading caption as soon as the document is ready', async () => {
     const bridge = renderWithSurface()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Abrir el live de TikTok' }))
+    await orderLive()
     expect(await screen.findByText('Cargando TikTok…')).toBeTruthy()
 
     act(() => bridge.emit({ mounted: true, state: 'ready' }))
@@ -222,8 +340,7 @@ describe('panel — the live surface', () => {
   it('names a failed load instead of showing an empty rectangle', async () => {
     const bridge = renderWithSurface()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Abrir el live de TikTok' }))
-    await act(async () => {})
+    await orderLive()
     act(() => bridge.emit({ mounted: true, state: 'failed', reason: 'NAME_NOT_RESOLVED' }))
 
     const alert = screen.getByRole('alert')
@@ -233,18 +350,30 @@ describe('panel — the live surface', () => {
     expect(screen.queryByText('Ningún live conectado')).toBeNull()
   })
 
+  it('names a channel main refused, instead of leaving the rectangle loading', async () => {
+    renderWithSurface(true)
+
+    typeChannel('mundokawaii')
+    fireEvent.click(openLiveButton())
+    await act(async () => {})
+
+    expect(screen.getByRole('alert').textContent).toContain('rechazo del proceso principal')
+    expect(screen.queryByText('Cargando TikTok…')).toBeNull()
+  })
+
   // The copy says "reintentá"; without a control that sentence asks for something the
   // operator cannot do. The retry releases the failed guest and mounts a fresh one.
   it('offers a retry that recreates the surface after a failure', async () => {
     const bridge = renderWithSurface()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Abrir el live de TikTok' }))
-    await act(async () => {})
+    await orderLive()
     act(() => bridge.emit({ mounted: true, state: 'failed', reason: 'NAME_NOT_RESOLVED' }))
     fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }))
     await act(async () => {})
 
     expect(bridge.calls.filter(call => call !== 'bounds')).toEqual(['mount', 'unmount', 'mount'])
+    // The retry asks for the channel that failed, not for whatever the field holds now.
+    expect(bridge.api.mount).toHaveBeenLastCalledWith('mundokawaii')
     // The retry re-attaches, so the explicit close is still there afterwards.
     expect(screen.getByRole('button', { name: 'Cerrar visor' })).toBeTruthy()
   })
@@ -254,8 +383,7 @@ describe('panel — the live surface', () => {
 
     expect(screen.getByText('Ningún live conectado')).toBeTruthy()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Abrir el live de TikTok' }))
-    await act(async () => {})
+    await orderLive()
 
     expect(screen.getByText('Cargando TikTok…')).toBeTruthy()
     expect(screen.queryByText('Ningún live conectado')).toBeNull()
@@ -264,8 +392,7 @@ describe('panel — the live surface', () => {
   it('announces loading through exactly one status element', async () => {
     renderWithSurface()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Abrir el live de TikTok' }))
-    await act(async () => {})
+    await orderLive()
 
     const statuses = screen.getAllByRole('status')
     expect(statuses).toHaveLength(1)
@@ -274,14 +401,31 @@ describe('panel — the live surface', () => {
     expect(statuses[0].querySelector('svg')?.getAttribute('aria-hidden')).toBe('true')
   })
 
+  // S13: jsdom has no layout, so the composition is the artifact: the viewer claims the
+  // rest of the column and keeps a floor, so no resize can leave it with zero height.
+  it('leaves the viewer the remaining height of the column, without an inner scroll', async () => {
+    renderWithSurface()
+
+    const viewer = screen.getByRole('region', { name: 'Superficie del live de TikTok' })
+    const classes = viewer.className.split(/\s+/)
+    expect(classes).toContain('flex-1')
+    expect(classes).toContain('min-h-40')
+    expect(classes).not.toContain('overflow-auto')
+
+    const body = viewer.parentElement as HTMLElement
+    const bodyClasses = body.className.split(/\s+/)
+    expect(bodyClasses).toContain('flex-col')
+    expect(bodyClasses).toContain('min-h-0')
+    expect(bodyClasses).not.toContain('overflow-auto')
+  })
+
   // Client-side routing swaps the panel out without reloading the document, so nothing
   // else would ever detach the guest: it would keep playing and swallowing pointer events
   // over the next screen at its old rectangle, with no visible control to close it.
   it('releases the surface when the panel unmounts', async () => {
     const bridge = renderWithSurface()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Abrir el live de TikTok' }))
-    await act(async () => {})
+    await orderLive()
     act(() => bridge.emit({ mounted: true, state: 'ready' }))
 
     bridge.view.unmount()
@@ -293,13 +437,129 @@ describe('panel — the live surface', () => {
   it('closes the surface when the operator asks', async () => {
     const bridge = renderWithSurface()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Abrir el live de TikTok' }))
-    await act(async () => {})
+    await orderLive()
     act(() => bridge.emit({ mounted: true, state: 'ready' }))
     fireEvent.click(screen.getByRole('button', { name: 'Cerrar visor' }))
     await act(async () => {})
 
     expect(bridge.api.unmount).toHaveBeenCalledOnce()
-    expect(screen.getByRole('button', { name: 'Abrir el live de TikTok' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Abrir el live' })).toBeTruthy()
+  })
+})
+
+// S14: the operator decides how much each column weighs. The separators are the only
+// controls for that, so their ARIA contract and their keyboard steps are the behaviour.
+describe('panel — the draggable distribution', () => {
+  function separator(label: string): HTMLElement {
+    return screen.getByRole('separator', { name: label })
+  }
+
+  function value(element: HTMLElement): number {
+    return Number(element.getAttribute('aria-valuenow'))
+  }
+
+  it('renders two vertical separators between the three columns', () => {
+    state.stats = stats
+    render(<Panel onEditStore={() => {}} />)
+
+    const separators = screen.getAllByRole('separator')
+    expect(separators).toHaveLength(2)
+    for (const element of separators) {
+      expect(element.getAttribute('aria-orientation')).toBe('vertical')
+      expect(element.getAttribute('tabindex')).toBe('0')
+      expect(value(element)).toBeGreaterThan(0)
+      expect(Number(element.getAttribute('aria-valuemin'))).toBeGreaterThan(0)
+      expect(Number(element.getAttribute('aria-valuemax'))).toBeGreaterThan(value(element))
+      expect(element.getAttribute('aria-valuetext')).toBe(`${value(element)} píxeles`)
+    }
+    expect(separators.map(element => element.getAttribute('aria-label'))).toEqual([
+      'Ancho de la columna Live de TikTok',
+      'Ancho de la columna Productos',
+    ])
+  })
+
+  it('moves 16 px with the arrow keys and 48 px with Shift', () => {
+    state.stats = stats
+    render(<Panel onEditStore={() => {}} />)
+    const live = separator('Ancho de la columna Live de TikTok')
+    const before = value(live)
+
+    fireEvent.keyDown(live, { key: 'ArrowRight' })
+    expect(value(live)).toBe(before + 16)
+
+    fireEvent.keyDown(live, { key: 'ArrowRight', shiftKey: true })
+    expect(value(live)).toBe(before + 64)
+
+    fireEvent.keyDown(live, { key: 'ArrowLeft' })
+    expect(value(live)).toBe(before + 48)
+  })
+
+  it('redistributes the pair, so one column only gives what the next one takes', () => {
+    state.stats = stats
+    render(<Panel onEditStore={() => {}} />)
+    const live = separator('Ancho de la columna Live de TikTok')
+    const products = separator('Ancho de la columna Productos')
+    const beforeLive = value(live)
+    const beforeProducts = value(products)
+
+    fireEvent.keyDown(live, { key: 'ArrowRight' })
+
+    expect(value(live)).toBe(beforeLive + 16)
+    expect(value(products)).toBe(beforeProducts - 16)
+  })
+
+  it('clamps every separator at its minimum width', () => {
+    state.stats = stats
+    render(<Panel onEditStore={() => {}} />)
+
+    for (const [label, min] of [
+      ['Ancho de la columna Live de TikTok', 340],
+      ['Ancho de la columna Productos', 240],
+    ] as const) {
+      const element = separator(label)
+      expect(Number(element.getAttribute('aria-valuemin'))).toBe(min)
+      for (let press = 0; press < 40; press += 1) fireEvent.keyDown(element, { key: 'ArrowLeft' })
+      expect(value(element)).toBe(min)
+    }
+  })
+
+  it('clamps at the ceiling it announces, so ARIA never promises more than the drag gives', () => {
+    state.stats = stats
+    render(<Panel onEditStore={() => {}} />)
+    const live = separator('Ancho de la columna Live de TikTok')
+
+    for (let press = 0; press < 60; press += 1) fireEvent.keyDown(live, { key: 'ArrowRight' })
+
+    expect(value(live)).toBe(Number(live.getAttribute('aria-valuemax')))
+  })
+
+  it('follows a drag with the pointer', () => {
+    state.stats = stats
+    render(<Panel onEditStore={() => {}} />)
+    const live = separator('Ancho de la columna Live de TikTok')
+    const before = value(live)
+
+    fireEvent(live, new MouseEvent('pointerdown', { clientX: 500, bubbles: true }))
+    fireEvent(live, new MouseEvent('pointermove', { clientX: 540, bubbles: true }))
+    fireEvent(live, new MouseEvent('pointerup', { clientX: 540, bubbles: true }))
+    expect(value(live)).toBe(before + 40)
+
+    // A move after the pointer is released must not keep resizing.
+    fireEvent(live, new MouseEvent('pointermove', { clientX: 600, bubbles: true }))
+    expect(value(live)).toBe(before + 40)
+  })
+
+  // The artboard's breakpoint: one column, and the separators have nothing to separate.
+  it('stacks the columns and drops the separators below the narrow breakpoint', () => {
+    stubMatchMedia(true)
+    state.stats = stats
+    render(<Panel onEditStore={() => {}} />)
+
+    expect(screen.queryAllByRole('separator')).toHaveLength(0)
+    const workspace = document.querySelector('[data-slot="workspace"]') as HTMLElement
+    expect(workspace.className.split(/\s+/)).toContain('grid-cols-1')
+    for (const heading of ['Live de TikTok', 'Productos', 'Leads']) {
+      expect(screen.getByRole('heading', { level: 2, name: heading })).toBeTruthy()
+    }
   })
 })

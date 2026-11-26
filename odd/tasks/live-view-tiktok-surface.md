@@ -24,6 +24,18 @@ S9 — No se relajan CSP, `sandbox`, `contextIsolation`, navegación ni permisos
 
 S10 — No se integra el contenedor `prototypes/tiktok-live-browser` (Docker + noVNC); no hay tablas `lives` ni `leads`, ni lectura de eventos, ni WhatsApp, ni ingestor.
 
+S11 — El renderer nombra un canal, nunca una URL: `livefy:live-surface-mount` recibe exactamente un argumento, el handle. `main` valida un patrón estricto (letras, dígitos, punto y guion bajo, 2–24 caracteres, al menos una letra o dígito), construye `https://www.tiktok.com/@<handle>/live` y lo comprueba contra la allowlist antes de cargar; un handle inválido se rechaza con error y nunca se carga.
+
+S12 — La columna 1 tiene un campo etiquetado para el handle (el `@` es adorno, no se teclea). El botón de abrir está deshabilitado mientras el campo está vacío o el handle es inválido (`aria-describedby` apunta al motivo visible). El último handle tecleado sobrevive mientras el panel sigue montado.
+
+S13 — El visor ocupa el alto restante de la columna (`flex-1`, sin scroll interno y con un piso de alto) y el rectángulo sigue a la columna en el colapso de la barra lateral, el resize de la ventana y el cambio de ancho de columna.
+
+S14 — Reparto ajustable: dos separadores visibles y arrastrables con `role="separator"`, `aria-orientation="vertical"`, `aria-valuenow/valuemin/valuemax/valuetext`, puntero y teclado (flechas 16 px, `Shift`+flecha 48 px), mínimos de 340 px (live) y 240 px (productos); una sola columna con los separadores ausentes bajo el ancho del artboard (1100 CSS px). Los anchos son estado de sesión, no persistido, y ningún resize deja el visor sin alto ni el espacio con desbordamiento horizontal.
+
+S15 — El panel no pinta la fila de cinco KPI ni la leyenda de seis estados. La consulta de dashboard y su contrato `metrics` no cambian; el estado de conexión sigue legible en el badge de la barra superior mediante `connectionCopy`. La línea del ingestor y la nota «El login visual no autentica al ingestor» se conservan.
+
+S16 — Una carga deja de estar «Cargando» cuando el documento está listo (`dom-ready`), `did-finish-load` es el mismo final y un fallo conserva su motivo por encima del documento de error que Chromium pinta después.
+
 ## Tasks
 
 | ID | Task | Specs | Route | Commit |
@@ -36,6 +48,13 @@ S10 — No se integra el contenedor `prototypes/tiktok-live-browser` (Docker + n
 | T6 | Tests: first column with and without the native surface | S6, S7 | inline | b51921f |
 | T7 | Docs: acceptance matrix and partition persistence note | S7 | inline | b51921f |
 | T8 | Checks, Windows mirror sync, human acceptance | S7, S8 | inline | — (pending) |
+| T9 | #40: handle en `main` — patrón estricto, construcción de URL y rechazo con error | S11 | inline | — (pending) |
+| T10 | #40: campo de canal en la columna 1, botón deshabilitado con motivo | S12 | inline | — (pending) |
+| T11 | #40: visor al alto restante de la columna | S13 | inline | — (pending) |
+| T12 | #40: reparto ajustable con dos separadores accesibles | S14 | inline | — (pending) |
+| T13 | #40: panel sin fila de KPI ni leyenda de estados | S15 | inline | — (pending) |
+| T14 | #40: fin de la carga en `dom-ready` y fallo que conserva su motivo | S16 | inline | — (pending) |
+| T15 | #40: tests de todo lo anterior, README y espejo de Windows | S12–S16, S7, S8 | inline | — (pending) |
 
 ## Log
 
@@ -63,6 +82,12 @@ primitives), and the change fills a rectangle without restyling anything. Runnin
 round would have proposed a second look nobody asked for. Reversible: if the operator wants
 a different live layout, it is a new issue with its own directions.
 
+**Design directions for the #40 adjustment.** `design/live-canales/` holds three
+alternatives for the panel without the KPI row and with a full-height viewer plus the channel
+field: `01-channel-bar-full-height.html`, `02-viewer-with-status-rail.html`,
+`03-resizable-split.html`. None is handed off yet; the human picks one. The earlier "no design
+directions" note above still describes #39 only.
+
 **Slice boundary.** Two commits, `af932f8` (main-process boundary, IPC, hardening, its tests,
 feature document — 438 authored lines) and `b51921f` (renderer hook, panel, panel tests,
 README — 240 authored lines). The boundary commit is the high-risk one and can be reviewed
@@ -72,3 +97,7 @@ alone.
 `tiktok.com` and is therefore blocked by the navigation allowlist; manual login has to use
 phone or email. The surface carries no event ingestion, so columns 2 and 3 stay empty.
 Nothing here has been exercised in the packaged Windows app yet.
+
+L6 (#40, design, agent): `design/live-canales/` for the panel adjustment — 01-channel-bar-full-height.html, 02-viewer-with-status-rail.html, 03-resizable-split.html. No artboard handed off yet; all three are alternatives until the human picks one.
+
+L7 (#40, decision, human + agent): the chosen artboard is `design/live-canales/03-resizable-split.html` (resizable split); `01-channel-bar-full-height.html` and `02-viewer-with-status-rail.html` stay as the alternatives. The canvas comment on the artboard was applied: the six-state chip list leaves column 1 ("No veo tan necesarios estos estados, se puede eliminar?") and the connection state stays readable in the top bar badge through `connectionCopy`. New tasks T9–T15 (specs S11–S16) carry the adjustment: the renderer names a handle instead of a URL, the viewer fills the column, the three columns are redistributed with two accessible separators, the KPI row and the legend are gone, and a finished document ends the loading caption. Implemented in `apps/desktop` (`electron/live-surface.cjs`, `electron/main.cjs`, `electron/preload.cjs`, `src/lib/live-surface.ts`, `src/panel.tsx`, `src/vite-env.d.ts`, their tests and the README); nothing committed, built or mirrored yet.
