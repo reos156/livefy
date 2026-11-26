@@ -131,18 +131,36 @@ describe('shop wizard — step 2 · Cómo te pagan', () => {
     expect(onSubmit).not.toHaveBeenCalled()
   })
 
-  it('reveals the datum of a selected method and not the one of an unselected method', () => {
+  it('reveals the datum of a selected method inside its own card and not the one of an unselected method', () => {
     renderWizard()
     fillStoreStep()
     next()
 
+    // One card per catalogue method, in a two-column grid that folds to one column
+    // when the wizard is narrow.
+    const cards = document.querySelectorAll('[data-slot="payment-method"]')
+    expect(cards.length).toBe(paymentMethods.length)
+    const grid = cards[0].parentElement
+    expect(grid?.className).toContain('grid')
+    expect(grid?.className).toContain('grid-cols-2')
+
     choosePayment(/nequi/i)
 
-    // Each selected method carries its own datum, labelled and hinted by the catalogue.
-    expect(screen.getByLabelText('Tu Nequi')).toBeTruthy()
-    expect(screen.getByText('El número con el que recibís los pagos.')).toBeTruthy()
+    // The datum opens inside the card of the method it belongs to, labelled and
+    // hinted by the catalogue.
+    const nequi = screen.getByRole('button', { name: /nequi/i })
+    expect(nequi.getAttribute('aria-pressed')).toBe('true')
+    const nequiCard = nequi.closest('[data-slot="payment-method"]') as HTMLElement
+    expect(nequiCard.getAttribute('data-selected')).toBe('true')
+    expect(within(nequiCard).getByLabelText('Tu Nequi')).toBeTruthy()
+    expect(within(nequiCard).getByText('El número con el que recibís los pagos.')).toBeTruthy()
+
+    // An unselected method stays a closed card: no label, no field.
     expect(screen.queryByLabelText('Tu llave Bre-B')).toBeNull()
     expect(screen.queryByLabelText('Tu cuenta')).toBeNull()
+    const breB = screen.getByRole('button', { name: /llave bre-b/i })
+    expect(breB.getAttribute('aria-pressed')).toBe('false')
+    expect(within(breB.closest('[data-slot="payment-method"]') as HTMLElement).queryByRole('textbox')).toBeNull()
 
     fireEvent.change(screen.getByLabelText('Tu Nequi'), { target: { value: '3005089676' } })
     next()
