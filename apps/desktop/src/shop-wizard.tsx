@@ -48,6 +48,9 @@ const STEPS = [
 ] as const
 
 type Step = (typeof STEPS)[number]['number']
+// The step is the only piece of wizard navigation a caller can own. When it lives in the
+// URL, a transient remount re-reads it instead of falling back to the first step.
+export type WizardStep = Step
 
 const STEP_LEADS: Record<Step, string> = {
   1: 'Cómo te van a encontrar. Elegí lo que mejor describe lo que vendés.',
@@ -182,19 +185,29 @@ function StepProgress({ step }: { step: Step }) {
   </div>
 }
 
-export function ShopWizard({ initial, categories, paymentMethods, dialCodes, pending = false, error, footer, onSubmit }: {
+export function ShopWizard({ initial, categories, paymentMethods, dialCodes, step: ownedStep, onStepChange, pending = false, error, footer, onSubmit }: {
   initial?: ShopView | null
   categories: CatalogCategory[]
   paymentMethods: CatalogPaymentMethod[]
   dialCodes: CatalogDialCode[]
+  step?: WizardStep
+  onStepChange?: (step: WizardStep) => void
   pending?: boolean
   error?: string | null
   footer?: ReactNode
   onSubmit: (input: WizardInput) => void
 }) {
   const [form, setForm] = useState<Form>(() => initialForm(initial))
-  const [step, setStep] = useState<Step>(1)
+  const [internalStep, setInternalStep] = useState<Step>(1)
+  const step = ownedStep ?? internalStep
   const [errors, setErrors] = useState<Errors>({})
+
+  // Every move reports itself, so an owning caller (the URL) can record it. The internal
+  // state keeps the wizard working unchanged for callers that own nothing.
+  function goTo(next: Step) {
+    setInternalStep(next)
+    onStepChange?.(next)
+  }
 
   function update<K extends Exclude<keyof Form, 'paymentData'>>(key: K, value: Form[K]) {
     setForm(current => ({ ...current, [key]: value }))
@@ -253,11 +266,11 @@ export function ShopWizard({ initial, categories, paymentMethods, dialCodes, pen
     const found = validateStep(step, form, paymentMethods, dialCodes)
     applyStepErrors(found)
     if (Object.keys(found).length > 0) return
-    if (step < 3) setStep((step + 1) as Step)
+    if (step < 3) goTo((step + 1) as Step)
   }
 
   function back() {
-    if (step > 1) setStep((step - 1) as Step)
+    if (step > 1) goTo((step - 1) as Step)
   }
 
   function submit(event: FormEvent<HTMLFormElement>) {
@@ -271,7 +284,7 @@ export function ShopWizard({ initial, categories, paymentMethods, dialCodes, pen
     setErrors(Object.assign({}, ...Object.values(foundByStep)))
     const blocking = STEPS.find(item => Object.keys(foundByStep[item.number]).length > 0)
     if (blocking) {
-      setStep(blocking.number)
+      goTo(blocking.number)
       return
     }
     onSubmit(toInput(form, paymentMethods))

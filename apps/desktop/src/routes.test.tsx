@@ -10,25 +10,48 @@ vi.mock('./platform/auth', () => ({
 const state = vi.hoisted(() => ({ isLoading: false, isAuthenticated: false, isRefreshing: false }))
 const authHook = vi.hoisted(() => vi.fn())
 const listeners = vi.hoisted(() => new Set<() => void>())
+// What the backend answers, per query the renderer subscribes to. The stored shop stays
+// `null` by default, which keeps an unconfigured operator on the wizard.
+const data = vi.hoisted(() => ({
+  shop: null as unknown,
+  stats: undefined as unknown,
+  categories: [] as unknown,
+  paymentMethods: [] as unknown,
+  dialCodes: [] as unknown,
+  mutation: vi.fn(async () => null),
+}))
 vi.mock('convex/react', async () => {
   const { useReducer, useEffect } = await import('react')
+  // The renderer subscribes with real function references; the name inside one is the only
+  // stable key a mock can read without importing the module under test.
+  const referenced = (ref: object) => {
+    const [symbol] = Object.getOwnPropertySymbols(ref)
+    return (ref as Record<symbol, string>)[symbol]
+  }
+  const answers: Record<string, () => unknown> = {
+    'shops:current': () => data.shop,
+    'dashboard:getDashboardStats': () => data.stats,
+    'catalog:categories': () => data.categories,
+    'catalog:paymentMethods': () => data.paymentMethods,
+    'catalog:dialCodes': () => data.dialCodes,
+  }
   return { useConvexAuth: () => {
     authHook()
     const [, update] = useReducer(value => value + 1, 0)
     useEffect(() => { listeners.add(update); return () => { listeners.delete(update) } }, [])
     return state
   },
-  // The private entry reads the operator's shop; an unconfigured shop keeps it on
-  // the wizard, which is the screen these route assertions look for.
-  useQuery: () => null,
-  useMutation: () => async () => null }
+  useQuery: (ref: object) => answers[referenced(ref)]?.(),
+  useMutation: () => data.mutation }
 })
 beforeEach(() => { vi.spyOn(window, 'scrollTo').mockImplementation(() => {}) })
 import { AuthConfiguration } from './lib/auth'
 import { createAppRouter } from './routes'
+import type { CatalogCategory, CatalogDialCode, CatalogPaymentMethod, DashboardStats, ShopView } from './lib/shop-api'
 afterEach(() => {
   cleanup(); vi.clearAllMocks(); vi.restoreAllMocks()
   Object.assign(state, { isLoading: false, isAuthenticated: false, isRefreshing: false })
+  Object.assign(data, { shop: null, stats: undefined, categories: [], paymentMethods: [], dialCodes: [] })
 })
 it('bootstraps memory navigation independently of Clerk hash and reloads publicly', async () => {
   const source = readFileSync('src/main.tsx', 'utf8')
@@ -105,4 +128,106 @@ it('does not enter before backend confirmation', async () => {
   const { router } = setup('/')
   expect(await screen.findByText('Official Clerk launchers')).toBeTruthy()
   expect(router.state.location.pathname).toBe('/')
+})
+
+// An operator with a stored shop: the panel opens, the wizard only opens when asked for.
+const storedShop: ShopView = {
+  shopId: 'shop_1',
+  name: 'Mundo Kawaii',
+  description: 'Accesorios y papelería',
+  categorySlugs: ['accesorios'],
+  paymentMethodSlugs: ['nequi'],
+  paymentData: [{ slug: 'nequi', value: '3005089676' }],
+  whatsapp: { dialCode: '+57', number: '3001234567' },
+  tiktokBotHandle: null,
+  whatsappBotNumber: null,
+}
+const categories: CatalogCategory[] = [{ slug: 'accesorios', label: 'Accesorios' }]
+const paymentMethods: CatalogPaymentMethod[] = [{
+  slug: 'nequi',
+  label: 'Nequi',
+  description: 'Billetera · te llega al celular o por QR',
+  dataKind: 'phone',
+  dataLabel: 'Tu Nequi',
+  dataHint: 'El número con el que recibís los pagos.',
+}]
+const dialCodes: CatalogDialCode[] = [{ iso2: 'CO', label: 'Colombia', dial: '+57' }]
+const dashboardStats: DashboardStats = {
+  shopId: 'shop_1',
+  shopName: 'Mundo Kawaii',
+  liveConnection: null,
+  metrics: { activeLives: 0, newLeads: 0, pendingLeads: 0, conversionRate: 0, estimatedSales: 0 },
+  lives: [],
+}
+function withStoredShop() {
+  state.isAuthenticated = true
+  Object.assign(data, { shop: storedShop, stats: dashboardStats, categories, paymentMethods, dialCodes })
+}
+
+it('opens the store form from the panel and returns to it when the edit is saved', async () => {
+  withStoredShop()
+  const { router } = setup('/app')
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Editar tienda' }))
+
+  expect(await screen.findByRole('heading', { name: 'Configurá tu tienda' })).toBeTruthy()
+  // The form owns a path of its own, and it opens prefilled with the stored shop.
+  expect(router.state.location.pathname).toBe('/app/store')
+  expect((screen.getByLabelText('Nombre de la tienda') as HTMLInputElement).value).toBe('Mundo Kawaii')
+  expect(screen.queryByRole('heading', { level: 1, name: 'Panel' })).toBeNull()
+  // The way out of the session stays reachable from the form itself.
+  expect(screen.getByRole('button', { name: 'Sign out' })).toBeTruthy()
+
+  fireEvent.click(screen.getByRole('button', { name: 'Continuar' }))
+  expect(await screen.findByText('Paso 2 de 3')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'Continuar' }))
+  expect(await screen.findByText('Paso 3 de 3')).toBeTruthy()
+
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar tienda' }))
+
+  // Finishing the edit lands on the panel again, at its own path.
+  expect(await screen.findByRole('heading', { level: 1, name: 'Panel' })).toBeTruthy()
+  expect(router.state.location.pathname).toBe('/app')
+  expect(data.mutation).toHaveBeenCalledTimes(1)
+
+  // The sidebar entry reaches the same surface.
+  fireEvent.click(screen.getByRole('button', { name: 'Tienda' }))
+  expect(await screen.findByText('Paso 1 de 3')).toBeTruthy()
+  expect(router.state.location.pathname).toBe('/app/store')
+
+  // Leaving the form without saving also returns to the panel.
+  fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+  expect(await screen.findByRole('heading', { level: 1, name: 'Panel' })).toBeTruthy()
+  expect(router.state.location.pathname).toBe('/app')
+  expect(data.mutation).toHaveBeenCalledTimes(1)
+})
+
+it('keeps the store form and its step through a transient backend refresh', async () => {
+  withStoredShop()
+  const { router } = setup('/app')
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Editar tienda' }))
+  fireEvent.click(await screen.findByRole('button', { name: 'Continuar' }))
+  expect(await screen.findByText('Paso 2 de 3')).toBeTruthy()
+  // Changing step never saves: whatever the form loses now was lost to a remount.
+  expect(data.mutation).not.toHaveBeenCalled()
+
+  act(() => {
+    state.isRefreshing = true
+    listeners.forEach(update => update())
+  })
+  expect(screen.getByRole('status').textContent).toBe('Checking backend access')
+
+  act(() => {
+    state.isRefreshing = false
+    listeners.forEach(update => update())
+  })
+
+  // Nothing was saved, so whatever the form lost, it lost to the remount.
+  expect(data.mutation).not.toHaveBeenCalled()
+  // The refresh is transient: the surface and the step it was on survive it.
+  expect(screen.queryByRole('heading', { level: 1, name: 'Panel' })).toBeNull()
+  expect(await screen.findByText('Paso 2 de 3')).toBeTruthy()
+  expect(router.state.location.pathname).toBe('/app/store')
+  expect(data.mutation).not.toHaveBeenCalled()
 })
