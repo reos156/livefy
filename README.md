@@ -1,12 +1,14 @@
 # Livefy
 
-Livefy busca facilitar la gestión comercial de transmisiones en vivo de TikTok. El repositorio todavía no ofrece un flujo comercial completo: contiene una base de escritorio Electron/React y un contrato de autenticación y sesión verificado contra Convex en desarrollo (DEV).
+Livefy busca facilitar la gestión comercial de transmisiones en vivo de TikTok. El repositorio ofrece hoy una base de escritorio Electron/React con el acceso verificado, el alta de tienda, el dashboard del operador y el visor de TikTok LIVE en la primera de tres columnas. El flujo comercial completo —leads, WhatsApp, productos y cierre de carrito— todavía no existe.
 
 ## Estado actual
 
-- **Implementado (DEV):** ventana Electron aislada con fronteras IPC, Clerk como único emisor de autenticación en web y Electron con la UI oficial del proveedor, registro, inicio de sesión, rutas privadas con guard, sesión nativa y navegación con TanStack Router sobre Convex. Ver H1.1–H1.7 en el [hito de acceso Windows](odd/tasks/mvp-h1-access-windows.md).
-- **Pendiente:** recuperación de contraseña (H1.8–H1.12), la attestation negativa de Clerk y la CSP de producción, la aplicación empaquetada en Windows y todas las funciones comerciales del MVP (wizard de tienda, dashboard, panel de live, productos, leads, Kapso e ingestor local).
-- **Windows:** existe evidencia humana del lanzamiento básico de la vista previa (H1.1) y del acceso en DEV. La seguridad en ejecución, la attestation negativa de Clerk y la aplicación empaquetada en Windows no están certificados.
+- **Implementado (DEV), acceso:** ventana Electron aislada con fronteras IPC, Clerk como único emisor de autenticación en web y Electron con la UI oficial del proveedor, registro, inicio de sesión, rutas privadas con guard, sesión nativa, recuperación de contraseña y navegación con TanStack Router sobre Convex. H1.1–H1.8, H1.11 y H1.12 están cerrados en el [hito de acceso Windows](odd/tasks/mvp-h1-access-windows.md); H1.9 y H1.10 quedaron absorbidos por H1.8 y no se pasaron como criterios separados.
+- **Implementado (DEV), primera porción comercial:** R1 wizard de tienda con los catálogos en base de datos, R2 dashboard del operador con su contrato de métricas, y R3 columna 1 del panel de live —visor TikTok aislado, aceptado por el operador—. Ver los PR #25, #35, #36 y #42.
+- **Pendiente:** R3 columnas 2 y 3 (productos y leads), R4 máquina de estados del lead, R5 WhatsApp por Kapso, R6 sesión de escritorio e ingestor local, R7 producto activo y cierre de carrito, y R8 seguimiento post-live. No existen todavía las tablas `lives`, `leads`, `products` ni `orders`, ni el webhook en `convex/http.ts`; `apps/` contiene sólo `desktop`.
+- **Residuales conocidos:** las métricas de R2 tienen contrato en el backend pero el panel no las pinta, los identificadores del bot no se muestran en el wizard, el puente IPC no limita el tamaño del payload, el gate negativo de emisor ajeno (S2) sigue abierto por decisión, y un build firmado e instalado no está certificado.
+- **Windows:** existe evidencia humana del lanzamiento básico de la vista previa (H1.1), del acceso y la recuperación en DEV, de la jornada de la aplicación empaquetada (H1.12, `dist:win` sobre `win-unpacked`) y de la CSP de producción entregada por header. La attestation negativa de Clerk no está certificada.
 - **Alcance:** DEV aceptado, sin certificación de producción ni despliegue.
 
 ## Tecnologías
@@ -24,7 +26,7 @@ bun run test
 bun run build
 ```
 
-Estos son comandos disponibles, no comprobaciones ejecutadas al redactar esta documentación. `build` genera los recursos de la aplicación; no crea un instalador ni realiza firma o distribución.
+Estos son comandos disponibles, no comprobaciones ejecutadas al redactar esta documentación. `build` genera los recursos de la aplicación; no crea un instalador ni realiza firma o distribución. Para eso último existe `bun run dist:win` (o `dist:win:unpacked`) en `apps/desktop`, que tampoco firma ni publica.
 
 ## Desarrollo y ejecución
 
@@ -49,7 +51,7 @@ cd apps/desktop
 bun run start
 ```
 
-La activación o reutilización de operaciones remotas de Auth requiere autorización explícita independiente; estos pasos no despliegan Convex.
+La activación o reutilización de operaciones remotas de Auth requiere autorización explícita independiente; estos pasos no despliegan Convex. Para que el operador pruebe un cambio en Windows hay además un espejo local del worktree: `scripts/sync-windows.local.sh` previsualiza y `scripts/sync-windows.local.sh --apply` copia hacia `C:\Livefy\mvp`.
 
 ## Más información
 
