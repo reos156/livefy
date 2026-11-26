@@ -281,7 +281,7 @@ rectángulo, un canal y muestra el estado; no nombra una URL ni instancia un `<w
 | Permisos | Ninguno concedido: pedidos y comprobaciones responden `false`. La reproducción de video y audio no los requiere. |
 | Ventanas y descargas | `window.open` en deny y `will-download` cancelado en la sesión de la partición. |
 | Estado | `idle`, `loading`, `ready` o `failed` con motivo; una carga fallida se muestra como error, no como rectángulo vacío. `ready` llega en `dom-ready` (y en `did-finish-load`, que es el mismo final); un fallo conserva su motivo. |
-| Escala | El guest renderiza al 90 % (`LIVE_ZOOM` en `electron/live-surface.cjs`): el texto y el video quedan casi a tamaño, y el riel de comentarios de TikTok sigue cortado porque su layout de escritorio pide ~1000 CSS px y una columna de ~410 DIP da ~456. Ensanchar la columna es la palanca que lo devuelve; bajar más el zoom fue rechazado por ilegible. |
+| Escala | El guest renderiza al 80 % (`LIVE_ZOOM` en `electron/live-surface.cjs`). El riel de comentarios de TikTok pide ~1000 CSS px y sigue cortado en columnas angostas: ensanchar la columna es la palanca que lo devuelve. Bajar más el zoom fue rechazado por ilegible (0,5) y probado sin convencer (0,9). |
 
 El reparto de las tres columnas es estado de sesión: dos separadores arrastrables y, por
 teclado, flechas de 16 px y `Shift`+flecha de 48 px, con mínimos de 340 px (live) y 240 px

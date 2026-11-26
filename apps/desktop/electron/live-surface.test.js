@@ -204,10 +204,10 @@ describe('live surface boundary', () => {
     expect(window.contentView.addChildView).toHaveBeenCalledWith(view)
     expect(view.options.webPreferences).toEqual(live.liveWebPreferences)
     expect(view.webContents.loadURL).toHaveBeenCalledWith('https://www.tiktok.com/@mundokawaii/live')
-    // The operator chose near-unity scale over the smaller type of lower values, knowing the
+    // The operator reverted half scale for being unreadable and kept this value, knowing the
     // rail clips until the column is wide enough.
-    expect(live.LIVE_ZOOM).toBe(0.9)
-    expect(view.webContents.setZoomFactor).toHaveBeenCalledWith(0.9)
+    expect(live.LIVE_ZOOM).toBe(0.8)
+    expect(view.webContents.setZoomFactor).toHaveBeenCalledWith(0.8)
     expect(surface.status()).toEqual({ mounted: true, state: 'loading' })
 
     // Mounting twice must reuse the single surface instead of stacking views.
