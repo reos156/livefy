@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Panel — sidebar, top bar, KPIs y tres columnas</title>
+<style>
+  :root {
+    --background: oklch(1.0000 0 0); --foreground: oklch(0.2850 0 0); --card: oklch(1.0000 0 0);
+    --muted: oklch(0.9845 0.0026 106.4477); --muted-foreground: oklch(0.5103 0 0);
+    --border: oklch(0.9269 0.0160 110.5685); --input: oklch(0.9448 0.0134 115.8392);
+    --primary: oklch(0.9347 0.1825 120.5229); --primary-foreground: oklch(0 0 0);
+    --accent: oklch(0.9353 0.1021 109.4248); --ring: oklch(0.9347 0.1825 120.5229); --radius: 1rem;
+  }
+  html.dark { --background: oklch(0.2679 0.0036 106.6427); --foreground: oklch(0.9576 0.0027 106.4494);
+    --card: oklch(0.2928 0.0018 106.5092); --muted: oklch(0.3160 0.0025 106.5500);
+    --muted-foreground: oklch(0.7200 0.0040 106.4500); --border: oklch(0.3618 0.0101 106.8928);
+    --input: oklch(0.3400 0.0090 106.8000); --accent: oklch(0.3900 0.0600 112.0000); --primary-foreground: oklch(0 0 0); }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--background); color: var(--foreground);
+    font-family: ui-sans-serif, system-ui, sans-serif; font-size: 13px; line-height: 1.45; }
+  :focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; }
+
+  /* Sidebar + contenido: la anatomía del kit. */
+  .shell { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+  aside { border-right: 1px solid var(--border); background: var(--card); padding: 12px 10px;
+    display: flex; flex-direction: column; gap: 2px; }
+  .brand { display: flex; align-items: center; gap: 9px; padding: 2px 8px 14px; }
+  .mark { width: 28px; height: 28px; border-radius: 9px; background: var(--primary);
+    color: var(--primary-foreground); display: grid; place-items: center; font-weight: 700; font-size: 13px; }
+  .brand strong { font-size: 13.5px; }
+  .group { font-size: 10px; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--muted-foreground); padding: 10px 8px 5px; }
+  .nav-item { display: flex; align-items: center; gap: 9px; padding: 7px 9px; border-radius: 8px;
+    color: var(--muted-foreground); text-decoration: none; font-size: 12.5px; }
+  .nav-item[aria-current="page"] { background: var(--muted); color: var(--foreground); font-weight: 600; }
+  .nav-item[aria-disabled="true"] { opacity: .55; }
+  .nav-item .soon { margin-left: auto; font-size: 9.5px; text-transform: uppercase; letter-spacing: .04em; }
+  aside .sp { flex: 1; }
+
+  .main { display: flex; flex-direction: column; min-width: 0; }
+  header.top { display: flex; align-items: center; gap: 10px; padding: 11px 16px;
+    border-bottom: 1px solid var(--border); background: var(--card); }
+  .crumbs { font-size: 12px; color: var(--muted-foreground); }
+  .crumbs strong { color: var(--foreground); font-size: 13px; }
+  .sp { flex: 1; }
+  .status { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border);
+    border-radius: 999px; padding: 4px 10px; font-size: 11.5px; color: var(--muted-foreground); }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted-foreground); }
+  button.b { height: 29px; padding: 0 11px; border-radius: 8px; font: inherit; font-size: 11.5px; font-weight: 600;
+    border: 1px solid transparent; background: var(--primary); color: var(--primary-foreground); cursor: pointer; }
+  button.g { background: transparent; border-color: var(--border); color: var(--foreground); font-weight: 500; }
+  button.h { background: transparent; border-color: transparent; color: var(--muted-foreground); font-weight: 500; }
+  .disabled { opacity: .45; pointer-events: none; }
+
+  /* Tarjetas de KPI: Card con CardHeader/CardContent en la implementación. */
+  .kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 9px; padding: 14px 16px 0; }
+  .kpi { border: 1px solid var(--border); border-radius: 12px; background: var(--card); padding: 11px 12px; }
+  .kpi .label { font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted-foreground); }
+  .kpi .value { font-size: 21px; font-weight: 700; margin-top: 3px; letter-spacing: -0.01em; }
+  .kpi .foot { font-size: 10.5px; color: var(--muted-foreground); margin-top: 2px; }
+
+  .cols { display: grid; grid-template-columns: 1.35fr 1fr 1.3fr; gap: 9px; padding: 14px 16px 16px; flex: 1; }
+  .col { border: 1px solid var(--border); border-radius: 12px; background: var(--card); display: flex;
+    flex-direction: column; min-width: 0; }
+  .col > header { display: flex; align-items: center; gap: 7px; padding: 10px 12px;
+    border-bottom: 1px solid var(--border); }
+  .col > header h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .05em;
+    color: var(--muted-foreground); margin: 0; }
+  .body { padding: 10px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+  .viewer { flex: 1; min-height: 170px; border: 1px dashed var(--border); border-radius: 9px; background: var(--muted);
+    display: grid; place-items: center; text-align: center; padding: 16px; color: var(--muted-foreground); font-size: 11.5px; }
+  .viewer strong { display: block; color: var(--foreground); font-size: 12px; margin-bottom: 3px; }
+  .drop { border: 1px dashed var(--border); border-radius: 9px; padding: 16px 12px; text-align: center;
+    color: var(--muted-foreground); font-size: 11.5px; background: var(--muted); flex: 1;
+    display: flex; flex-direction: column; justify-content: center; }
+  .drop strong { display: block; color: var(--foreground); font-size: 12px; margin-bottom: 3px; }
+  .slot { border: 1px solid var(--primary); border-radius: 9px; padding: 9px 10px; font-size: 11.5px;
+    background: var(--accent); display: flex; justify-content: space-between; }
+  .note { font-size: 10.5px; color: var(--muted-foreground); margin: 0; }
+  .health { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 10.5px; color: var(--muted-foreground); }
+  .chip { display: inline-block; font-size: 10px; border: 1px solid var(--border); border-radius: 999px;
+    padding: 1px 6px; color: var(--muted-foreground); }
+  .chip[data-on="true"] { background: var(--accent); border-color: var(--accent); color: var(--foreground); }
+  table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  th { text-align: left; font-weight: 600; color: var(--muted-foreground); padding: 5px 3px;
+    border-bottom: 1px solid var(--border); font-size: 9.5px; text-transform: uppercase; letter-spacing: .04em; }
+  td { padding: 7px 3px; color: var(--muted-foreground); }
+  .toggle { position: fixed; top: 8px; right: 8px; font-size: 10px; padding: 4px 8px; border-radius: 6px;
+    border: 1px solid var(--border); background: var(--card); color: var(--muted-foreground); cursor: pointer; }
+</style>
+</head>
+<body>
+<button class="toggle" type="button" onclick="document.documentElement.classList.toggle('dark')">claro / oscuro</button>
+<div class="shell">
+  <aside aria-label="Principal">
+    <div class="brand"><span class="mark" aria-hidden="true">L</span><strong>Livefy</strong></div>
+    <span class="group">Operación</span>
+    <nav aria-label="Operación" style="display:flex;flex-direction:column;gap:2px">
+      <a class="nav-item" href="#" aria-current="page">Panel</a>
+      <a class="nav-item" href="#" aria-disabled="true">Leads <span class="soon">pronto</span></a>
+      <a class="nav-item" href="#" aria-disabled="true">Ventas <span class="soon">pronto</span></a>
+    </nav>
+    <span class="group">Catálogo</span>
+    <nav aria-label="Catálogo" style="display:flex;flex-direction:column;gap:2px">
+      <a class="nav-item" href="#" aria-disabled="true">Productos <span class="soon">pronto</span></a>
+      <a class="nav-item" href="#">Tienda</a>
+    </nav>
+    <span class="sp"></span>
+    <a class="nav-item" href="#">Sign out</a>
+  </aside>
+
+  <div class="main">
+    <header class="top">
+      <div class="crumbs"><strong>Panel</strong> · Mundo Kawaii</div>
+      <span class="sp"></span>
+      <span class="status"><span class="dot" aria-hidden="true"></span>Desconectado</span>
+      <button class="b g" type="button">Editar tienda</button>
+      <button class="b" type="button" disabled class="disabled" title="Requiere un live conectado">Finalizar live</button>
+    </header>
+
+    <div class="kpis">
+      <div class="kpi"><div class="label">Lives activos</div><div class="value">0</div><div class="foot">Sin datos todavía</div></div>
+      <div class="kpi"><div class="label">Leads nuevos</div><div class="value">0</div><div class="foot">Sin datos todavía</div></div>
+      <div class="kpi"><div class="label">Pendientes</div><div class="value">0</div><div class="foot">Sin datos todavía</div></div>
+      <div class="kpi"><div class="label">Conversión</div><div class="value">0 %</div><div class="foot">Sin datos todavía</div></div>
+      <div class="kpi"><div class="label">Ventas estimadas</div><div class="value">$0</div><div class="foot">Sin datos todavía</div></div>
+    </div>
+
+    <div class="cols">
+      <section class="col" aria-labelledby="c1">
+        <header><h2 id="c1">Live de TikTok</h2><span class="sp"></span><span class="chip">ended</span></header>
+        <div class="body">
+          <button class="b disabled" type="button" disabled aria-describedby="n1">Conectá tu primer live</button>
+          <p class="note" id="n1">La conexión de lives llega en la próxima etapa.</p>
+          <div class="viewer"><div><strong>Ningún live conectado</strong>Al conectar, el live se abre en una superficie aislada, sin Node y con sandbox.</div></div>
+          <div class="health">
+            <span>Ingestor: <strong style="color:var(--foreground)">sin sesión</strong></span>
+            <span>Brecha: <strong style="color:var(--foreground)">—</strong></span>
+            <span class="chip" data-on="true">connected</span><span class="chip">reconnecting</span>
+            <span class="chip">offline</span><span class="chip">suspended-risk</span>
+            <span class="chip">disconnected</span><span class="chip">ended</span>
+          </div>
+          <p class="note">El login visual no autentica al ingestor. Cerrar la app detiene sólo la captura local, no el live comercial.</p>
+        </div>
+      </section>
+
+      <section class="col" aria-labelledby="c2">
+        <header><h2 id="c2">Productos</h2><span class="sp"></span><button class="b g" type="button" disabled class="disabled">Crear</button></header>
+        <div class="body">
+          <div class="slot"><span>Producto activo</span><strong>ninguno</strong></div>
+          <div class="drop"><strong>Arrastrá un producto acá</strong>El activo es el que se ofrece y se notifica según el estado de cada lead.</div>
+          <p class="note">Sin productos cargados. Se persisten en Convex.</p>
+        </div>
+      </section>
+
+      <section class="col" aria-labelledby="c3">
+        <header><h2 id="c3">Leads</h2><span class="sp"></span><span class="note">0 en el live</span></header>
+        <div class="body">
+          <table>
+            <thead><tr><th>Handle</th><th>WhatsApp</th><th>Estado</th><th>Ítems</th><th>Total</th><th>Última act.</th></tr></thead>
+            <tbody></tbody>
+          </table>
+          <div class="drop"><strong>Sin leads todavía</strong>Entran en tiempo real. El comprobante se valida o rechaza en esta columna.</div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+</body>
+</html>

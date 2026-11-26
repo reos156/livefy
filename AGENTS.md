@@ -15,6 +15,16 @@ Every Livefy screen is built on the official shadcn/ui components. Adding an off
 - Application-specific composition, layout and product logic stay ours; this premise does not authorize installing the whole catalog or rewriting business logic.
 - **The human exercises the UI and accepts it.** Automated tests prove behaviour; they never prove acceptance. A screen counts as accepted only after the human runs it, unless they explicitly ask for that verification to be done with Playwright.
 
+## Desktop app validation — standing premise
+
+A change the human will exercise in the desktop app ends with the Windows mirror synced. A change that exists only in this worktree is not testable by them, and acceptance is theirs.
+
+- Run `scripts/sync-windows.local.sh` with no argument first: it previews and writes nothing. Apply with `scripts/sync-windows.local.sh --apply`. It mirrors this worktree into `C:\Livefy\mvp`, overridable with `LIVEFY_WIN_ROOT`.
+- The script deliberately never copies nor deletes `node_modules`, `dist`, `.env.local`, `.turbo` or logs, and it deletes in the destination only inside `apps/desktop/src` and `apps/desktop/electron`, where code is renamed or removed. Say so when a change relies on one of the excluded paths.
+- Sync after the checks pass and before handing the change over, then give the run commands: from `apps/desktop`, `bun run dev` for the renderer on `127.0.0.1:5173` and `bun run desktop:dev` for Electron.
+- When `package.json` or the lockfile changes, say it explicitly: the Windows side needs its own install before it can run.
+- The script carries files, not history. The Windows checkout is a validation surface, not the source of truth, and its git state says nothing about what was delivered.
+
 ## Git and delivery — standing premises
 
 - **No work starts before the issue exists and the human approves it.** Open the issue from `.github/ISSUE_TEMPLATE/mvp-task.yml` describing the requirement or the adjustment, then stop and wait for approval before writing code, producing a design brief, or cutting a branch. The issue is the agreement on what will be done: it is what confirms the scope is understood the same way the human understands it, and an ambiguity caught after work started costs a rewrite instead of a message.

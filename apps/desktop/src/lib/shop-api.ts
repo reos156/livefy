@@ -39,6 +39,36 @@ export type CatalogPaymentMethod = {
 }
 export type CatalogDialCode = { iso2: string; label: string; dial: string }
 
+// S9: the panel must distinguish these six live states. `null` means the operator has
+// no live at all, which is not one of them.
+export type LiveConnection =
+  | 'connected'
+  | 'reconnecting'
+  | 'offline'
+  | 'suspended-risk'
+  | 'disconnected'
+  | 'ended'
+
+export type DashboardMetrics = {
+  activeLives: number
+  newLeads: number
+  pendingLeads: number
+  // 0..1; the screen formats it as a percentage.
+  conversionRate: number
+  // Whole Colombian pesos.
+  estimatedSales: number
+}
+
+// D-D: the five metrics are part of the contract before their sources exist, so the
+// screen and the query keep this exact shape when R3 and R4 start filling it.
+export type DashboardStats = {
+  shopId: string
+  shopName: string
+  liveConnection: LiveConnection | null
+  metrics: DashboardMetrics
+  lives: Array<{ liveId: string; status: LiveConnection }>
+}
+
 // Closed set the backend publishes. Typing the copy map against it turns a renamed or
 // new code into a typecheck failure instead of a silent generic fallback.
 export type ShopValidationCode =
@@ -73,6 +103,11 @@ export const catalogFunctions = {
   categories: makeFunctionReference<'query', Record<string, never>, CatalogCategory[]>('catalog:categories'),
   paymentMethods: makeFunctionReference<'query', Record<string, never>, CatalogPaymentMethod[]>('catalog:paymentMethods'),
   dialCodes: makeFunctionReference<'query', Record<string, never>, CatalogDialCode[]>('catalog:dialCodes'),
+
+// The empty argument object is the contract: the shop comes from the identity, so the
+// client has no identifier to send (S3).
+export const dashboardFunctions = {
+  getDashboardStats: makeFunctionReference<'query', Record<string, never>, DashboardStats>('dashboard:getDashboardStats'),
 }
 
 const copy: Record<ShopValidationCode, string> = {

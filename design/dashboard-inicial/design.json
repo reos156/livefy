@@ -1,0 +1,28 @@
+{
+  "title": "Panel del operador — tres columnas, estado vacío",
+  "brief": "Panel de control del operador de Livefy, con la anatomía de dashboard shadcn y las tres columnas que define el scope: Live de TikTok (superficie aislada, login manual que no autentica al ingestor, salud del ingestor y advertencia de brecha), Productos (disponibles, producto activo, drag & drop, crear) y Leads (handle, WhatsApp, estado, ítems, total, última actividad, comprobante y cierre de carrito). Arriba, las cinco métricas de R2: lives activos, leads nuevos, pendientes, conversión y ventas estimadas. El panel distingue connected, reconnecting, offline, suspended-risk, disconnected y ended, y 'Finalizar live' es una acción de negocio explícita separada de cerrar la app. El producto tiene dos apps — app/desktop con Electron y visor, app/web sin visor — sobre un frontend compartido, así que las direcciones difieren en cómo el visor convive con el resto del panel. Como todavía no existe captura de lives ni de productos ni de leads, cada columna muestra su estado vacío honesto y el CTA 'Conectá tu primer live' queda deshabilitado con nota. No se inventan deltas, series, productos ni leads.",
+  "feature": "odd/tasks/initial-dashboard.md",
+  "artboards": [
+    {
+      "file": "01-three-columns-one-window.html",
+      "title": "Tres columnas en una ventana",
+      "tradeoff": "Es literalmente el panel de tres columnas del scope, con el visor compartiendo ventana con productos y leads. La columna de leads queda con ancho justo para seis columnas y la app web tendría que ocultar la primera, dejando un hueco que hay que rediseñar por plataforma.",
+      "width": 1280,
+      "height": 900
+    },
+    {
+      "file": "02-shared-core-viewer-strip.html",
+      "title": "Núcleo compartido y el visor como franja de estado",
+      "tradeoff": "La misma ventana sirve a escritorio y web: arriba vive el estado del live y del ingestor como franja, y el contenido son las dos columnas que ambas apps comparten. Gana espacio para productos y leads y no duplica layout, pero el visor pierde jerarquía y en escritorio obliga a una ventana aparte para ver el live.",
+      "width": 1280,
+      "height": 900
+    },
+    {
+      "file": "03-viewer-own-window.html",
+      "title": "El visor en su propia ventana",
+      "tradeoff": "Separa físicamente lo no confiable: el visor es una ventana aislada y el panel queda como el núcleo que también corre en web. Coincide con la frontera de seguridad y con el ingestor autónomo; suma manejo de dos ventanas y el operador tiene que ordenarlas en pantalla.",
+      "width": 1280,
+      "height": 900
+    }
+  ]
+}
