@@ -6,11 +6,11 @@ const LIVE_PARTITION = 'persist:tiktok'
 // The renderer names a channel, never a URL: the host is fixed here and the handle only
 // ever reaches the path, so no channel can move the guest to another origin.
 const LIVE_ORIGIN = 'https://www.tiktok.com'
-// TikTok's desktop live layout needs roughly 1000 CSS px to show its right rail (viewers,
-// comments, the compose box). The column gives ~410 DIP, so the page renders at half scale:
-// 410 / 0.5 = 820 CSS px, which is what the operator accepted over losing the chat. At 0.8 the
-// rail still clipped; this is the width the layout actually needs.
-const LIVE_ZOOM = 0.5
+// The page renders slightly zoomed out. TikTok's desktop live layout needs roughly 1000 CSS px
+// for its right rail (viewers, comments, the compose box); a ~410 DIP column at 0.9 gives ~456,
+// so the rail still clips. The operator chose this over the smaller type of lower scales: the
+// rail is the price, and widening the column is the lever that buys it back.
+const LIVE_ZOOM = 0.9
 // TikTok handles: letters, digits, dot and underscore, 2–24 characters, and at least one
 // letter or digit so `..` or `__` cannot pass as a channel.
 const LIVE_HANDLE = /^(?=.*[A-Za-z0-9])[A-Za-z0-9._]{2,24}$/

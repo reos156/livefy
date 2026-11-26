@@ -126,3 +126,5 @@ L10 (#41, agent): the first column's header is one row again — the field's lab
 L11 (#41, agent): the ingestor line and its note ("El login visual no autentica al ingestor. Cerrar la app detiene sólo la captura local, no el live comercial.") left the first column. With no ingestor behind them they measured nothing; the scope's S6 health reading has no UI surface until R6 exists.
 
 L12 (#41, agent): `LIVE_ZOOM` is 0.5, not 0.8. Measured against the operator's window (1546 px wide, column 1 at ~410 DIP), 0.8 gave the page ~512 CSS px and the comment rail still clipped; half scale gives ~820, which is what TikTok's desktop live layout needs. The human chose the smaller everything over widening the column or a second window.
+
+L13 (#41, agent): `LIVE_ZOOM` is 0.9. Half scale was rejected as too small; at 0.9 the type and video stay near real size and the comment rail clips again (~456 CSS px of the ~1000 the layout wants). The trade is explicit: the operator keeps readable content and buys the rail back by widening the column, which the dividers already allow.

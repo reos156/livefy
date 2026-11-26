@@ -204,10 +204,10 @@ describe('live surface boundary', () => {
     expect(window.contentView.addChildView).toHaveBeenCalledWith(view)
     expect(view.options.webPreferences).toEqual(live.liveWebPreferences)
     expect(view.webContents.loadURL).toHaveBeenCalledWith('https://www.tiktok.com/@mundokawaii/live')
-    // At half scale the column's rectangle gives TikTok the ~820 CSS px its live layout needs
-    // for the comment rail; at 0.8 the rail still clipped.
-    expect(live.LIVE_ZOOM).toBe(0.5)
-    expect(view.webContents.setZoomFactor).toHaveBeenCalledWith(0.5)
+    // The operator chose near-unity scale over the smaller type of lower values, knowing the
+    // rail clips until the column is wide enough.
+    expect(live.LIVE_ZOOM).toBe(0.9)
+    expect(view.webContents.setZoomFactor).toHaveBeenCalledWith(0.9)
     expect(surface.status()).toEqual({ mounted: true, state: 'loading' })
 
     // Mounting twice must reuse the single surface instead of stacking views.
