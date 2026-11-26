@@ -12,9 +12,10 @@ interface Window {
     logout(): Promise<void>
     preserveAndQuit?(): Promise<void>
   }
-  // Present only in the Electron shell. A rectangle and a status, never a URL.
+  // Present only in the Electron shell. A rectangle, a channel handle and a status, never
+  // a URL: main validates the handle and builds the address.
   livefyLive?: {
-    mount(): Promise<LiveSurfaceStatus>
+    mount(channel: string): Promise<LiveSurfaceStatus>
     setBounds(bounds: { x: number; y: number; width: number; height: number }): Promise<boolean>
     unmount(): Promise<LiveSurfaceStatus>
     status(): Promise<LiveSurfaceStatus>

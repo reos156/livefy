@@ -5,7 +5,7 @@ const { createTokenStorage } = require('./clerk-storage.cjs')
 const { rendererHandler } = require('./protocol.cjs')
 const path = require('node:path')
 const { DEV_URL, webPreferences, secureContents } = require('./security.cjs')
-const { createLiveSurface, toViewBounds } = require('./live-surface.cjs')
+const { createLiveSurface, requireLiveChannel, toViewBounds } = require('./live-surface.cjs')
 
 const development = !app.isPackaged && process.argv.includes('--livefy-dev')
 // This file is bundled to dist/main.cjs (electron/build-main.mjs); the unbundled
@@ -108,14 +108,17 @@ if (bridge.isPrimaryInstance) app.whenReady().then(() => {
   }
   ipcMain.handle('livefy:session-logout', (event, ...args) => terminal('logout', event, args))
   ipcMain.handle('livefy:session-preserve-and-quit', (event, ...args) => terminal('preserve', event, args))
-  // The surface channels carry the rectangle and nothing else: the renderer never names a
-  // URL, so it cannot point third-party content anywhere the policy has not allowed.
+  // The surface channels carry the rectangle and one handle, never a URL: the renderer
+  // cannot point third-party content anywhere the policy has not allowed. The handle is
+  // validated and turned into a URL here, and an invalid one is refused with an error
+  // instead of loading something the operator did not name.
   ipcMain.handle('livefy:live-surface-mount', (event, ...args) => {
     requireRenderer(event)
-    if (args.length) throw new Error('Denied')
+    if (args.length !== 1) throw new Error('Denied')
+    const url = requireLiveChannel(args[0])
     const owner = BrowserWindow.fromWebContents(event.sender)
     if (!owner) throw new Error('Denied')
-    liveSurface.mount(owner)
+    liveSurface.mount(owner, url)
     return liveSurface.status()
   })
   ipcMain.handle('livefy:live-surface-bounds', (event, ...args) => {

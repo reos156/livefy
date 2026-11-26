@@ -172,18 +172,19 @@ describe('live surface boundary', () => {
     const FakeView = viewClass(views)
     const window = { contentView: { addChildView: vi.fn(), removeChildView: vi.fn() } }
     const surface = live.createLiveSurface(FakeView)
+    const url = live.requireLiveChannel('mundokawaii')
 
     expect(surface.status()).toEqual({ mounted: false, state: 'idle' })
 
-    surface.mount(window)
+    surface.mount(window, url)
     const view = views[0]
     expect(window.contentView.addChildView).toHaveBeenCalledWith(view)
     expect(view.options.webPreferences).toEqual(live.liveWebPreferences)
-    expect(view.webContents.loadURL).toHaveBeenCalledWith(live.LIVE_HOME)
+    expect(view.webContents.loadURL).toHaveBeenCalledWith('https://www.tiktok.com/@mundokawaii/live')
     expect(surface.status()).toEqual({ mounted: true, state: 'loading' })
 
     // Mounting twice must reuse the single surface instead of stacking views.
-    surface.mount(window)
+    surface.mount(window, url)
     expect(views).toHaveLength(1)
 
     surface.setBounds({ x: 8, y: 9, width: 640, height: 360 })
@@ -204,12 +205,115 @@ describe('live surface boundary', () => {
     const seen = []
     const surface = live.createLiveSurface(viewClass([]))
     surface.subscribe(status => seen.push(status))
-    surface.mount({ contentView: { addChildView: vi.fn(), removeChildView: vi.fn() } })
+    surface.mount({ contentView: { addChildView: vi.fn(), removeChildView: vi.fn() } }, live.requireLiveChannel('mundokawaii'))
     const guest = surface.view().webContents
     guest.emit('did-finish-load')
     expect(surface.status().state).toBe('ready')
     guest.emit('did-fail-load', {}, -105, 'NAME_NOT_RESOLVED', 'https://www.tiktok.com/', true)
     expect(surface.status()).toEqual({ mounted: true, state: 'failed', reason: 'NAME_NOT_RESOLVED' })
     expect(seen.at(-1)).toEqual({ mounted: true, state: 'failed', reason: 'NAME_NOT_RESOLVED' })
+  })
+})
+
+// S11: the renderer names a channel, never a URL. The handle is validated here, the URL is
+// built here, and the allowlist check happens before anything loads.
+describe('live channel', () => {
+  function mountedSurface(url) {
+    const views = []
+    const surface = live.createLiveSurface(viewClass(views))
+    surface.mount({ contentView: { addChildView: vi.fn(), removeChildView: vi.fn() } }, url)
+    return { surface, views, guest: surface.view().webContents }
+  }
+
+  it('accepts only a strict handle', () => {
+    for (const handle of ['mundokawaii', 'Mundo.Kawaii_01', 'a1', 'x'.repeat(24)]) {
+      expect(live.parseLiveHandle(handle)).toBe(handle)
+    }
+    for (const handle of [
+      'a',
+      'x'.repeat(25),
+      '@mundokawaii',
+      'mundo kawaii',
+      'mundo-kawaii',
+      'mundo/kawaii',
+      'mundo?kawaii',
+      '..',
+      '__',
+      '',
+      ' mundo',
+      null,
+      undefined,
+      42,
+      ['mundokawaii'],
+      { handle: 'mundokawaii' },
+    ]) {
+      expect(live.parseLiveHandle(handle)).toBeNull()
+    }
+  })
+
+  it('builds the live URL from the handle and keeps it inside the allowlist', () => {
+    expect(live.liveUrlForHandle('mundokawaii')).toBe('https://www.tiktok.com/@mundokawaii/live')
+    expect(live.liveUrlForHandle('Mundo.Kawaii_01')).toBe('https://www.tiktok.com/@Mundo.Kawaii_01/live')
+    expect(live.isAllowedLiveUrl(live.liveUrlForHandle('mundokawaii'))).toBe(true)
+    expect(live.liveUrlForHandle('@mundokawaii')).toBeNull()
+    expect(live.liveUrlForHandle('mundo kawaii')).toBeNull()
+    expect(live.liveUrlForHandle(null)).toBeNull()
+  })
+
+  it('refuses an invalid channel with a thrown error instead of loading something', () => {
+    expect(live.requireLiveChannel('mundokawaii')).toBe('https://www.tiktok.com/@mundokawaii/live')
+    for (const handle of ['@mundokawaii', 'mundo kawaii', 'a', '', null, 42]) {
+      expect(() => live.requireLiveChannel(handle)).toThrow('Invalid live channel')
+    }
+  })
+
+  it('loads the channel it was given and nothing else', () => {
+    const { guest } = mountedSurface(live.requireLiveChannel('mundokawaii'))
+    expect(guest.loadURL).toHaveBeenCalledWith('https://www.tiktok.com/@mundokawaii/live')
+  })
+
+  it('refuses to mount a URL outside the allowlist, or no URL at all', () => {
+    const views = []
+    const surface = live.createLiveSurface(viewClass(views))
+    const window = { contentView: { addChildView: vi.fn(), removeChildView: vi.fn() } }
+
+    expect(() => surface.mount(window, 'https://evil.test/@mundokawaii/live')).toThrow('Refused live URL')
+    expect(() => surface.mount(window, 'http://www.tiktok.com/@mundokawaii/live')).toThrow('Refused live URL')
+    expect(() => surface.mount(window)).toThrow('Refused live URL')
+    // A refused mount must not leave a half-created guest attached to the window.
+    expect(views).toHaveLength(0)
+    expect(window.contentView.addChildView).not.toHaveBeenCalled()
+    expect(surface.status()).toEqual({ mounted: false, state: 'idle' })
+  })
+
+  // S16: the caption used to wait for `did-finish-load`, which can arrive after the page is
+  // already usable. The document being ready is the end of the load.
+  it('reports ready as soon as the document is ready', () => {
+    const { surface, guest } = mountedSurface(live.requireLiveChannel('mundokawaii'))
+    expect(surface.status().state).toBe('loading')
+
+    guest.emit('dom-ready')
+    expect(surface.status()).toEqual({ mounted: true, state: 'ready' })
+
+    // `did-finish-load` stays the same end state instead of a second one.
+    guest.emit('did-finish-load')
+    expect(surface.status()).toEqual({ mounted: true, state: 'ready' })
+  })
+
+  it('lets a failure win over the error page it paints', () => {
+    const { surface, guest } = mountedSurface(live.requireLiveChannel('mundokawaii'))
+
+    guest.emit('did-fail-load', {}, -105, 'NAME_NOT_RESOLVED', 'https://www.tiktok.com/@mundokawaii/live', true)
+    expect(surface.status()).toEqual({ mounted: true, state: 'failed', reason: 'NAME_NOT_RESOLVED' })
+
+    // Chromium loads its own error document, which fires ready events of its own.
+    guest.emit('dom-ready')
+    guest.emit('did-finish-load')
+    expect(surface.status()).toEqual({ mounted: true, state: 'failed', reason: 'NAME_NOT_RESOLVED' })
+
+    // A new navigation starts clean, so a retry can still become ready.
+    guest.emit('did-start-loading')
+    guest.emit('dom-ready')
+    expect(surface.status()).toEqual({ mounted: true, state: 'ready' })
   })
 })

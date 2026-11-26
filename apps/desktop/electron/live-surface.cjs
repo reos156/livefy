@@ -3,7 +3,12 @@
 // inside it. Third-party content stays a sibling of the renderer instead of a child of it,
 // which is what keeps `sandbox`, `contextIsolation` and the app's CSP untouched.
 const LIVE_PARTITION = 'persist:tiktok'
-const LIVE_HOME = 'https://www.tiktok.com/'
+// The renderer names a channel, never a URL: the host is fixed here and the handle only
+// ever reaches the path, so no channel can move the guest to another origin.
+const LIVE_ORIGIN = 'https://www.tiktok.com'
+// TikTok handles: letters, digits, dot and underscore, 2–24 characters, and at least one
+// letter or digit so `..` or `__` cannot pass as a channel.
+const LIVE_HANDLE = /^(?=.*[A-Za-z0-9])[A-Za-z0-9._]{2,24}$/
 // No preload: a bridge into third-party content is a privileged channel the app does not
 // need. `webviewTag` stays false for the same reason it is false everywhere else.
 const liveWebPreferences = Object.freeze({
@@ -53,6 +58,29 @@ function hardenLiveContents(contents) {
     if (!isAllowedLiveUrl(details?.url)) details?.preventDefault()
   })
   contents.on('will-attach-webview', event => event.preventDefault())
+}
+
+// A handle is the only thing the renderer may name. Anything that is not exactly the
+// pattern is null, so the caller has to refuse it instead of loading something plausible.
+function parseLiveHandle(value) {
+  return typeof value === 'string' && LIVE_HANDLE.test(value) ? value : null
+}
+
+// The URL is built after the handle is validated and then checked against the same
+// allowlist the navigation guards use. If the two ever disagreed, the allowlist wins.
+function liveUrlForHandle(value) {
+  const handle = parseLiveHandle(value)
+  if (!handle) return null
+  const url = `${LIVE_ORIGIN}/@${handle}/live`
+  return isAllowedLiveUrl(url) ? url : null
+}
+
+// The mount channel's only argument is the handle. Refusing here, with a thrown error, is
+// what keeps an invalid channel from being mounted as an empty or unexpected page.
+function requireLiveChannel(value) {
+  const url = liveUrlForHandle(value)
+  if (!url) throw new Error('Invalid live channel')
+  return url
 }
 
 function whole(value) {
@@ -105,11 +133,27 @@ function createLiveSurface(WebContentsView) {
   }
 
   function attachListeners(guest) {
-    guest.on('did-start-loading', () => publish({ mounted: true, state: 'loading' }))
-    guest.on('did-finish-load', () => publish({ mounted: true, state: 'ready' }))
+    // One flag per navigation. Chromium paints its own error document after a failed main
+    // frame load, and that document fires ready events: without the flag, a failure would
+    // be overwritten by the error page it drew.
+    let failed = false
+    guest.on('did-start-loading', () => {
+      failed = false
+      publish({ mounted: true, state: 'loading' })
+    })
+    // `dom-ready` is the end of the load the operator waits for. `did-finish-load` can
+    // arrive after the page is already usable, so waiting for it left the caption stuck on
+    // "Cargando" over a live document. Both mean the same state.
+    guest.on('dom-ready', () => {
+      if (!failed) publish({ mounted: true, state: 'ready' })
+    })
+    guest.on('did-finish-load', () => {
+      if (!failed) publish({ mounted: true, state: 'ready' })
+    })
     guest.on('did-fail-load', (_event, _code, description, _url, isMainFrame) => {
       // Subresource failures are normal on a live stream; only the document counts.
       if (isMainFrame === false) return
+      failed = true
       publish({ mounted: true, state: 'failed', reason: description || 'unknown' })
     })
   }
@@ -117,8 +161,11 @@ function createLiveSurface(WebContentsView) {
   return {
     view: () => view,
 
-    mount(window) {
+    mount(window, url) {
       if (view) return view
+      // Second gate, after the channel is parsed: a URL that is not on the allowlist never
+      // becomes a guest, so a bug in the builder cannot point the surface elsewhere.
+      if (!isAllowedLiveUrl(url)) throw new Error('Refused live URL')
       view = new WebContentsView({ webPreferences: { ...liveWebPreferences } })
       hardenLiveContents(view.webContents)
       attachListeners(view.webContents)
@@ -126,7 +173,7 @@ function createLiveSurface(WebContentsView) {
       // Position before loading, so the first paint never lands at the window origin.
       if (bounds) view.setBounds(bounds)
       publish({ mounted: true, state: 'loading' })
-      view.webContents.loadURL(LIVE_HOME).catch(() => {
+      view.webContents.loadURL(url).catch(() => {
         publish({ mounted: true, state: 'failed', reason: 'load-rejected' })
       })
       return view
@@ -162,8 +209,11 @@ function createLiveSurface(WebContentsView) {
 
 module.exports = {
   LIVE_PARTITION,
-  LIVE_HOME,
+  LIVE_ORIGIN,
   liveWebPreferences,
+  parseLiveHandle,
+  liveUrlForHandle,
+  requireLiveChannel,
   isAllowedLiveUrl,
   hardenLiveContents,
   parseBounds,

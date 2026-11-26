@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 // The surface lives in the main process. The renderer owns two things only: where the
-// rectangle goes and what to say while it loads. A missing bridge means the browser build,
-// where the surface does not exist and the column must say so instead of pretending.
+// rectangle goes and what to say while it loads, plus the channel the operator asked for.
+// A missing bridge means the browser build, where the surface does not exist and the
+// column must say so instead of pretending.
 type Bounds = { x: number; y: number; width: number; height: number }
 
 function toBounds(rect: DOMRect): Bounds {
@@ -58,11 +59,17 @@ export function useLiveSurface() {
     }
   }, [bridge, report])
 
-  const mount = useCallback(async () => {
+  const mount = useCallback(async (channel: string) => {
     if (!bridge) return
     // Position before creating the guest: it must never paint at the window origin first.
     report()
-    setStatus(await bridge.mount())
+    try {
+      setStatus(await bridge.mount(channel))
+    } catch {
+      // Main refused the channel or the bridge broke. That is a failed surface, not a
+      // silently empty rectangle; the renderer cannot tell whether the guest exists.
+      setStatus({ mounted: true, state: 'failed', reason: 'rechazo del proceso principal' })
+    }
     report()
   }, [bridge, report])
 
@@ -84,11 +91,11 @@ export function useLiveSurface() {
   }, [bridge])
 
   // A failed guest is replaced, not repaired: the renderer owns no part of it, so retrying
-  // means releasing it and mounting a fresh one.
-  const restart = useCallback(async () => {
+  // means releasing it and mounting a fresh one for the channel that failed.
+  const restart = useCallback(async (channel: string) => {
     if (!bridge) return
     await unmount()
-    await mount()
+    await mount(channel)
   }, [bridge, mount, unmount])
 
   return { available: Boolean(bridge), status, frame, report, mount, unmount, restart }
