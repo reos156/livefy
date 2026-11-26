@@ -376,6 +376,10 @@ function LeadsColumn({ count }: { count: number }) {
 // The three columns and the two rails always add up to the width that was measured, which
 // is what keeps a resize from leaving a horizontal overflow or a column of no width.
 const COLUMN_MIN = [340, 240, 260] as const
+// The width below which the three columns cannot all keep their minimum and still fill the
+// row. It is the sum of the minimums plus the two rails, and it is what decides between the
+// split and the stacked layout (see `useColumnWidths`).
+const MIN_TOTAL = COLUMN_MIN[0] + COLUMN_MIN[1] + COLUMN_MIN[2]
 const SEPARATOR_WIDTH = 10
 const KEY_STEP = 16
 const KEY_STEP_LARGE = 48
@@ -383,19 +387,45 @@ const DEFAULT_WIDTHS: Widths = [556, 322, 386]
 const NARROW_QUERY = '(max-width: 1100px)'
 type Widths = [number, number, number]
 
-// Scaling by the measured total keeps the proportions the operator chose; the remainder
-// (rounding included) goes to the third column so the three tracks still fill the row.
+// What shrinks when the workspace narrows is the slack above the three minimums, never the
+// minimums themselves: fitting a column to 1 px left the tracks summing to the measured
+// width while every number derived from them — the rails' ARIA, the keyboard step — was
+// wrong. The proportions the operator chose are kept in the slack, so a split that was
+// already fitted is returned unchanged.
 function fitWidths(widths: Widths, budget: number): Widths {
   const total = widths[0] + widths[1] + widths[2]
   if (budget <= 0 || total <= 0) return widths
-  const scaled: Widths = [
-    Math.max(1, Math.round(widths[0] * budget / total)),
-    Math.max(1, Math.round(widths[1] * budget / total)),
-    Math.max(1, Math.round(widths[2] * budget / total)),
+  // There is no honest three-column split below this width: it would have to break a
+  // minimum or overflow the row sideways. The caller stacks instead.
+  if (budget < MIN_TOTAL) return widths
+  const slack = budget - MIN_TOTAL
+  const extras: Widths = [
+    Math.max(0, widths[0] - COLUMN_MIN[0]),
+    Math.max(0, widths[1] - COLUMN_MIN[1]),
+    Math.max(0, widths[2] - COLUMN_MIN[2]),
   ]
-  const remainder = budget - scaled[0] - scaled[1]
-  scaled[2] = remainder >= 1 ? remainder : 1
-  return scaled
+  const extraTotal = extras[0] + extras[1] + extras[2]
+  // A set already sitting on its minimums has no proportion to keep, so the slack follows
+  // the minimums themselves instead of dividing by zero.
+  const share = extraTotal > 0 ? extras : [...COLUMN_MIN]
+  const shareTotal = extraTotal > 0 ? extraTotal : MIN_TOTAL
+  const fitted: Widths = [
+    COLUMN_MIN[0] + Math.round(slack * share[0] / shareTotal),
+    COLUMN_MIN[1] + Math.round(slack * share[1] / shareTotal),
+    COLUMN_MIN[2] + Math.round(slack * share[2] / shareTotal),
+  ]
+  // Rounding is the only difference left. It lands on the column with the most room above
+  // its minimum, which has at least one pixel of it whenever the residue is negative, so
+  // the correction can never push a column under its minimum.
+  const residue = budget - (fitted[0] + fitted[1] + fitted[2])
+  if (residue !== 0) {
+    let target: 0 | 1 | 2 = 0
+    for (const index of [1, 2] as const) {
+      if (fitted[index] - COLUMN_MIN[index] > fitted[target] - COLUMN_MIN[target]) target = index
+    }
+    fitted[target] += residue
+  }
+  return fitted
 }
 
 // Two neighbouring columns share one total: a separator only moves the line between them,
@@ -450,6 +480,13 @@ function useNarrowWorkspace(): boolean {
 function useColumnWidths(narrow: boolean) {
   const grid = useRef<HTMLDivElement | null>(null)
   const [widths, setWidths] = useState<Widths>(DEFAULT_WIDTHS)
+  // Whether the measured width can hold the three minimums and both rails. When it cannot,
+  // the workspace stacks instead of drawing a split it cannot honour: the alternatives are a
+  // column under its minimum or a row that scrolls sideways, and S14 rules out both. The
+  // stacked layout is the one the artboard already uses below its breakpoint, so the same
+  // screen simply arrives a little earlier (a window just above 1100 px with the sidebar
+  // expanded is the only real case).
+  const [fits, setFits] = useState(true)
 
   useEffect(() => {
     if (narrow) return
@@ -460,6 +497,7 @@ function useColumnWidths(narrow: boolean) {
       if (available <= 0) return
       const next = available - SEPARATOR_WIDTH * 2
       if (next <= 0) return
+      setFits(next >= MIN_TOTAL)
       setWidths(current => {
         const fitted = fitWidths(current, next)
         return fitted[0] === current[0] && fitted[1] === current[1] && fitted[2] === current[2] ? current : fitted
@@ -478,6 +516,7 @@ function useColumnWidths(narrow: boolean) {
   return {
     grid,
     widths,
+    fits,
     resize: (index: 0 | 1, target: number) => setWidths(current => moveColumns(current, index, target)),
   }
 }
@@ -485,7 +524,10 @@ function useColumnWidths(narrow: boolean) {
 // The rail itself is the control, so it carries the window-splitter semantics: role,
 // orientation, value and keyboard steps. No installed primitive splits a layout — the
 // Separator primitive is a static divider — so it draws the line inside this rail and the
-// rail owns the interaction.
+// rail owns the interaction. `aria-valuemin`/`aria-valuemax` are exactly the range the keys
+// and the drag deliver (`moveColumns` clamps to the same pair), and the value always sits
+// inside it, so a step is delivered in full until the bound rather than spent correcting a
+// value that had drifted out of range.
 function ColumnSeparator({ index, label, width, min, max, onResize }: {
   index: 0 | 1
   label: string
@@ -507,7 +549,7 @@ function ColumnSeparator({ index, label, width, min, max, onResize }: {
     aria-valuemax={Math.max(min, max)}
     aria-valuenow={width}
     aria-valuetext={`${width} píxeles`}
-    title="Arrastrá o usá las flechas para ajustar el ancho"
+    title="Arrastrá o usá las flechas (16 px, Shift 48 px) para ajustar el ancho"
     className="group/separator relative flex w-2.5 touch-none cursor-col-resize items-center justify-center outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
     onKeyDown={event => {
       const step = event.shiftKey ? KEY_STEP_LARGE : KEY_STEP
@@ -547,6 +589,10 @@ function Workspace({ shopName, leadCount, narrow }: {
   narrow: boolean
 }) {
   const columns = useColumnWidths(narrow)
+  // One column below the artboard breakpoint, and one column when the measured width cannot
+  // hold all three minimums: the split would have to break a minimum or overflow the row, so
+  // the workspace stacks at that size and returns to the split as soon as it fits again.
+  const stacked = narrow || !columns.fits
   const template = `${columns.widths[0]}px ${SEPARATOR_WIDTH}px ${columns.widths[1]}px ${SEPARATOR_WIDTH}px minmax(0, 1fr)`
 
   return <main aria-labelledby="workspace-title" className="min-h-0 flex-1">
@@ -556,12 +602,16 @@ function Workspace({ shopName, leadCount, narrow }: {
       data-slot="workspace"
       className={cn(
         'grid p-4',
-        narrow ? 'grid-cols-1 gap-2.5 overflow-y-auto' : 'h-full min-h-0 items-stretch',
+        narrow ? 'grid-cols-1 gap-2.5 overflow-y-auto'
+          // Stacked by measurement: the panel still owns a viewport-sized height, so the grid
+          // is the scroller that keeps the stacked columns reachable.
+          : stacked ? 'h-full min-h-0 grid-cols-1 gap-2.5 overflow-y-auto'
+            : 'h-full min-h-0 items-stretch',
       )}
-      style={narrow ? undefined : ({ gridTemplateColumns: template } as CSSProperties)}
+      style={stacked ? undefined : ({ gridTemplateColumns: template } as CSSProperties)}
     >
       <LiveColumn />
-      {!narrow && <ColumnSeparator
+      {!stacked && <ColumnSeparator
         index={0}
         label="Ancho de la columna Live de TikTok"
         width={columns.widths[0]}
@@ -572,7 +622,7 @@ function Workspace({ shopName, leadCount, narrow }: {
         onResize={columns.resize}
       />}
       <ProductsColumn />
-      {!narrow && <ColumnSeparator
+      {!stacked && <ColumnSeparator
         index={1}
         label="Ancho de la columna Productos"
         width={columns.widths[1]}

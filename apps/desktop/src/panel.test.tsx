@@ -563,3 +563,138 @@ describe('panel — the draggable distribution', () => {
     }
   })
 })
+
+// jsdom has no layout, so the measured width is forced on the grid and a `resize` event runs
+// the same code path the window resize does. The invariants below are the ones the split
+// promises the operator, and every one of them was broken by a fit that clamped to 1 px
+// instead of to each column's minimum.
+describe('panel — the split keeps its own numbers', () => {
+  function stubLayout(width: number) {
+    stubMatchMedia(false)
+    const bridge = renderWithSurface()
+    const workspace = document.querySelector('[data-slot="workspace"]') as HTMLElement
+    let measured = width
+    Object.defineProperty(workspace, 'clientWidth', { configurable: true, get: () => measured })
+    function measure(next = measured) {
+      measured = next
+      act(() => { window.dispatchEvent(new Event('resize')) })
+    }
+    measure()
+    return { ...bridge, workspace, measure }
+  }
+
+  // The template is the artifact: three tracks and the two rails between them. The third
+  // column is the remainder, so a wrong fit shows up as a wrong remainder instead of
+  // disappearing off the end of the row.
+  function tracks(workspace: HTMLElement, measured: number): [number, number, number] {
+    const parts = workspace.style.gridTemplateColumns.split(/\s+/)
+    expect(parts).toHaveLength(6)
+    expect(parts.slice(4)).toEqual(['minmax(0,', '1fr)'])
+    const [live, railOne, products, railTwo] = parts.slice(0, 4).map(part => Number.parseFloat(part))
+    expect(railOne).toBe(10)
+    expect(railTwo).toBe(10)
+    return [live, products, measured - live - products - 20]
+  }
+
+  function rail(element: HTMLElement, name: 'aria-valuemin' | 'aria-valuemax' | 'aria-valuenow'): number {
+    return Number(element.getAttribute(name))
+  }
+
+  it('keeps every column at its minimum and every rail inside its own range after a resize', () => {
+    const { workspace } = stubLayout(932)
+
+    const [live, products, leads] = tracks(workspace, 932)
+    expect(live).toBeGreaterThanOrEqual(340)
+    expect(products).toBeGreaterThanOrEqual(240)
+    expect(leads).toBeGreaterThanOrEqual(260)
+    // The measured width is spent exactly: no gap and no horizontal overflow.
+    expect(live + products + leads + 20).toBe(932)
+
+    const [first, second] = screen.getAllByRole('separator')
+    for (const element of [first, second]) {
+      expect(rail(element, 'aria-valuenow')).toBeGreaterThanOrEqual(rail(element, 'aria-valuemin'))
+      expect(rail(element, 'aria-valuenow')).toBeLessThanOrEqual(rail(element, 'aria-valuemax'))
+    }
+    // Each rail reports the column it splits, and its ceiling is what the next column can
+    // give up: what the drag and the keys actually deliver.
+    expect(rail(first, 'aria-valuenow')).toBe(live)
+    expect(rail(second, 'aria-valuenow')).toBe(products)
+    expect(rail(first, 'aria-valuemax')).toBe(live + products - 240)
+    expect(rail(second, 'aria-valuemax')).toBe(products + leads - 260)
+  })
+
+  it('delivers the step the arrows announce, and stops exactly on the bound', () => {
+    stubLayout(932)
+    const [live, second] = screen.getAllByRole('separator')
+    const min = rail(live, 'aria-valuemin')
+    const max = rail(live, 'aria-valuemax')
+
+    // An arrow right never shrinks a column, not even one step away from the ceiling: the
+    // step used to be spent pulling a value that had drifted past its own maximum back in.
+    const startedAt = rail(live, 'aria-valuenow')
+    fireEvent.keyDown(live, { key: 'ArrowRight' })
+    expect(rail(live, 'aria-valuenow')).toBeGreaterThanOrEqual(startedAt)
+    expect(rail(live, 'aria-valuenow')).toBe(Math.min(startedAt + 16, max))
+
+    // `Shift` moves a whole 48 px of the pair it splits, not the 19 px the ceiling allowed.
+    const secondStart = rail(second, 'aria-valuenow')
+    fireEvent.keyDown(second, { key: 'ArrowRight', shiftKey: true })
+    expect(rail(second, 'aria-valuenow')).toBe(Math.min(secondStart + 48, rail(second, 'aria-valuemax')))
+    expect(rail(second, 'aria-valuenow')).toBeGreaterThan(secondStart)
+    expect(rail(second, 'aria-valuenow')).toBeGreaterThanOrEqual(rail(second, 'aria-valuemin'))
+  })
+
+  it('delivers a full step from the floor, and stops exactly on the ceiling', () => {
+    stubLayout(932)
+    const [live] = screen.getAllByRole('separator')
+    const min = rail(live, 'aria-valuemin')
+
+    for (let press = 0; press < 10; press += 1) fireEvent.keyDown(live, { key: 'ArrowLeft' })
+    expect(rail(live, 'aria-valuenow')).toBe(min)
+
+    // A whole step, not a residue of a value that had drifted out of range.
+    fireEvent.keyDown(live, { key: 'ArrowRight' })
+    expect(rail(live, 'aria-valuenow')).toBe(min + 16)
+    fireEvent.keyDown(live, { key: 'ArrowLeft', shiftKey: true })
+    expect(rail(live, 'aria-valuenow')).toBe(min)
+    fireEvent.keyDown(live, { key: 'ArrowRight', shiftKey: true })
+    expect(rail(live, 'aria-valuenow')).toBe(min + 48)
+
+    // From there the ceiling is the only thing left: the bound is reached, never passed.
+    fireEvent.keyDown(live, { key: 'ArrowRight' })
+    expect(rail(live, 'aria-valuenow')).toBe(Math.min(min + 64, rail(live, 'aria-valuemax')))
+    expect(rail(live, 'aria-valuenow')).toBeLessThanOrEqual(rail(live, 'aria-valuemax'))
+  })
+
+  // Below the width where all three minimums fit there is no honest split: the tracks would
+  // have to break a minimum or overflow the row. The workspace stacks there instead, and
+  // the split comes back as soon as the measured width can hold all three again.
+  it('stacks instead of breaking its minimums when the measured width cannot hold all three', () => {
+    const { workspace, measure } = stubLayout(800)
+
+    expect(screen.queryAllByRole('separator')).toHaveLength(0)
+    expect(workspace.className.split(/\s+/)).toContain('grid-cols-1')
+
+    measure(1400)
+
+    const [live, products, leads] = tracks(workspace, 1400)
+    expect(live).toBeGreaterThanOrEqual(340)
+    expect(products).toBeGreaterThanOrEqual(240)
+    expect(leads).toBeGreaterThanOrEqual(260)
+    expect(live + products + leads + 20).toBe(1400)
+    expect(screen.getAllByRole('separator')).toHaveLength(2)
+  })
+
+  // The resize event fires far more often than the layout actually changes, and the fit is
+  // applied to the widths it produced last time. Re-measuring the same width must not walk
+  // the columns down towards their minimums.
+  it('is idempotent across repeated measurements of the same width', () => {
+    const { workspace, measure } = stubLayout(1400)
+    const first = tracks(workspace, 1400)
+
+    measure()
+    measure()
+
+    expect(tracks(workspace, 1400)).toEqual(first)
+  })
+})

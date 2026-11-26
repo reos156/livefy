@@ -101,3 +101,20 @@ Nothing here has been exercised in the packaged Windows app yet.
 L6 (#40, design, agent): `design/live-canales/` for the panel adjustment — 01-channel-bar-full-height.html, 02-viewer-with-status-rail.html, 03-resizable-split.html. No artboard handed off yet; all three are alternatives until the human picks one.
 
 L7 (#40, decision, human + agent): the chosen artboard is `design/live-canales/03-resizable-split.html` (resizable split); `01-channel-bar-full-height.html` and `02-viewer-with-status-rail.html` stay as the alternatives. The canvas comment on the artboard was applied: the six-state chip list leaves column 1 ("No veo tan necesarios estos estados, se puede eliminar?") and the connection state stays readable in the top bar badge through `connectionCopy`. New tasks T9–T15 (specs S11–S16) carry the adjustment: the renderer names a handle instead of a URL, the viewer fills the column, the three columns are redistributed with two accessible separators, the KPI row and the legend are gone, and a finished document ends the loading caption. Implemented in `apps/desktop` (`electron/live-surface.cjs`, `electron/main.cjs`, `electron/preload.cjs`, `src/lib/live-surface.ts`, `src/panel.tsx`, `src/vite-env.d.ts`, their tests and the README); nothing committed, built or mirrored yet.
+
+L8 (#40, fix, agent + independent verifier): two blockers reproduced against the committed surface. B1 — `fitWidths` clamped each track to 1 px instead of to its column minimum, so after a resize the tracks stopped summing to the measured width with every column at or above `COLUMN_MIN`: Products fell to 232 against its declared 240, separator 1 reported `aria-valuenow=401` outside its own `340…393`, and the keys shrank or under-stepped instead of moving the promised 16/48 px. The fit now shrinks only the slack above the three minimums (rounding lands on the column with the most room, so it can never push one under), and below `MIN_TOTAL` — the sum of the minimums plus both rails — the workspace stacks: the split has no honest shape there, and the stacked layout is the one the artboard already uses rather than a row that scrolls sideways (S14). B2 — `unmount()` published `{mounted:false,state:'idle'}` and the abandoned `loadURL(...).catch` then published `failed` over it, disabling "Abrir el live" and turning "Cerrar visor" into a no-op. Every mount is now a generation and nothing from a retired one can publish. The state machine also stops getting stuck: `loading` has exactly two exits (usable document, failure), `did-start-loading` has no transition at all (it used to erase the failure flag and put the caption back over a live), and a document navigation the allowlist blocked while loading is the failure it is. Two advisories fixed along the way: the allowlist gate in `mount` now runs before the reuse early return, and `src/vite-env.d.ts` ends in a newline.
+
+
+## #40 acceptance
+
+Verbatim from issue reos156/livefy#40 ("Criterios de aceptación"), so a verifier does not
+report them as missing.
+
+- **AC1** Escribir un canal válido habilita "Abrir el live"; vacío o inválido lo mantiene deshabilitado con el motivo visible.
+- **AC2** Abrir carga el live del canal escrito; la superficie muestra video y audio y permite el login manual.
+- **AC3** Ningún camino del renderer permite que main cargue una URL arbitraria: sólo el handle validado, y el resultado sigue pasando la allowlist de TikTok.
+- **AC4** La superficie ocupa toda la altura de la columna, sin scroll interno, y sigue alineada al colapsar la barra lateral y al redimensionar la ventana.
+- **AC5** El panel no muestra la fila de KPIs; las tres columnas siguen y ninguna métrica aparece inventada.
+- **AC6** El cartel "Cargando TikTok…" desaparece cuando la página queda usable; un fallo muestra el motivo y ofrece reintentar.
+- **AC7** `bun run typecheck`, `bun run test` y `bun run build` en verde desde la raíz.
+- **AC8** Espejo de Windows sincronizado y aceptación del humano ejerciendo la pantalla.

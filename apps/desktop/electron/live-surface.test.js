@@ -32,16 +32,38 @@ class Guest extends EventEmitter {
   }
 }
 
-function viewClass(views) {
+function viewClass(views, load = () => Promise.resolve()) {
   return class FakeView {
     constructor(options) {
       this.options = options
       this.webContents = new Guest()
+      this.webContents.loadURL = vi.fn(load)
       this.bounds = null
       views.push(this)
     }
     setBounds(next) { this.bounds = next }
   }
+}
+
+// A promise the test settles by hand, so a load can still be in flight while the surface is
+// closed and the operator (or Chromium) moves on.
+function deferredLoads() {
+  const loads = []
+  return {
+    loads,
+    load: () => new Promise((resolve, reject) => { loads.push({ resolve, reject }) }),
+  }
+}
+
+async function flushed() {
+  await new Promise(resolve => { setImmediate(resolve) })
+}
+
+function mountedSurface(url) {
+  const views = []
+  const surface = live.createLiveSurface(viewClass(views))
+  surface.mount({ contentView: { addChildView: vi.fn(), removeChildView: vi.fn() } }, url)
+  return { surface, views, guest: surface.view().webContents }
 }
 
 describe('live surface boundary', () => {
@@ -218,13 +240,6 @@ describe('live surface boundary', () => {
 // S11: the renderer names a channel, never a URL. The handle is validated here, the URL is
 // built here, and the allowlist check happens before anything loads.
 describe('live channel', () => {
-  function mountedSurface(url) {
-    const views = []
-    const surface = live.createLiveSurface(viewClass(views))
-    surface.mount({ contentView: { addChildView: vi.fn(), removeChildView: vi.fn() } }, url)
-    return { surface, views, guest: surface.view().webContents }
-  }
-
   it('accepts only a strict handle', () => {
     for (const handle of ['mundokawaii', 'Mundo.Kawaii_01', 'a1', 'x'.repeat(24)]) {
       expect(live.parseLiveHandle(handle)).toBe(handle)
@@ -306,14 +321,144 @@ describe('live channel', () => {
     guest.emit('did-fail-load', {}, -105, 'NAME_NOT_RESOLVED', 'https://www.tiktok.com/@mundokawaii/live', true)
     expect(surface.status()).toEqual({ mounted: true, state: 'failed', reason: 'NAME_NOT_RESOLVED' })
 
-    // Chromium loads its own error document, which fires ready events of its own.
+    // Chromium loads its own error document, which fires start and ready events of its own.
+    // Neither may take the state back: a start event that reset the failure left the caption
+    // on "Cargando" forever, and a ready event would have hidden the reason.
+    guest.emit('did-start-loading')
     guest.emit('dom-ready')
     guest.emit('did-finish-load')
     expect(surface.status()).toEqual({ mounted: true, state: 'failed', reason: 'NAME_NOT_RESOLVED' })
+  })
 
-    // A new navigation starts clean, so a retry can still become ready.
-    guest.emit('did-start-loading')
+  // A retry is a new mount, not a new document in the same one, so the failure above is
+  // final for its generation and the operator gets a clean one.
+  it('lets a fresh mount start clean after a failure', () => {
+    const { surface, guest } = mountedSurface(live.requireLiveChannel('mundokawaii'))
+    const window = { contentView: { addChildView: vi.fn(), removeChildView: vi.fn() } }
+
+    guest.emit('did-fail-load', {}, -105, 'NAME_NOT_RESOLVED', 'https://www.tiktok.com/@mundokawaii/live', true)
+    expect(surface.status().state).toBe('failed')
+
+    surface.unmount(window)
+    surface.mount(window, live.requireLiveChannel('mundokawaii'))
+    expect(surface.status()).toEqual({ mounted: true, state: 'loading' })
+
+    surface.view().webContents.emit('dom-ready')
+    expect(surface.status()).toEqual({ mounted: true, state: 'ready' })
+  })
+})
+
+// A refused URL is refused even when a surface is already open: with the reuse check first,
+// the second gate never ran and a caller could believe it had mounted something.
+describe('a second mount', () => {
+  it('is refused when its URL is not on the allowlist, instead of returning the open view', () => {
+    const views = []
+    const surface = live.createLiveSurface(viewClass(views))
+    const window = { contentView: { addChildView: vi.fn(), removeChildView: vi.fn() } }
+
+    const first = surface.mount(window, live.requireLiveChannel('mundokawaii'))
+    expect(() => surface.mount(window, 'https://evil.test/@mundokawaii/live')).toThrow('Refused live URL')
+    expect(() => surface.mount(window)).toThrow('Refused live URL')
+    // The refused call changed nothing: one guest, still the one that was mounted.
+    expect(views).toHaveLength(1)
+    expect(surface.view()).toBe(first)
+    expect(surface.status()).toEqual({ mounted: true, state: 'loading' })
+
+    // A valid second mount still reuses the single surface.
+    expect(surface.mount(window, live.requireLiveChannel('mundokawaii'))).toBe(first)
+    expect(views).toHaveLength(1)
+  })
+})
+
+// Every mount is a generation of its own. An event, a failure or a rejected `loadURL` that
+// belongs to a surface the operator already closed must publish nothing: overwriting the
+// `idle` an unmount published is what left the column offering a retry for a viewer that no
+// longer existed, disabled "Abrir el live" and turned "Cerrar visor" into a no-op.
+describe('live surface generations', () => {
+  function deferredSurface() {
+    const views = []
+    const deferred = deferredLoads()
+    const surface = live.createLiveSurface(viewClass(views, deferred.load))
+    const window = { contentView: { addChildView: vi.fn(), removeChildView: vi.fn() } }
+    return { surface, views, window, loads: deferred.loads }
+  }
+
+  it('stays idle when the load the operator abandoned rejects afterwards', async () => {
+    const { surface, window, loads } = deferredSurface()
+    const seen = []
+    surface.subscribe(status => seen.push(status))
+
+    surface.mount(window, live.requireLiveChannel('mundokawaii'))
+    expect(surface.status()).toEqual({ mounted: true, state: 'loading' })
+
+    surface.unmount(window)
+    expect(surface.status()).toEqual({ mounted: false, state: 'idle' })
+
+    // Closing the surface aborts the load, and the rejection arrives afterwards.
+    loads[0].reject(new Error('ERR_ABORTED'))
+    await flushed()
+
+    expect(surface.status()).toEqual({ mounted: false, state: 'idle' })
+    expect(seen.at(-1)).toEqual({ mounted: false, state: 'idle' })
+    expect(seen.filter(status => status.state === 'failed')).toHaveLength(0)
+  })
+
+  it('ignores the closed guest events and the stale rejection after a new mount', async () => {
+    const { surface, window, loads } = deferredSurface()
+
+    surface.mount(window, live.requireLiveChannel('mundokawaii'))
+    const retired = surface.view().webContents
+    surface.unmount(window)
+    surface.mount(window, live.requireLiveChannel('otrocanal'))
+    expect(surface.status()).toEqual({ mounted: true, state: 'loading' })
+
+    // Everything the retired generation says from here on belongs to nothing.
+    retired.emit('dom-ready')
+    retired.emit('did-start-loading')
+    retired.emit('did-fail-load', {}, -105, 'NAME_NOT_RESOLVED', 'https://www.tiktok.com/@mundokawaii/live', true)
+    loads[0].reject(new Error('ERR_ABORTED'))
+    await flushed()
+    expect(surface.status()).toEqual({ mounted: true, state: 'loading' })
+
+    // The current mount still owns the state, in both directions.
+    surface.view().webContents.emit('dom-ready')
+    expect(surface.status()).toEqual({ mounted: true, state: 'ready' })
+
+    retired.emit('did-fail-load', {}, -105, 'NAME_NOT_RESOLVED', 'https://www.tiktok.com/@mundokawaii/live', true)
+    expect(surface.status()).toEqual({ mounted: true, state: 'ready' })
+  })
+
+  // A document navigation the allowlist blocked leaves the frame where it was, so nothing
+  // will ever become ready. Waiting for an event that cannot arrive is the third way the
+  // caption stayed on "Cargando"; the block is the failure.
+  it('reports a blocked document navigation as the failure it is', () => {
+    const { surface, guest } = mountedSurface(live.requireLiveChannel('mundokawaii'))
+
+    const blocked = { preventDefault: vi.fn() }
+    guest.emit('will-navigate', blocked, 'https://accounts.google.com/o/oauth2/auth')
+
+    expect(blocked.preventDefault).toHaveBeenCalledOnce()
+    expect(surface.status()).toEqual({ mounted: true, state: 'failed', reason: 'navegación bloqueada' })
+  })
+
+  // The surface already loaded, so the same block is just a blocked link: the live stays.
+  it('keeps a live that was already loaded when a later link is blocked', () => {
+    const { surface, guest } = mountedSurface(live.requireLiveChannel('mundokawaii'))
     guest.emit('dom-ready')
+
+    const blocked = { preventDefault: vi.fn() }
+    guest.emit('will-navigate', blocked, 'https://accounts.google.com/')
+
+    expect(blocked.preventDefault).toHaveBeenCalledOnce()
+    expect(surface.status()).toEqual({ mounted: true, state: 'ready' })
+  })
+
+  it('never lets a start event reopen a mount that already finished loading', () => {
+    const { surface, guest } = mountedSurface(live.requireLiveChannel('mundokawaii'))
+    guest.emit('dom-ready')
+
+    guest.emit('did-start-loading')
+
     expect(surface.status()).toEqual({ mounted: true, state: 'ready' })
   })
 })

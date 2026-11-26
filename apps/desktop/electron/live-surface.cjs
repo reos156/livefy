@@ -36,7 +36,7 @@ function isAllowedLiveUrl(raw) {
 // replace themselves.
 const hardenedSessions = new WeakSet()
 
-function hardenLiveContents(contents) {
+function hardenLiveContents(contents, { onBlockedDocument } = {}) {
   const { session } = contents
   session.setPermissionRequestHandler((_contents, _permission, callback) => callback(false))
   session.setPermissionCheckHandler(() => false)
@@ -45,9 +45,15 @@ function hardenLiveContents(contents) {
     session.on('will-download', event => event.preventDefault())
   }
   contents.setWindowOpenHandler(() => ({ action: 'deny' }))
+  // A blocked navigation is not only a denied request: the frame stays on the document it
+  // had, so a load that was blocked never becomes the document the surface was waiting for.
+  // `onBlockedDocument` lets the surface count that as the failure it is. Only the document
+  // events report here; a blocked subframe is as ordinary as a failed subresource.
   for (const name of ['will-navigate', 'will-redirect']) {
     contents.on(name, (event, url) => {
-      if (!isAllowedLiveUrl(url)) event.preventDefault()
+      if (isAllowedLiveUrl(url)) return
+      event.preventDefault()
+      onBlockedDocument?.(url)
     })
   }
   // `will-navigate` is main-frame only, so an embedded document could still navigate
@@ -124,6 +130,13 @@ function toViewBounds(bounds, zoomFactor) {
 function createLiveSurface(WebContentsView) {
   let view = null
   let bounds = null
+  // Every mount is a generation of its own, and the record is the token for it. A listener,
+  // a failure or a rejected `loadURL` that arrives after its mount was replaced — or closed
+  // — holds a record that is no longer `live`, so it can publish nothing. Without that,
+  // `unmount` published `idle` and the rejection of the load it had just abandoned published
+  // `failed` over it, which disabled "Abrir el live", left a false error in the column and
+  // turned "Cerrar visor" into a no-op until the operator found "Reintentar".
+  let live = null
   let state = { mounted: false, state: 'idle' }
   const listeners = new Set()
 
@@ -132,29 +145,47 @@ function createLiveSurface(WebContentsView) {
     for (const listener of listeners) listener(state)
   }
 
-  function attachListeners(guest) {
-    // One flag per navigation. Chromium paints its own error document after a failed main
-    // frame load, and that document fires ready events: without the flag, a failure would
-    // be overwritten by the error page it drew.
-    let failed = false
-    guest.on('did-start-loading', () => {
-      failed = false
-      publish({ mounted: true, state: 'loading' })
-    })
+  function current(token) {
+    return token !== null && token === live
+  }
+
+  // The only state machine this surface has, and the reason it cannot get stuck on
+  // "Cargando": `loading` has exactly two exits, and the phase never moves backwards.
+  //
+  //   loading --`dom-ready` / `did-finish-load`---------------------> ready
+  //   loading --`did-fail-load` / rejected loadURL / blocked document-> failed
+  //   ready   --`did-fail-load` of a later document-------------------> failed
+  //
+  // There is deliberately no transition on `did-start-loading`. It used to reset the failure
+  // flag, so a failure followed by a start event (which Chromium's own error document fires)
+  // left the caption on "Cargando" for ever; and it used to publish `loading` again, putting
+  // the caption back over a live document. A retry is a new mount, so a finished generation
+  // never has to reopen.
+  //
+  // A failure is final for its generation and keeps its first reason, which is why the
+  // error page Chromium paints after `did-fail-load` cannot turn it back into `ready`.
+  function ready(token) {
+    if (!current(token) || token.phase !== 'loading') return
+    token.phase = 'ready'
+    publish({ mounted: true, state: 'ready' })
+  }
+
+  function fail(token, reason) {
+    if (!current(token) || token.phase === 'failed') return
+    token.phase = 'failed'
+    publish({ mounted: true, state: 'failed', reason })
+  }
+
+  function attachListeners(guest, token) {
     // `dom-ready` is the end of the load the operator waits for. `did-finish-load` can
     // arrive after the page is already usable, so waiting for it left the caption stuck on
     // "Cargando" over a live document. Both mean the same state.
-    guest.on('dom-ready', () => {
-      if (!failed) publish({ mounted: true, state: 'ready' })
-    })
-    guest.on('did-finish-load', () => {
-      if (!failed) publish({ mounted: true, state: 'ready' })
-    })
+    guest.on('dom-ready', () => ready(token))
+    guest.on('did-finish-load', () => ready(token))
     guest.on('did-fail-load', (_event, _code, description, _url, isMainFrame) => {
       // Subresource failures are normal on a live stream; only the document counts.
       if (isMainFrame === false) return
-      failed = true
-      publish({ mounted: true, state: 'failed', reason: description || 'unknown' })
+      fail(token, description || 'unknown')
     })
   }
 
@@ -162,20 +193,31 @@ function createLiveSurface(WebContentsView) {
     view: () => view,
 
     mount(window, url) {
-      if (view) return view
-      // Second gate, after the channel is parsed: a URL that is not on the allowlist never
-      // becomes a guest, so a bug in the builder cannot point the surface elsewhere.
+      // The allowlist runs before the reuse: with the early return first, a second mount with
+      // a refused URL was a silent no-op and the gate looked decorative. Refusing instead
+      // costs nothing and tells the caller its URL was never accepted.
       if (!isAllowedLiveUrl(url)) throw new Error('Refused live URL')
+      if (view) return view
+      const token = { phase: 'loading' }
+      live = token
       view = new WebContentsView({ webPreferences: { ...liveWebPreferences } })
-      hardenLiveContents(view.webContents)
-      attachListeners(view.webContents)
+      hardenLiveContents(view.webContents, {
+        // A document navigation the allowlist blocked while the surface is still loading
+        // leaves the frame on whatever it had, so nothing will ever become usable: that is a
+        // failure, not a caption to wait on. Once the live is up, a blocked link is just a
+        // blocked link and the live stays on screen.
+        onBlockedDocument: () => {
+          if (token.phase === 'loading') fail(token, 'navegación bloqueada')
+        },
+      })
+      attachListeners(view.webContents, token)
       window.contentView.addChildView(view)
       // Position before loading, so the first paint never lands at the window origin.
       if (bounds) view.setBounds(bounds)
       publish({ mounted: true, state: 'loading' })
-      view.webContents.loadURL(url).catch(() => {
-        publish({ mounted: true, state: 'failed', reason: 'load-rejected' })
-      })
+      // The rejection belongs to this generation: if the operator closed the surface first,
+      // `fail` finds a retired token and publishes nothing over the `idle` it already sent.
+      view.webContents.loadURL(url).catch(() => fail(token, 'load-rejected'))
       return view
     },
 
@@ -191,6 +233,9 @@ function createLiveSurface(WebContentsView) {
       if (!view) return
       const closing = view
       view = null
+      // Retiring the generation is what makes the abandoned load, its guest and its failure
+      // stale from here on.
+      live = null
       // A closed window has already destroyed its content view; detaching then throws, and
       // that is not a failure of the surface.
       try { window.contentView.removeChildView(closing) } catch { /* window already gone */ }
