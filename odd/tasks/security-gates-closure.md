@@ -46,15 +46,21 @@ signed JWT negatives (`mvp-h1-access-windows.md:257`), production CSP delivery
 - T1 (S1, S2, S3) — route writer. Negative harness in
   `scripts/verify-clerk-dev.mjs` plus unit negatives and exit-code coverage.
   Code and tests only; no Clerk or Convex service change, no deployment.
-  Commit: pending.
+  Commit: `b45c8ff` (refusal keeps the gate pending unless provenance is
+  attested), `bd2354c` (wrong-audience negative attested from a script-minted
+  template token), `b886812` (fixture on a non-empty instance, auth refusals
+  recognised).
 - T2 (S4, S5) — route writer. Single-source CSP policy shared by the build
   transform and the Electron response header, with tests.
-  Commit: pending.
+  Commit: `c6b788d`.
 - T3 (S6, S7, S8) — route writer. End-to-end failure-path coverage through the
   existing mock seams; fix a real gap only if the tests expose one.
-  Commit: pending.
+  Commit: `86d47e4` (offline logout, revoked session and memory-only disclosure).
 - T4 — route gentle-ai-verify. Independent verification of T1–T3 (Risk item 2 and
-  item 3 apply). Not optional.
+  item 3 apply). Not optional. Status: DONE — one round per task, all recorded in
+  L5 (T1–T3 plus the `security.cjs` and dependency checks, one blocking T1 defect
+  found and corrected), L7 (second round reproduced the forged-token probe and
+  proved both regression tests bite) and L12 (S10 and the refusal predicate).
 - T5 (S1, S2) — S1 CLOSED, S2 OPEN BY DECISION. Clerk CLI authenticated (DEV, the
   only app/instance). The authorized audience case exists: template
   `livefy-h1-2c-wrong-aud`

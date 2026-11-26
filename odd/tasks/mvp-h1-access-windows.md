@@ -21,16 +21,22 @@ below, without rewriting their historical evidence or delivery status.
   scoped cleanup) and production CSP verification remain mandatory preproduction
   gates, **not waived for publishing**. Any execution or mutation needs separate
   bounded authorization.
-- **H1.8 remains pending**: validate visibility/accessibility of the recovery entry
-  in the current official Clerk screens and access to the provider-managed flow.
-  A missing recovery option is a hypothesis, not an observed defect. Clerk owns
-  recovery; no custom request/reset UI or separate Resend implementation is
-  authorized by this amendment.
+- **H1.8 — CLOSED, status corrected here after this amendment was written.** The
+  text above this correction said "H1.8 remains pending"; it is superseded by the
+  H1.8 record below, where the recovery entry was validated as visible and
+  keyboard-reachable in the official `SignIn` on Windows DEV and the
+  provider-managed flow was reached and completed end to end, human-observed. Clerk
+  still owns recovery; no custom request/reset UI or separate Resend implementation
+  was authorized by this amendment.
 - Historical H1.9–H1.10 implementation obligations consolidate into H1.8 as
   **superseded, not passed**. Their IDs and historical criteria remain below for
-  traceability; this is no claim of delivered reset email, successful reset or
-  negative-challenge coverage. H1.11/H1.12 remain open with their real Windows,
-  failure-case, packaged and production prerequisites; theme tasks are unchanged.
+  traceability; no separate negative-challenge coverage is claimed for them.
+- **H1.11 and H1.12 — CLOSED, status corrected here after this amendment was
+  written.** The text above said both "remain open"; each carries human-observed
+  Windows evidence in the records below, and H1.12 covers the packaged
+  `win-unpacked` journey. Neither closes the production prerequisites nor the
+  signed and installed build: those remain prepublication gates. Theme tasks are
+  unchanged.
 
 No new tests, runtime checks, services, issues, commits or publishing were performed
 or authorized here. This passive amendment has no meaningful behavioral RED;
