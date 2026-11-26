@@ -233,31 +233,6 @@
   }
   .field input:focus, .field input:focus-visible { outline: none; box-shadow: none; }
 
-  .legend {
-    display: flex; align-items: stretch; gap: 6px; flex: 0 0 auto;
-    padding: 6px 8px; border-bottom: 1px solid var(--border); background: var(--card);
-  }
-  .legend-label {
-    display: flex; align-items: center; flex: 0 0 auto; padding-right: 2px;
-    font-size: 10px; font-weight: 500; letter-spacing: 0.05em; text-transform: uppercase;
-    color: var(--muted-foreground);
-  }
-  .segmented {
-    display: flex; flex: 1; min-width: 0; margin: 0; padding: 0; list-style: none;
-    border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden;
-    background: var(--muted);
-  }
-  .segmented li {
-    flex: 1 1 0; min-width: 0; display: flex; align-items: center; justify-content: center;
-    gap: 4px; padding: 4px 3px; font-size: 10px; line-height: 1.2; text-align: center;
-    color: var(--muted-foreground); overflow-wrap: anywhere;
-  }
-  .segmented li + li { box-shadow: inset 1px 0 0 var(--border); }
-  .segmented li[aria-current="true"] {
-    background: var(--accent); color: var(--accent-foreground); font-weight: 600;
-  }
-  .segmented li[aria-current="true"] .dot { background: var(--accent-foreground); }
-
   .livewrap { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 0; padding: 8px 8px 6px; }
   .viewer {
     position: relative; flex: 1; min-height: 130px; overflow: hidden;
@@ -404,18 +379,6 @@
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg>
           </button>
         </header>
-
-        <div class="legend">
-          <span class="legend-label" aria-hidden="true">Estados</span>
-          <ul class="segmented" aria-label="Estados del live">
-            <li aria-current="true"><span class="dot" aria-hidden="true"></span>connected</li>
-            <li>reconnecting</li>
-            <li>offline</li>
-            <li>suspended-risk</li>
-            <li>disconnected</li>
-            <li>ended</li>
-          </ul>
-        </div>
 
         <div class="livewrap">
           <div class="viewer" role="img" aria-label="Live de TikTok abierto en la superficie nativa: la creadora muestra un producto frente a la cámara.">
