@@ -1,0 +1,24 @@
+# Prototipo de validacion - API de Kapso (WhatsApp Business API)
+# Script: test_kapso.py
+#
+# Dependencias directas fijadas a las versiones del entorno original:
+#   pyenv venv_live_ecommerce · Python 3.12.10 · verificado 2026-11-19
+# El freeze completo (9 paquetes, incluye transitivas) quedo guardado en:
+#   ~/backups/venv-freezes-<fecha>/venv_live_ecommerce.txt
+#
+# Recrear el entorno:
+#   python3.12 -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt
+#
+# Variables de entorno requeridas (archivo local de variables, fuera de git):
+#   KAPSO_API_KEY
+#   KAPSO_PHONE_NUMBER_ID
+#   KAPSO_AUTH_TEMPLATE_NAME
+#   TEST_RECIPIENT_PHONE
+#
+# Nota: ../requirements.txt pide estas mismas dependencias con rangos abiertos
+# (>=) para todos los prototipos del MVP. Este archivo las fija para que el
+# test de Kapso sea reproducible aunque el resolver avance de version.
+
+httpx==0.28.1
+python-dotenv==1.2.2
+websockets==16.0

@@ -8,3 +8,9 @@ node_modules/
 
 # Local Convex development binding
 /apps/desktop/.env.local
+
+# Agent tooling and MCP configuration: installed per machine, never product code
+.agents/
+.pi/
+skills-lock.json
+.mcp.json
