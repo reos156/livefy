@@ -1,10 +1,11 @@
-const { app, BrowserWindow, protocol, net, safeStorage, ipcMain } = require('electron')
+const { app, BrowserWindow, WebContentsView, protocol, net, safeStorage, ipcMain } = require('electron')
 const { createClerkBridge } = require('@clerk/electron')
 const Store = require('electron-store')
 const { createTokenStorage } = require('./clerk-storage.cjs')
 const { rendererHandler } = require('./protocol.cjs')
 const path = require('node:path')
 const { DEV_URL, webPreferences, secureContents } = require('./security.cjs')
+const { createLiveSurface } = require('./live-surface.cjs')
 
 const development = !app.isPackaged && process.argv.includes('--livefy-dev')
 // This file is bundled to dist/main.cjs (electron/build-main.mjs); the unbundled
@@ -40,6 +41,22 @@ if (bridge.isPrimaryInstance && process.defaultApp) {
 let logoutPending
 let logoutComplete = false
 const trustedContents = new Set()
+// One surface per process: the live and its partition outlive a window recreation, and a
+// second surface would mean a second guest loading third-party content.
+const liveSurface = createLiveSurface(WebContentsView)
+liveSurface.subscribe(status => {
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (!window.isDestroyed()) window.webContents.send('livefy:live-surface-status', status)
+  }
+})
+
+// The single sender rule every privileged channel shares: the trusted renderer, its main
+// frame, on the entry document. Anything else is refused before it reaches a handler.
+function requireRenderer(event) {
+  const frame = event.senderFrame
+  if (!trustedContents.has(event.sender) || !frame ||
+      frame !== event.sender.mainFrame || frame.url?.split('#')[0] !== entry) throw new Error('Denied')
+}
 
 function createWindow() {
   // A 15" laptop at its usual scaling gives the panel roughly 1536x864 CSS pixels, and the
@@ -57,6 +74,8 @@ function createWindow() {
   trustedContents.add(window.webContents)
   window.webContents.on('destroyed', () => trustedContents.delete(window.webContents))
   secureContents(window.webContents, entry)
+  // Closing the window takes the guest with it; a recreated window mounts a fresh one.
+  window.on('closed', () => liveSurface.unmount(window))
   const loaded = window.loadURL(entry)
   loaded.catch(() => {
     console.error('Unable to load the local Livefy renderer. Build it or start the development server.')
@@ -72,9 +91,8 @@ if (bridge.isPrimaryInstance) app.whenReady().then(() => {
     return storage.persistence
   })
   function terminal(operation, event, args) {
-    const frame = event.senderFrame
-    if (args.length || !trustedContents.has(event.sender) || !frame ||
-        frame !== event.sender.mainFrame || frame.url?.split('#')[0] !== entry) throw new Error('Denied')
+    requireRenderer(event)
+    if (args.length) throw new Error('Denied')
     if (logoutPending) return logoutPending
     if (logoutComplete) return Promise.resolve()
     logoutPending = storage[operation]().then(() => {
@@ -90,6 +108,34 @@ if (bridge.isPrimaryInstance) app.whenReady().then(() => {
   }
   ipcMain.handle('livefy:session-logout', (event, ...args) => terminal('logout', event, args))
   ipcMain.handle('livefy:session-preserve-and-quit', (event, ...args) => terminal('preserve', event, args))
+  // The surface channels carry the rectangle and nothing else: the renderer never names a
+  // URL, so it cannot point third-party content anywhere the policy has not allowed.
+  ipcMain.handle('livefy:live-surface-mount', (event, ...args) => {
+    requireRenderer(event)
+    if (args.length) throw new Error('Denied')
+    const owner = BrowserWindow.fromWebContents(event.sender)
+    if (!owner) throw new Error('Denied')
+    liveSurface.mount(owner)
+    return liveSurface.status()
+  })
+  ipcMain.handle('livefy:live-surface-bounds', (event, ...args) => {
+    requireRenderer(event)
+    if (args.length !== 1) throw new Error('Denied')
+    return liveSurface.setBounds(args[0])
+  })
+  ipcMain.handle('livefy:live-surface-unmount', (event, ...args) => {
+    requireRenderer(event)
+    if (args.length) throw new Error('Denied')
+    const owner = BrowserWindow.fromWebContents(event.sender)
+    if (!owner) throw new Error('Denied')
+    liveSurface.unmount(owner)
+    return liveSurface.status()
+  })
+  ipcMain.handle('livefy:live-surface-status', (event, ...args) => {
+    requireRenderer(event)
+    if (args.length) throw new Error('Denied')
+    return liveSurface.status()
+  })
   createWindow()
   app.on('activate', () => {
     if (!logoutPending && !logoutComplete && BrowserWindow.getAllWindows().length === 0) createWindow()
@@ -105,6 +151,10 @@ app.on('will-quit', () => {
   ipcMain.removeHandler('livefy:session-persistence')
   ipcMain.removeHandler('livefy:session-logout')
   ipcMain.removeHandler('livefy:session-preserve-and-quit')
+  ipcMain.removeHandler('livefy:live-surface-mount')
+  ipcMain.removeHandler('livefy:live-surface-bounds')
+  ipcMain.removeHandler('livefy:live-surface-unmount')
+  ipcMain.removeHandler('livefy:live-surface-status')
   protocol.unhandle('livefy')
 })
 app.on('window-all-closed', () => {

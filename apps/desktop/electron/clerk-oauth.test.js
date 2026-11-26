@@ -39,6 +39,8 @@ function bootstrap({ development = false, primary = true, defaultApp = false,
   }
   class BrowserWindow {
     maximize() {}
+    // See clerk-main.test.js: the bootstrap registers a `closed` handler on every window.
+    on(name, callback) { (this.listeners ??= {})[name] = callback }
     static getAllWindows() { return windows }
     static fromWebContents(sender) { return windows.find(window => window.webContents === sender) }
     constructor() {
