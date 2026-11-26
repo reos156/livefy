@@ -28,14 +28,14 @@ S10 — No se integra el contenedor `prototypes/tiktok-live-browser` (Docker + n
 
 | ID | Task | Specs | Route | Commit |
 |---|---|---|---|---|
-| T1 | Design directions for the live view shell, canvas, human pick | S1, S6 | inline + gentle-design | — |
-| T2 | TikTok surface in main: `WebContentsView` on `persist:tiktok` + hardening policy | S2, S3, S4, S5, S9 | inline | — |
-| T3 | IPC allowlist: mount, unmount, bounds, state — with argument validation | S1, S3 | inline | — |
-| T4 | `/app/live` route, 3-column shell, honest empty states | S1, S6 | inline | — |
-| T5 | Tests: surface hardening policy and guest wiring | S3, S4, S5, S7 | inline | — |
-| T6 | Tests: shell rendering and empty states | S6, S7 | inline | — |
-| T7 | Docs: acceptance matrix row and partition persistence note | S7 | inline | — |
-| T8 | Checks, Windows mirror sync, human acceptance | S7, S8 | inline | — |
+| T1 | Design directions for the live view shell | S1, S6 | dropped — the 3-column shell already exists in `panel.tsx` | — |
+| T2 | TikTok surface in main: `WebContentsView` on `persist:tiktok` + hardening policy | S2, S3, S4, S5, S9 | inline | af932f8 |
+| T3 | IPC allowlist: mount, unmount, bounds, state — with argument validation | S1, S3 | inline | af932f8 |
+| T4 | Live surface mounted in the first column of the panel, honest empty states | S1, S6 | inline | b51921f |
+| T5 | Tests: surface hardening policy and guest wiring | S3, S4, S5, S7 | inline | af932f8 |
+| T6 | Tests: first column with and without the native surface | S6, S7 | inline | b51921f |
+| T7 | Docs: acceptance matrix and partition persistence note | S7 | inline | b51921f |
+| T8 | Checks, Windows mirror sync, human acceptance | S7, S8 | inline | — (pending) |
 
 ## Log
 
@@ -48,3 +48,27 @@ L3 (user): "el prototipo al que me referia era a este \proyectos\livefy\code\wor
 L4 (user): "aceptado el issue #39, implementalo"
 
 L5 (decision, agent): the spike's `<webview partition="persist:tiktok">` is not transferable as markup: the app freezes `webPreferences` with `webviewTag: false` and cancels `will-attach-webview`, and the scope forbids relaxing sandbox/CSP/navigation. The surface becomes a `WebContentsView` owned by the main process; the spike contributes what it proved (TikTok loads and manual login persists in Electron's Chromium), not its markup.
+## Delivery notes
+
+**Deviation — no `/app/live` route.** S1 named a route and a sidebar entry, written before
+the code was read. The panel (`src/panel.tsx`) already *is* the three-column live workspace:
+`LiveColumn`, `ProductsColumn` and `LeadsColumn` with the visual contract from the README.
+Adding a second route that renders the same screen would duplicate it, so the surface opens
+in the existing first column and the sidebar's `Panel` entry stays current. A separate route
+becomes meaningful only when the live workspace stops being the panel body.
+
+**Deviation — no design directions.** T1 was planned because the issue assumed a new screen.
+The screen exists with an accepted visual contract (`.dark`, semantic tokens, installed
+primitives), and the change fills a rectangle without restyling anything. Running the design
+round would have proposed a second look nobody asked for. Reversible: if the operator wants
+a different live layout, it is a new issue with its own directions.
+
+**Slice boundary.** Two commits, `af932f8` (main-process boundary, IPC, hardening, its tests,
+feature document — 438 authored lines) and `b51921f` (renderer hook, panel, panel tests,
+README — 240 authored lines). The boundary commit is the high-risk one and can be reviewed
+alone.
+
+**Known limits, recorded rather than hidden.** Third-party OAuth (Google/Apple) navigates off
+`tiktok.com` and is therefore blocked by the navigation allowlist; manual login has to use
+phone or email. The surface carries no event ingestion, so columns 2 and 3 stay empty.
+Nothing here has been exercised in the packaged Windows app yet.
