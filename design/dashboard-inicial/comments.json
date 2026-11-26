@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "comments": [
+    {
+      "id": "cze8pws7",
+      "file": "01-three-columns-one-window.html",
+      "selector": "body > div > div:nth-of-type(2)",
+      "excerpt": "LIVE DE TIKTOK ended Conectá tu primer live La conexión de lives llega en la próxima etapa. Ningún live conectado Al conectar, el live se abre en una superficie aislada, sin Node y con sandbox. Ingestor: sin sesión Brecha: — connected reconnecting offline suspended-risk disconnected ended El login v",
+      "comment": "Recuerda que el dashboard sea de este tipo https://shadcnuikit.com/dashboard/default antes me dijiste algo asi que funciono: Tomé la anatomía: sidebar + top bar + tarjetas de KPI + área de contenido., recuerda que no inventamos nada sino que usamos los componentes de shadcn",
+      "createdAt": "2026-11-25T23:51:01.235Z",
+      "status": "resolved",
+      "sentAt": "2026-11-25T23:51:01.250Z",
+      "resolvedAt": "2026-11-25T23:51:32.009Z",
+      "resolution": "Artboard 01 rehecho con la anatomía del kit: sidebar con grupos Operación/Catálogo, top bar con breadcrumb y acciones, tarjetas de KPI (Card) y el área de contenido con las tres columnas. Sin datos inventados: ceros, deltas omitidos y cada columna en su estado vacío."
+    }
+  ]
+}

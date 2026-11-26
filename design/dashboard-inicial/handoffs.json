@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "chosen": "01-three-columns-one-window.html",
+  "handoffs": {
+    "01-three-columns-one-window.html": {
+      "status": "in_progress",
+      "queued": true,
+      "sentAt": "2026-11-25T23:51:04.691Z",
+      "startedAt": "2026-11-25T23:52:03.532Z",
+      "implementedAt": null,
+      "feature": "odd/tasks/initial-dashboard.md",
+      "note": "Implementando el panel: shell con sidebar y top bar, KPIs desde getDashboardStats (ceros reales), y las tres columnas en estado vacío con el CTA deshabilitado."
+    }
+  }
+}
