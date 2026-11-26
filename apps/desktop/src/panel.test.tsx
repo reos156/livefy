@@ -234,9 +234,10 @@ describe('panel — dashboard chrome', () => {
       expect(screen.queryByText(state)).toBeNull()
     }
     expect(screen.getByText('Conectado')).toBeTruthy()
-    // The ingestor line and its note stay, which is what the column still owes the operator.
-    expect(screen.getByText(/Ingestor:/)).toBeTruthy()
-    expect(screen.getByText(/El login visual no autentica al ingestor/)).toBeTruthy()
+    // The ingestor line and its note left the column with the legend: while there is no
+    // ingestor, the only honest thing those rows said was that nothing was measured.
+    expect(screen.queryByText(/Ingestor:/)).toBeNull()
+    expect(screen.queryByText(/no autentica al ingestor/)).toBeNull()
   })
 })
 

@@ -319,13 +319,6 @@ function LiveColumn() {
         <p className="text-xs text-muted-foreground">Al conectar, el live se abre en una superficie aislada, sin Node y con sandbox.</p>
       </div>}
     </div>
-    {/* S6: the local ingestor health and its gap. Empty until R3 owns those readings,
-        so the screen states the absence instead of inventing a measurement. */}
-    <div className="flex flex-wrap gap-x-2.5 gap-y-1 text-xs text-muted-foreground">
-      <span>Ingestor: <strong className="font-semibold text-foreground">sin sesión</strong></span>
-      <span>Brecha: <strong className="font-semibold text-foreground">—</strong></span>
-    </div>
-    <p className="text-xs text-muted-foreground">El login visual no autentica al ingestor. Cerrar la app detiene sólo la captura local, no el live comercial.</p>
   </Column>
 }
 
