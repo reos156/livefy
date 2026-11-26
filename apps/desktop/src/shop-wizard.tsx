@@ -290,7 +290,7 @@ export function ShopWizard({ initial, categories, paymentMethods, dialCodes, ste
     onSubmit(toInput(form, paymentMethods))
   }
 
-  return <VisualShell title="Configurá tu tienda">
+  return <VisualShell title="Configurá tu tienda" wide>
     <form noValidate onSubmit={submit} className="flex flex-col gap-5">
       <StepProgress step={step} />
 
@@ -351,8 +351,9 @@ export function ShopWizard({ initial, categories, paymentMethods, dialCodes, ste
 
       {step === 2 && <FieldGroup>
         <FieldSet>
+          {/* The step lead above already says what this group offers: repeating it here
+              reads the same sentence twice. */}
           <FieldLegend>Medios de pago</FieldLegend>
-          <FieldDescription>Marcá los medios que aceptás y cargá el dato de cada uno. Al menos uno.</FieldDescription>
           <Field
             data-invalid={errors.paymentMethodSlugs ? true : undefined}
             aria-invalid={errors.paymentMethodSlugs ? true : undefined}
@@ -369,23 +370,27 @@ export function ShopWizard({ initial, categories, paymentMethods, dialCodes, ste
                 const errorId = `${inputId}-error`
                 // The datum opens inside the method's own card: there is no separate section
                 // and no shared field, so the operator sees which method each value belongs to.
+                // `min-w-0` lets the column shrink below the label's min-content width, and
+                // the label itself wraps instead of the card of another column paying for it.
                 return <div
                   key={method.slug}
                   data-slot="payment-method"
                   data-selected={selected || undefined}
-                  className={cn('rounded-xl border', selected ? 'border-primary ring-1 ring-primary' : 'border-border')}
+                  className={cn('min-w-0 rounded-xl border', selected ? 'border-primary ring-1 ring-primary' : 'border-border')}
                 >
                   <Button
                     type="button"
                     aria-pressed={selected}
                     variant="ghost"
-                    className="h-auto w-full flex-col items-start gap-0.5 rounded-xl px-3.5 py-3 text-left"
+                    // The primitive keeps button copy on one line; a catalogue label is prose
+                    // that has to wrap inside its own card.
+                    className="h-auto w-full flex-col items-start gap-0.5 rounded-xl px-3.5 py-3 text-left whitespace-normal break-words"
                     onClick={() => toggleInList('paymentMethodSlugs', method.slug)}
                   >
-                    <span className="font-medium">{method.label}</span>
-                    <span className="text-xs font-normal text-muted-foreground">{method.description}</span>
+                    <span className="min-w-0 font-medium">{method.label}</span>
+                    <span className="min-w-0 text-xs font-normal text-muted-foreground">{method.description}</span>
                   </Button>
-                  {selected && <Field data-invalid={datumError ? true : undefined} className="px-3.5 pb-3.5">
+                  {selected && <Field data-invalid={datumError ? true : undefined} className="min-w-0 px-3.5 pb-3.5">
                     <FieldLabel htmlFor={inputId}>{method.dataLabel}</FieldLabel>
                     <Input
                       id={inputId}
@@ -444,9 +449,13 @@ export function ShopWizard({ initial, categories, paymentMethods, dialCodes, ste
       <div className="flex items-center gap-2">
         {step > 1 && <Button type="button" variant="outline" onClick={back}>Atrás</Button>}
         <span className="flex-1" />
+        {/* Distinct keys on purpose. Sharing a position made React reuse the pressed node, so
+            the `type=button` the operator clicked became the `type=submit` of the last step
+            mid-dispatch; the browser then ran that node's activation behaviour and submitted
+            the form, saving the shop and bouncing to the panel from step 2. */}
         {step < 3
-          ? <Button type="button" onClick={advance}>Continuar</Button>
-          : <Button type="submit" disabled={pending} data-icon={pending ? 'inline-start' : undefined}>
+          ? <Button key="advance" type="button" onClick={advance}>Continuar</Button>
+          : <Button key="save" type="submit" disabled={pending} data-icon={pending ? 'inline-start' : undefined}>
             {pending && <Spinner data-icon="inline-start" />}
             {pending ? 'Guardando…' : 'Guardar tienda'}
           </Button>}

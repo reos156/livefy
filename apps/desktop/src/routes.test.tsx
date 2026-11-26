@@ -202,6 +202,35 @@ it('opens the store form from the panel and returns to it when the edit is saved
   expect(data.mutation).toHaveBeenCalledTimes(1)
 })
 
+// The human sees the edit bounce back to the panel on the way from step 2 to step 3, with
+// nothing clicked but `Continuar`. This drives the real router through that exact move so a
+// bounce inside the routed surface fails here instead of only in Electron.
+it('keeps the store form on step 3 when the operator advances from step 2', async () => {
+  withStoredShop()
+  const { router } = setup('/app')
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Editar tienda' }))
+  expect(await screen.findByText('Paso 1 de 3')).toBeTruthy()
+  expect(router.state.location.href).toBe('/app/store?paso=1')
+
+  // Step 1 is prefilled with the stored shop, so the gating is already satisfied.
+  fireEvent.click(screen.getByRole('button', { name: 'Continuar' }))
+  expect(await screen.findByText('Paso 2 de 3')).toBeTruthy()
+  expect(router.state.location.href).toBe('/app/store?paso=2')
+  // The stored datum answers step 2's gating, so the third step is one click away.
+  expect((screen.getByLabelText('Tu Nequi') as HTMLInputElement).value).toBe('3005089676')
+
+  fireEvent.click(screen.getByRole('button', { name: 'Continuar' }))
+  expect(await screen.findByText('Paso 3 de 3')).toBeTruthy()
+
+  // Still the form, on its own path and its third step; the panel did not take over.
+  expect(screen.getByLabelText('Número de WhatsApp')).toBeTruthy()
+  expect(screen.queryByRole('heading', { level: 1, name: 'Panel' })).toBeNull()
+  expect(router.state.location.href).toBe('/app/store?paso=3')
+  // Advancing never saves: the save is what returns the operator to the panel.
+  expect(data.mutation).not.toHaveBeenCalled()
+})
+
 it('keeps the store form and its step through a transient backend refresh', async () => {
   withStoredShop()
   const { router } = setup('/app')

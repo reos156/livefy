@@ -128,6 +128,8 @@ describe('shop wizard — step 2 · Cómo te pagan', () => {
 
     expect(screen.getByText('Elegí al menos un medio de pago.')).toBeTruthy()
     expect(screen.getByText('Paso 2 de 3')).toBeTruthy()
+    // One instruction, read once: the step lead says it and the group does not repeat it.
+    expect(screen.getAllByText('Marcá los medios que aceptás y cargá el dato de cada uno. Al menos uno.')).toHaveLength(1)
     expect(onSubmit).not.toHaveBeenCalled()
   })
 
