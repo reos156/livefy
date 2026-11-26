@@ -49,8 +49,8 @@ panel with each column in its empty state: no live connected, no products, no le
 
 ## Tasks
 
-- **T1** — `getDashboardStats` in Convex: shop derived from the identity, the five metrics and an empty lives list, no client-supplied identifiers. Specs: S1, S3, S4. Route: pending.
-- **T2** — The dashboard screen in the direction the human chooses, official primitives and tokens only. Specs: S1, S2, D-A, D-D. Route: pending.
+- **T1** — `getDashboardStats` in Convex: shop derived from the identity, the five metrics, the live connection state and an empty lives list, no client-supplied identifiers. Specs: S1, S3, S4, S9. Route: delegated writer.
+- **T2** — The panel in the chosen direction (`design/dashboard-inicial/01-three-columns-one-window.html`): sidebar, top bar, KPI cards and the three columns. Specs: S1, S2, S5–S9, D-A, D-D. Route: delegated writer.
 - **T3** — Editing the shop and signing out stay reachable; the summary is retired. Specs: D-C. Route: pending.
 - **T4** — Tests: authz, zeroed metrics, empty state with the disabled CTA, the shop edit path. Specs: S1–S4. Route: pending.
 - **T5** — Verification, Windows sync, deploy and delivery. Specs: all. Route: pending.
@@ -62,3 +62,5 @@ panel with each column in its empty state: no live connected, no products, no le
 - **L3** — Design directions written to `design/dashboard-inicial/` and opened on the canvas; implementation waits for the human's choice.
 - **L4** — Human's correction, verbatim: "creo que no revisaste muy bien la seccion 2. Spec (contrato verificable propuesto) del @docs/livefy-scope-mvp_20260928.md por que claramente dice que el dashboard va dividido en 3 columnas, etc..., no se de donde sacas que lo unico que nos interesa es leads, conversion, ventas". Accepted: the first six artboards are superseded; the panel is the three-column workspace of R3, shown empty.
 - **L5** — The full document was read end to end after the human asked for it, and the previous nine artboards were deleted and redesigned. Three corrections landed: there are two apps (`app/desktop` with the viewer and `app/web` without) over one shared frontend; the post-login routing and the paste-the-URL connect flow were dropped from the design by the human's instruction; and "Finalizar live" stays as an explicit business action in the panel. The new directions differ only in how the viewer coexists with the shared core, because that is the real boundary the document draws.
+- **L6** — Human chose artboard `01-three-columns-one-window.html` and its handoff was reported in progress. Branch `feat/initial-dashboard`.
+- **L7** — The first deploy attempt of `getDashboardStats` failed schema validation, and the cause is ordering, not the panel: DEV already runs the new `shops` shape from PR #35, while this branch is cut from `main`, which still declares the previous shape. Pushing the older schema over the existing shop document is rejected because that document carries `categorySlugs`/`paymentData` and no longer has `categories`. The panel therefore cannot be deployed or manually tested until #35 merges and this branch is rebased onto it. Recorded rather than retried.
