@@ -314,10 +314,10 @@ humano. Ningún caso está aceptado todavía.
 Reparto de columnas: **aceptado 2026-11-26** por el humano con los valores de apertura
 400 / 320 / 544 px. Siguen ajustables con los divisores y con el teclado.
 
-Límite registrado, no aceptado como defecto: con el zoom del guest en 0,8 el riel de
-comentarios de TikTok se corta en una columna de ~400 px. Se probó a 0,5 (ilegible) y 0,9
-(sin mejora) y el operador eligió este valor; ensanchar la columna es la palanca conocida.
-Audio del live: **no reportado** en esta aceptación, sigue pendiente.
+Riel de comentarios de TikTok: **aceptado 2026-11-26**. Con el zoom del guest en 0,8 y el
+ancho de la columna, el operador lee el chat completo usando el scroll de la página; no se
+trata como defecto. Se probaron 0,5 (ilegible) y 0,9 (sin mejora) antes de este valor.
+Audio del live: **aceptado 2026-11-26** por el mismo operador en la app de Windows.
 
 ## Historial H1.1/H1.2 (no describe los proveedores actuales)
 
